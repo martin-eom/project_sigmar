@@ -9,6 +9,6 @@ The basic architecture to have a map with players and units is implemented. Only
 A client with a display showing the map and units and basic controls (arrow-keys left and right for switching units, clicking once for position and a second time for orientation to give orders to a unit) is implemented. Only very basic physics are implemented so far. The soldiers are treated as non-interacting, dampened harmonic oscillators with respect to their target position.
 Some algorithms have been implemented to reform ranks after soldier deaths and unit rotation.
 # "Immediate" to-do list
-..* collision detection and resolution
-..* pathfinding (amd properly implementing the Map object with actual obstacles)
-..* giving soldiers an orientation and changing their movement from any direction to forward and turning (except for very small distances)
+* collision detection and resolution
+* pathfinding (amd properly implementing the Map object with actual obstacles)
+* giving soldiers an orientation and changing their movement from any direction to forward and turning (except for very small distances)
