@@ -1,4 +1,4 @@
-# Contains shapes to be drawn
+### Contains shapes to be drawn.
 
 from numpy import array, dot
 

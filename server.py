@@ -8,6 +8,12 @@ from events import *
 import network
 from time import time
 from twisted.spread import pb
+from math import ceil
+import _pickle as pickle
+def deepcopy(a):
+    return pickle.loads(pickle.dumps(a, -1))
+
+### Contains classes needed for the server as well as the main loop of the server.
 
 
 class NetworkClientController(pb.Root):
@@ -94,15 +100,29 @@ class Game:
 
 
 class Map:
+    gridsize = 11
+
     # container for solid objects and some form of neighbourlisting
-        def __init__(self, dimensions):
-            self.dim = dimensions
+    def __init__(self, dimensions):
+        self.dim = dimensions
+        self.griddim = (ceil(self.dim[1] / Map.gridsize), ceil(self.dim[0] / Map.gridsize))
+        self.cleangrid()
 
+    def cleangrid(self):
+        self.grid = []
+        for i in range(self.griddim[0]):
+            self.grid.append([])
+            for j in range(self.griddim[1]):
+                self.grid[-1].append([])
 
+    def Assign(self, soldier, playerID, unitID):
+        gridpos = (int(soldier.pos[0] / Map.gridsize), int(soldier.pos[1] / Map.gridsize))
+        self.grid[gridpos[0]][gridpos[1]].append((soldier, playerID, unitID))
+        return gridpos
 
 
 from numpy import array
-from physics import DampenedOscillator
+from physics import DampenedOscillator, KnockUpdate, RepulsiveForceField
 from itertools import chain
 
 class Model:
@@ -116,6 +136,30 @@ class Model:
         self.dt = evManager.dt
         self.dump = []
         self.tOfLastDump = time()
+
+    def NeighbourForces(self):
+        for i, map_row in enumerate(self.map.grid):
+            for j, tile in enumerate(map_row):
+                for sid1, sold1 in enumerate(tile):
+                    for sid2, sold2 in enumerate(tile[sid1 + 1 : len(tile)]):
+                        f = RepulsiveForceField(sold1[0].pos, sold2[0].pos, sold1[0].rad, sold2[0].rad, \
+                                                sold1[1], sold2[1], sold1[2], sold2[2])
+                        sold1[0].force += f
+                        sold2[0].force -= f
+                        #sold1[0].knockForce = +f
+                        #sold2[0].knockForce = -f
+                    for neighbourIDs in (((i+1)%self.map.griddim[0], j), \
+                                        (i, (j+1)%self.map.griddim[1]), \
+                                        ((i+1)%self.map.griddim[0], \
+                                        (j+1)%self.map.griddim[1])):
+                        tile = self.map.grid[neighbourIDs[0]][neighbourIDs[1]]
+                        for sid2, sold2 in enumerate(tile):
+                            f = RepulsiveForceField(sold1[0].pos, sold2[0].pos, sold1[0].rad, sold2[0].rad, \
+                                                    sold1[1], sold2[1], sold1[2], sold2[2])
+                            sold1[0].force += f
+                            sold2[0].force -= f
+                            #sold1[0].knockForce = +f
+                            #sold2[0].knockForce = -f
         
     def Notify(self, event):
         ev = None
@@ -157,13 +201,35 @@ class Model:
             else:
                 print("[WARNING:] Tried to move unit that was not in player unit list.")
         elif isinstance(event, TickEvent):
-            for player in self.players:
-                for unit in player.units:
+            """for pID, player in enumerate(self.players):
+                for uID, unit in enumerate(player.units):
                     if unit.placed:
-                        for soldier in list(chain(*unit.soldiers)):
-                            if soldier is not None and soldier.pos is not None:
-                                DampenedOscillator(soldier, self.dt)
+                        # soldierIDs?
+                        for rID, row in enumerate(unit.soldiers):
+                            for cID, soldier in enumerate(row):
+                                if soldier is not None and soldier.pos is not None:
+                                    soldier.gridpos = self.map.Assign(soldier.pos, pID, uID, rID, cID, rad)
+            """
+            for pID, player in enumerate(self.players):
+                for uID, unit in enumerate(player.units):
+                    if unit.placed:
+                        # soldierIDs?
+                        for rID, row in enumerate(unit.soldiers):
+                            for cID, soldier in enumerate(row):
+                                if soldier is not None and soldier.pos is not None:                                    
+                                    DampenedOscillator(soldier, self.dt)
+                                    soldier.gridpos = self.map.Assign(soldier, pID, uID)
+                                    # iterate displacement from special force
                         unit.updatePos()
+            # combat
+            self.NeighbourForces()
+            #for player in self.players:
+            #    for unit in player.units:
+            #        for row in unit.soldiers:
+            #            for soldier in row:
+            #                if soldier is not None and soldier.pos is not None:
+            #                    KnockUpdate(soldier, self.dt)
+            self.map.cleangrid()
         elif isinstance(event, KillEvent):
             soldierFound = False
             for row in event.unit.soldiers:
@@ -239,15 +305,16 @@ class SimpleUnit(Unit):
     def __init__(self):
         super().__init__()
         self.width = 8
-        self.maxSoldiers = 16
+        self.maxSoldiers = 64
         self.defaultSpacing = self.spacing = 15
+        self.soldierClass = Soldier
         self.soldiers = []
         for i in range(self.maxSoldiers//self.width + int(self.maxSoldiers%self.width != 0)):
             self.soldiers.append([])
             for j in range(self.width):
                 self.soldiers[i].append(None)
         for i in range(self.maxSoldiers):
-            self.soldiers[i//self.width][i%self.width] = Soldier()
+            self.soldiers[i//self.width][i%self.width] = self.soldierClass()
         self.nSoldiers = countNestedListNotNone(self.soldiers)
         self.posInUnit = posInUnitByIDs(self)
         
@@ -332,13 +399,17 @@ class SimpleUnit(Unit):
 
 
 class Soldier:
+    rad = 5
 
     def __init__(self):
         self.pos = None
         self.posTarget = self.pos
-        self.vel = None
-        self.force = None
-        self.maxSpeed = 40
+        self.vel = array([0.,0.])
+        self.knockVel = array([0.,0.])
+        self.force = array([0.,0.])
+        self.knockForce = array([0.,0.])
+        self.maxSpeed = 5
+        self.gridpos = None
 
 
 class ConsoleView:

@@ -1,6 +1,9 @@
 import numpy
 from math import ceil
 
+### Contains game physics as well as some mathematical and geometric functions.
+
+
 def DampenedOscillator(entity, dt):
     k = 1e-1
     mu = 0.6
@@ -15,6 +18,12 @@ def DampenedOscillator(entity, dt):
     entity.vel = newVel
     entity.force = newForce
 
+def KnockUpdate(entity, dt):
+    mu = 10
+    
+    entity.knockForce -= mu*entity.knockVel
+    entity.pos += dt*entity.knockVel
+    entity.knockVel += dt*entity.knockForce
 
 def posInUnitByIDs(unit):
     nSoldiers = unit.nSoldiers
@@ -102,3 +111,36 @@ def removeNone(soldiers, width):
 def paddNone(soldiers, width):
     while len(soldiers[-1]) < width:
         soldiers[-1].append(None)
+
+
+def RepulsiveForceField(pos1, pos2, rad1, rad2, pID1, pID2, unitID1, unitID2):
+
+    K = 10
+    LJ_disp = 2**(1/6) - 1 # relative leonard jones displacement
+    minDist = rad1 + rad2
+    if pID1 == pID2:
+        minDist *= 0.7
+    direction = pos2 - pos1
+    dist = numpy.linalg.norm(direction)
+
+    def force(dist):    
+        force = 0
+        #force = numpy.array([0,0,0])
+        #minDist *= 0.7
+        if pID1 == pID2 or pID1 != pID2:
+            #print(dist, minDist)
+            if dist < minDist:
+                minDist6 = minDist**6
+                d2 = dist**2
+                d6 = d2**3
+                d7 = d6 * dist
+                d13 = d7 * d6
+                md2 = minDist**2
+                md6 = md2**3
+                md12 = md6**2
+                force += K * (12*md12/d13 - 6*md6/d7)
+        return force
+
+    f = force(dist + LJ_disp*minDist)
+    #print(f, dist, direction)
+    return -force(dist + LJ_disp*minDist) / dist * direction

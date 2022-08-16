@@ -1,4 +1,4 @@
-# Makes it so that events can be sent over the network and sorts them by sending direction
+### Makes it so that events can be sent over the network and sorts them by sending direction
 
 from events import *
 from twisted .spread import pb

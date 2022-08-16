@@ -1,4 +1,5 @@
-# Contains all event classes to be sent through an EventManager
+### Contains all event classes to be sent through an EventManager
+
 
 class Event:
     def __init__(self):
