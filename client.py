@@ -12,6 +12,9 @@ from serializer import OrganizeModelDump as OMoD
 from serializer import OrganizeMapDump as OMaD
 import pygame
 
+### Contains classes needed for the client as well as main loop of the client.
+
+
 global serverHost, serverPort
 serverHost, serverPort = "localhost", 8000
 
@@ -187,7 +190,7 @@ class View:
                 if unit.placed:
                     selectorColor = [0, 255, 26]
                     for soldier in unit.soldiers:
-                        pygame.draw.circle(self.window, selectorColor, View.viewPos(soldier.pos), 5)
+                        pygame.draw.circle(self.window, selectorColor, View.viewPos(soldier.pos), unit.rad + 2)
                         #pygame.draw.circle(self.window, selectorColor, View.viewPos(soldier.posTarget), 5) # need to implement transfer of posTarget first
                     pointer = Arrow(unit.posTarget, unit.rotTarget)
                     pygame.draw.polygon(self.window, selectorColor, [View.viewPos(p) for p in pointer.points])
@@ -200,7 +203,7 @@ class View:
                 for unit in player.units:
                     if unit.placed:
                         for soldier in unit.soldiers:
-                            pygame.draw.circle(self.window, color, View.viewPos(soldier.pos), 3)
+                            pygame.draw.circle(self.window, color, View.viewPos(soldier.pos), unit.rad)
             pygame.display.flip()
     
     def Notify(self, event):
@@ -242,6 +245,7 @@ class ViewUnit():
 
     def __init__(self):
         self.placed = False
+        self.rad = None
         self.pos = None
         self.rot = None
         self.posTarget = None
@@ -276,8 +280,8 @@ def main():
     model = ViewModel(evManager)
     view = View(evManager, model)
     controller = SimpleGameController(evManager, model, view)
-    serverHost = input("Host name: ")
-    serverPort = input("Port: ")
+    #serverHost = input("Host name: ")
+    #serverPort = input("Port: ")
     serverView.AttemptConnection()
 
     def FireTick(evManager):

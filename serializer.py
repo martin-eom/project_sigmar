@@ -1,7 +1,8 @@
 from itertools import chain
 from numpy import array
 
-# Serialzation functions for transfer via network
+### Contains serialzation functions for transfer via network.
+
 
 def ModelToDump(model):
     dump = []
@@ -14,6 +15,7 @@ def ModelToDump(model):
                 for tupel in (unit.pos, unit.posTarget, unit.rotTarget[0], unit.rotTarget[1]):
                     for number in tupel:
                         dump.append(float(number))
+                dump.append(unit.soldierClass.rad)
                 for soldier in list(chain(*unit.soldiers)):
                     if not soldier is None:
                         for number in soldier.pos:
@@ -48,6 +50,7 @@ def OrganizeModelDump(dump, simplemodel):
                     unit.pos = array([dump.pop(0), dump.pop(0)])
                     unit.posTarget = array([dump.pop(0), dump.pop(0)])
                     unit.rotTarget = array([[dump.pop(0), dump.pop(0)], [dump.pop(0), dump.pop(0)]])
+                    unit.rad = dump.pop(0)
                     soldiers = unit.soldiers
             depth += 1
         elif symbol == "]":

@@ -2,8 +2,9 @@ from events import *
 from itertools import chain
 from numpy import array
 
+### Contains class for Event Manager and some basic functions
 
-# Event Manager
+
 class EventManager:
     
     def __init__(self):
