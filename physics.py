@@ -5,15 +5,30 @@ from math import ceil
 
 
 def DampenedOscillator(entity, dt):
+    allyMaxSpeed = 5*numpy.sqrt(entity.mass)
+    allyMaxKnock = 2 / entity.mass
     k = 1
-    mu = 20*entity.Damp#-0.6
     
     dx = entity.posTarget - entity.pos
     dist = numpy.linalg.norm(dx)
     speed = numpy.linalg.norm(entity.vel)
     velSet = False
-    entity.vel += entity.knockVel
     knockSpeed = numpy.linalg.norm(entity.knockVel)
+    if not entity.enemyClose:
+        if knockSpeed > allyMaxKnock:
+            entity.knockVel *= allyMaxKnock / knockSpeed
+            knockSpeed = 5
+        if entity.allyPassing:
+            entity.setTempDamp(allyMaxSpeed)
+            #entity.knockVel *= 10
+    mu = 20*entity.tempDamp#-0.6
+    entity.vel += entity.knockVel
+    speed = numpy.linalg.norm(entity.vel)
+    if entity.allyPassing and not entity.enemyClose:
+        if knockSpeed:
+            entity.vel *= allyMaxSpeed/speed
+            speed = allyMaxSpeed
+            #print("passing")
     if dist < 0.5 and speed < 1 and knockSpeed < 0.5:
         newPos = entity.posTarget
         newVel = numpy.array([0., 0.])
@@ -27,7 +42,7 @@ def DampenedOscillator(entity, dt):
     strength = numpy.linalg.norm(newForce)
     if strength > entity.Force:
         newForce *= (entity.Force/strength)
-        mu = entity.Damp
+        mu = entity.tempDamp
         #if knockSpeed > 0.1*entity.maxSpeed:
         #    mu *= 1 + knockSpeed/entity.maxSpeed
     newForce += mu*entity.vel*speed
@@ -35,7 +50,7 @@ def DampenedOscillator(entity, dt):
         vpar = 0.
     else:
         vpar = numpy.dot(entity.vel, dx)/dist
-    if vpar > entity.maxSpeed:
+    if vpar > entity.tempMaxSpeed:
         newForce *= 0
     entity.pos = newPos
     entity.force = newForce
@@ -43,6 +58,10 @@ def DampenedOscillator(entity, dt):
         newVel = entity.vel + dt*entity.force
     entity.vel = newVel
     entity.knockVel = numpy.array([0., 0.])
+    if entity.allyPassing:
+        entity.setTempDamp(entity.maxSpeed)
+    entity.allyPassing = False
+    entity.enemyClose = False
 
 
 def KnockUpdate(entity, dt):
@@ -56,8 +75,8 @@ def posInUnitByIDs(unit):
     nSoldiers = unit.nSoldiers
     nCol = unit.width
     nRows = nSoldiers // nCol + int(nSoldiers%nCol == 1)
-    p0 = numpy.array([(nRows-1)/2. * unit.spacing, (nCol-1)/2. * unit.spacing])
-    dx, dy = numpy.array([-unit.spacing, 0]), numpy.array([0, -unit.spacing])
+    p0 = numpy.array([(nRows-1)/2. * unit.tempSpacing, (nCol-1)/2. * unit.tempSpacing])
+    dx, dy = numpy.array([-unit.tempSpacing, 0]), numpy.array([0, -unit.tempSpacing])
     posInUnit = []
     for i in range(len(unit.soldiers)):
         posInUnit.append([])
@@ -172,20 +191,39 @@ def RepulsiveForceField(pos1, pos2, rad1, rad2, pID1, pID2, unitID1, unitID2):
     #print(f, dist, direction)
     return -force(dist + LJ_disp*minDist) / dist * direction
 
-def CollisionCalculation(entity1, entity2, pID1, pID2, dt):
+def CollisionCalculation(entity1, entity2, pID1, pID2, uID1, uID2, dt):
     v1, v2 = numpy.array([0., 0.]), numpy.array([0., 0.])
     minDist = entity1.rad + entity2.rad
+    dx = entity2.pos - entity1.pos
+    dv = entity2.vel - entity1.vel
+    dxdv = numpy.dot(dx, dv)
+    movingAway = dxdv > 0
     if pID1 == pID2:
-        minDist *= 0.7
+        #minDist *= 0.8
+        if uID1 != uID2 and not movingAway:
+            entity1.allyPassing = True
+            entity2.allyPassing = True
+            #entity1.unit.allyClose = True
+            #entity2.unit.allyClose = True
+    else:
+        #minDist *= 1.1
+        entity1.enemyClose = True
+        entity2.enemyClose = True
+        entity1.unit.EnemyClose()
+        entity2.unit.EnemyClose()
+    if pID1 == pID2:
+        if uID1 != uID2 and not entity1.unit.enemyClose and not entity2.unit.enemyClose:
+            minDist *= 0.5
+            entity1.unit.AllyPassing()
+            entity2.unit.AllyPassing()
+        else:
+            minDist *= 0.8
     else:
         minDist *= 1.1
-    dx = entity2.pos - entity1.pos
     dist = numpy.linalg.norm(dx)
     if dist > minDist:
         return v1, v2
-    dv = entity2.vel - entity1.vel
-    dxdv = numpy.dot(dx, dv)
-    if dxdv > 0:    # checks if they are moving away from each other (post-collision)
+    if movingAway:    # checks if they are moving away from each other (post-collision)
         return v1, v2
     M = entity1.mass + entity2.mass
     prod = 2.*dxdv*dx/(M*dist**2)
