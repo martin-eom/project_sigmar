@@ -22,3 +22,12 @@ class Arrow:
         self.points.append(array(startPos) + dot(rot, [Arrow.line_length, 0]))
         self.points.append(array(startPos) + dot(rot, [Arrow.dl, Arrow.dt]))
         self.points.append(array(startPos) + dot(rot, [Arrow.dl, Arrow.dw]))
+
+
+class TriangleInCircle:
+    def __init__(self, center, rad, rot):
+        hrad = rad/2
+        self.points = []
+        self.points.append(center + dot(rot, array([0., hrad])))
+        self.points.append(center + dot(rot, array([hrad, 0.])))
+        self.points.append(center + dot(rot, array([0., -hrad])))

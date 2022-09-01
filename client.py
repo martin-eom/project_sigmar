@@ -11,6 +11,7 @@ from serializer import RotToDump
 from serializer import OrganizeModelDump as OMoD
 from serializer import OrganizeMapDump as OMaD
 import pygame
+import shapes
 
 ### Contains classes needed for the client as well as main loop of the client.
 
@@ -180,7 +181,6 @@ class View:
         return (pos[0], -pos[1])
 
     def NextRender(self):
-        from shapes import Arrow
         if not self.window == None:
             self.window.fill((255, 255, 255))
             # green outline and target arrow for selected unit
@@ -191,8 +191,10 @@ class View:
                     selectorColor = [0, 255, 26]
                     for soldier in unit.soldiers:
                         pygame.draw.circle(self.window, selectorColor, View.viewPos(soldier.pos), unit.rad + 2)
+                        tri = shapes.TriangleInCircle(soldier.pos, unit.rad, soldier.rot)
+                        pygame.draw.polygon(self.window, [255, 255, 255], [View.viewPos(p) for p in tri.points])
                         #pygame.draw.circle(self.window, selectorColor, View.viewPos(soldier.posTarget), 5) # need to implement transfer of posTarget first
-                    pointer = Arrow(unit.posTarget, unit.rotTarget)
+                    pointer = shapes.Arrow(unit.posTarget, unit.rotTarget)
                     pygame.draw.polygon(self.window, selectorColor, [View.viewPos(p) for p in pointer.points])
             # blue and green sprites for friendly and enemy units
             for id, player in enumerate(self.model.players):
@@ -204,6 +206,8 @@ class View:
                     if unit.placed:
                         for soldier in unit.soldiers:
                             pygame.draw.circle(self.window, color, View.viewPos(soldier.pos), unit.rad)
+                            tri = shapes.TriangleInCircle(soldier.pos, unit.rad, soldier.rot)
+                            pygame.draw.polygon(self.window, [255, 255, 255], [View.viewPos(p) for p in tri.points])
             pygame.display.flip()
     
     def Notify(self, event):
@@ -255,6 +259,7 @@ class ViewSoldier():
 
     def __init__(self):
         self.pos = None
+        self.rot = None
 
 class ViewMap():
     def __init__(self):

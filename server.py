@@ -3,6 +3,7 @@
 from base import EventManager
 from serializer import ModelToDump, MapToDump
 from serializer import OrganizeRotDump as ORD
+import units
 import numpy
 from events import *
 import network
@@ -121,7 +122,6 @@ class Map:
         return gridpos
 
 
-from numpy import array
 import physics
 #from physics import DampenedOscillator, KnockUpdate, RepulsiveForceField
 from itertools import chain
@@ -139,6 +139,7 @@ class Model:
         self.tOfLastDump = time()
         self.tickNum = 0
         self.tps = int(ceil(1 / self.dt)) # ticks per second
+        self.time = time()
 
     def NeighbourForces(self):
         for i, map_row in enumerate(self.map.grid):
@@ -187,7 +188,6 @@ class Model:
             for unit in player.units:
                 if unit.enemyClose:
                     enemyClose = False
-                    #unit.enemyClose = False
                     for soldier in list(chain(*unit.soldiers)):
                         if not soldier is None and soldier.enemyClose:
                             enemyClose = True
@@ -199,21 +199,20 @@ class Model:
     def DetectAllies(self):
         for player in self.players:
             for unit in player.units:
-                if unit.allyPassing:
-                    allyPassing = False
-                    #unit.allyPassing = False
+                if unit.allyClose:
+                    allyClose = False
                     for soldier in list(chain(*unit.soldiers)):
-                        if (not soldier is None) and soldier.allyPassing:
-                            allyPassing = True
+                        if (not soldier is None) and soldier.allyClose:
+                            allyClose = True
                             break
-                    if not allyPassing:
+                    if not allyClose:
                         print("Ally gone.")
-                        unit.ChangeSpacing(unit.spacing)
+                        #unit.ChangeSpacing(unit.spacing)
                         #unit.spacingChange = False
                         #unit.tempSpacing = unit.spacing
                         #unit.MoveTarget(unit.posTarget, unit.rotTarget)
                         #unit.spacingTicks = 0
-                    unit.allyPassing = allyPassing
+                    unit.allyClose = allyClose
                         
 
     def SpacingChange(self):
@@ -284,6 +283,9 @@ class Model:
             if self.tickNum % self.tps == 0:
                 self.DetectEnemies()
                 self.DetectAllies()
+                t = time()
+                print("Game speed: %.2f tps"%(self.tps/(t - self.time)))
+                self.time = t
             self.SpacingChange()
             for pID, player in enumerate(self.players):
                 for uID, unit in enumerate(player.units):
@@ -292,7 +294,7 @@ class Model:
                         for rID, row in enumerate(unit.soldiers):
                             for cID, soldier in enumerate(row):
                                 if soldier is not None and soldier.pos is not None:                                    
-                                    physics.DampenedOscillator(soldier, self.dt)
+                                    physics.DampenedOscillator2(soldier, self.dt)
                                     soldier.gridpos = self.map.Assign(soldier, pID, uID)
                                     # iterate displacement from special force
                         unit.updatePos()
@@ -330,7 +332,8 @@ class Model:
 class Player:
 
     def __init__(self, evManager):
-        self.units = [SimpleUnit(), SimpleUnit(), MonsterUnit(), CavalryUnit()]
+        self.units = [units.SimpleUnit(), units.SimpleUnit(), \
+                      units.MonsterUnit(), units.CavalryUnit()]
         
     def addUnit(self, unit):
         if unit not in self.units:
@@ -339,334 +342,8 @@ class Player:
             print("[WARNING:] Tried to add unit to player twice.")
         
 
-from physics import posInUnitByIDs, Reform, angleDirection, turnArray, removeNone, paddNone
-
-
-class Soldier:
-    rad = 5
-    mass = 1.
-    maxSpeed = 15.
-    accel = 3.
-
-    def __init__(self, unit = None):
-        self.Force = self.mass*self.accel
-        self.Damp = -self.Force/(self.maxSpeed**2)
-        self.pos = None
-        self.posTarget = self.pos
-        self.oldPosTarget = self.posTarget
-        self.vel = array([0.,0.])
-        self.knockVel = array([0.,0.])
-        self.force = array([0.,0.])
-        self.gridpos = None
-        self.allyPassing = False
-        self.enemyClose = False
-        self.tempMaxSpeed = self.maxSpeed
-        self.tempDamp = self.Damp
-        self.unit = unit
-
-    def setTempDamp(self, speed):
-        self.tempMaxSpeed = speed
-        self.tempDamp = -self.Force/(self.tempMaxSpeed**2)
-
-class Monster(Soldier):
-    rad = 15
-    mass = 9.
-    maxSpeed = 100.
-    accel = 4.
-
-    def __init__(self, unit = None):
-        super().__init__(unit)
-
-class Rider(Soldier):
-    rad = 7
-    mass = 3.
-    maxSpeed = 40.
-    accel = 3.
-
-    def __init__(self, unit = None):
-        super().__init__(unit)
-                                
-class Unit:
-    width = 1
-    maxSoldiers = 1
-    spacing = 0
-    wideSpacing = 0
-    soldierClass = Soldier
-    
-    def __init__(self):
-        self.placed = False
-        self.pos = None
-        self.rot = None
-        self.posTarget = None
-        self.rotTarget = None
-        self.vel = None
-        self.force = None
-        self.tempSpacing = self.spacing
-        self.allyPassing = False
-        self.enemyClose = False
-        self.spacingTick = 0
-        self.spacingChange = False
-
-        self.soldiers = []
-        for i in range(self.maxSoldiers//self.width + int(self.maxSoldiers%self.width != 0)):
-            self.soldiers.append([])
-            for j in range(self.width):
-                self.soldiers[i].append(None)
-        for i in range(self.maxSoldiers):
-            self.soldiers[i//self.width][i%self.width] = self.soldierClass(self)
-            #self.soldiers[i//self.width][i%self.width].unit = self
-        self.nSoldiers = countNestedListNotNone(self.soldiers)
-        self.posInUnit = posInUnitByIDs(self)
-    
-    """def Place(self, position, rotation):
-        self.pos = array(position)
-        self.rot = rotation
-        self.posTarget = position
-        self.rotTarget = rotation
-        self.vel = array([0, 0])
-        self.force = array([0, 0])"""
-
-    def Place(self, position, rotation):
-        for i in range(len(self.soldiers)):
-            for j in range(len(self.soldiers[i])):
-                if self.soldiers[i][j] is not None:
-                    self.soldiers[i][j].pos = position + numpy.dot(rotation, self.posInUnit[i][j])
-                    self.soldiers[i][j].posTarget = self.soldiers[i][j].pos
-                    self.soldiers[i][j].vel = array([0., 0.])
-                    self.soldiers[i][j].force = array([0., 0.])
-        self.pos = position
-        self.posTarget = position
-        self.rot = rotation
-        self.rotTarget = rotation
-        self.placed = True
-        
-    """def MoveTarget(self, position, rotation):
-        self.posTarget = array(position)
-        self.rotTarget = rotation"""
-
-    def MoveTarget(self, position, rotation):
-        self.posTarget = position
-        self.rotTarget = rotation
-        self.ReformForTurn()
-        for i in range(len(self.soldiers)):
-            for j in range(len(self.soldiers[i])):
-                if self.soldiers[i][j] is not None:
-                    self.soldiers[i][j].posTarget = position + numpy.dot(rotation, self.posInUnit[i][j])
-
-    def updatePos(self):
-        if self.soldiers:
-            self.pos = sum(soldier.pos for soldier in list(chain(*self.soldiers)) if soldier is not None) / self.nSoldiers
-        else:
-            self.pos = array([0,0])
-
-    def adjustSize(self):
-        currentSize = countNestedListNotNone(self.soldiers)
-        print("current size: %d; previous size: %d; diff: %d"%(currentSize,self.nSoldiers,self.nSoldiers-currentSize))
-        if not currentSize == self.nSoldiers:
-            print("########### %d soldiers have been killed! ###########"%(self.nSoldiers-currentSize))
-            self.nSoldiers = currentSize
-            self.soldiers = Reform(self.soldiers, self.width)
-            self.posInUnit = posInUnitByIDs(self)
-            for i in range(len(self.soldiers)):
-                for j in range(len(self.soldiers[i])):
-                    self.soldiers[i][j].posTarget = self.posTarget + numpy.dot(self.rotTarget, self.posInUnit[i][j])
-
-    def ReformForTurn(self):
-    # reassigns the soldiers to different array positions to minimize chaos when turning more than 45 degrees
-        rot = numpy.dot(self.rotTarget, numpy.linalg.inv(self.rot))
-        self.soldiers = turnArray(angleDirection(rot), self.soldiers)
-        self.rot = self.rotTarget
-        self.soldiers = Reform(self.soldiers, self.width)
-        self.posInUnit = posInUnitByIDs(self)
-
-    def ReformAfterLoss(self):
-
-    ###########!!!!!!########## # Only works for turning and kills, but not when units are scattered after a charge attack.
-                                # Proposed solution: Use a different reorganization structure which is triggered maybe once a second.
-                                # Unassign all soldiers from their position in unit.
-                                # while there are unassigned soldiers:
-                                #   Find the soldier furthest unassigned away from the unit posiiton target.
-                                #   Assign it to the closest (to itself) position in unit at target that is still unassigned.
-        
-    # resassigns the soldiers to different array positions to fill holes in the front line
-        if len(self.soldiers) > 1:
-            for i, deadSol in enumerate(self.soldiers[0]):
-                if deadSol is None:
-                    potentialReplacements = list(enumerate(self.soldiers[1][:i+1]))
-                    potentialReplacements.reverse()
-                    for j, soldier in potentialReplacements:
-                        if not soldier is None:
-                            self.soldiers[0][i] = soldier
-                            self.soldiers[1][j] = None
-                            break
-                    break
-            rowEmpty = True
-            for soldier in self.soldiers[1]:
-                if not soldier is None:
-                    rowEmpty = False
-                    break
-            if rowEmpty:
-                self.soldiers.pop(1)
-        print(self.soldiers)
-        self.soldiers = Reform(self.soldiers, self.width)
-        currentSize = countNestedListNotNone(self.soldiers)
-        self.nSoldiers = currentSize
-        self.posInUnit = posInUnitByIDs(self)
-        for i in range(len(self.soldiers)):
-            for j in range(len(self.soldiers[i])):
-                if not self.soldiers[i][j] is None:
-                    self.soldiers[i][j].posTarget = self.posTarget + numpy.dot(self.rotTarget, self.posInUnit[i][j])
-
-    def EnemyClose(self):
-        if not self.enemyClose:
-            print("Enemy close.")
-            self.enemyClose = True
-            self.ChangeSpacing(self.spacing)
-            #self.tempSpacing = self.spacing
-            #self.MoveTarget(self.posTarget, self.rotTarget)
-            #self.spacingTicks = 0
-            #self.spacingChange = True
-
-    def AllyPassing(self):
-        if not self.allyPassing:
-            print("Ally close.")
-            self.allyPassing = True
-            self.ChangeSpacing(self.wideSpacing)
-            #self.tempSpacing = self.wideSpacing
-            #self.MoveTarget(self.posTarget, self.rotTarget)
-            #self.spacingTicks = 0
-            #self.spacingChange = True
-        ##### we need to force them to change their spacing quickly!!!!!!#
-
-    def ChangeSpacing(self, spacing):
-        if not self.spacingChange:
-            for soldier in list(chain(*self.soldiers)):
-                soldier.oldPosTarget = soldier.posTarget.copy()
-            self.tempSpacing = spacing
-            self.MoveTarget(self.posTarget, self.rotTarget)
-            self.spacingTicks = 0
-            self.spacingChange = True
-            print("Changing unit spacing.")
-
-
 def countNestedListNotNone(soldiers):
     return len([1 for soldier in list(chain(*soldiers)) if not soldier is None])
-
-
-class MonsterUnit(Unit):
-    width = 1
-    maxSoldiers = 1
-    spacing = 0
-    wideSpacing = 0
-    soldierClass = Monster
-
-    def __init__(self):
-        super().__init__()
-
-class CavalryUnit(Unit):
-    width = 4
-    maxSoldiers = 16
-    spacing = 18
-    wideSpacing = 20
-    soldierClass = Rider
-
-class SimpleUnit(Unit):
-    width = 8
-    maxSoldiers = 64
-    spacing = 12
-    wideSpacing = 15
-    soldierClass = Soldier
-    
-    def __init__(self):
-        super().__init__()
-        """self.soldiers = []
-        for i in range(self.maxSoldiers//self.width + int(self.maxSoldiers%self.width != 0)):
-            self.soldiers.append([])
-            for j in range(self.width):
-                self.soldiers[i].append(None)
-        for i in range(self.maxSoldiers):
-            self.soldiers[i//self.width][i%self.width] = self.soldierClass()
-        self.nSoldiers = countNestedListNotNone(self.soldiers)
-        self.posInUnit = posInUnitByIDs(self)"""
-        
-    """def Place(self, position, rotation):
-        for i in range(len(self.soldiers)):
-            for j in range(len(self.soldiers[i])):
-                if self.soldiers[i][j] is not None:
-                    self.soldiers[i][j].pos = position + numpy.dot(rotation, self.posInUnit[i][j])
-                    self.soldiers[i][j].posTarget = self.soldiers[i][j].pos
-                    self.soldiers[i][j].vel = array([0, 0])
-                    self.soldiers[i][j].force = array([0, 0])
-        self.pos = position
-        self.posTarget = position
-        self.rot = rotation
-        self.rotTarget = rotation
-        self.placed = True"""
-        
-    """def MoveTarget(self, position, rotation):
-        self.posTarget = position
-        self.rotTarget = rotation
-        self.ReformForTurn()
-        for i in range(len(self.soldiers)):
-            for j in range(len(self.soldiers[i])):
-                if self.soldiers[i][j] is not None:
-                    self.soldiers[i][j].posTarget = position + numpy.dot(rotation, self.posInUnit[i][j])"""
-        
-    """def updatePos(self):
-        if self.soldiers:
-            self.pos = sum(soldier.pos for soldier in list(chain(*self.soldiers)) if soldier is not None) / self.nSoldiers
-        else:
-            self.pos = array([0,0])"""
-
-    """def adjustSize(self):
-        currentSize = countNestedListNotNone(self.soldiers)
-        print("current size: %d; previous size: %d; diff: %d"%(currentSize,self.nSoldiers,self.nSoldiers-currentSize))
-        if not currentSize == self.nSoldiers:
-            print("########### %d soldiers have been killed! ###########"%(self.nSoldiers-currentSize))
-            self.nSoldiers = currentSize
-            self.soldiers = Reform(self.soldiers, self.width)
-            self.posInUnit = posInUnitByIDs(self)
-            for i in range(len(self.soldiers)):
-                for j in range(len(self.soldiers[i])):
-                    self.soldiers[i][j].posTarget = self.posTarget + numpy.dot(self.rotTarget, self.posInUnit[i][j])"""
-        
-    """def ReformForTurn(self):
-    # reassigns the soldiers to different array positions to minimize chaos when turning more than 45 degrees
-        rot = numpy.dot(self.rotTarget, numpy.linalg.inv(self.rot))
-        self.soldiers = turnArray(angleDirection(rot), self.soldiers)
-        self.rot = self.rotTarget
-        self.soldiers = Reform(self.soldiers, self.width)
-        self.posInUnit = posInUnitByIDs(self)"""
-        
-    """def ReformAfterLoss(self):
-    # resassigns the soldiers to different array positions to fill holes in the front line
-        if len(self.soldiers) > 1:
-            for i, deadSol in enumerate(self.soldiers[0]):
-                if deadSol is None:
-                    potentialReplacements = list(enumerate(self.soldiers[1][:i+1]))
-                    potentialReplacements.reverse()
-                    for j, soldier in potentialReplacements:
-                        if not soldier is None:
-                            self.soldiers[0][i] = soldier
-                            self.soldiers[1][j] = None
-                            break
-                    break
-            rowEmpty = True
-            for soldier in self.soldiers[1]:
-                if not soldier is None:
-                    rowEmpty = False
-                    break
-            if rowEmpty:
-                self.soldiers.pop(1)
-        print(self.soldiers)
-        self.soldiers = Reform(self.soldiers, self.width)
-        currentSize = countNestedListNotNone(self.soldiers)
-        self.nSoldiers = currentSize
-        self.posInUnit = posInUnitByIDs(self)
-        for i in range(len(self.soldiers)):
-            for j in range(len(self.soldiers[i])):
-                if not self.soldiers[i][j] is None:
-                    self.soldiers[i][j].posTarget = self.posTarget + numpy.dot(self.rotTarget, self.posInUnit[i][j])"""
 
 
 class ConsoleView:

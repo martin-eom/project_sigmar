@@ -3,64 +3,139 @@ from math import ceil
 
 ### Contains game physics as well as some mathematical and geometric functions.
 
+two_pi = 2*numpy.pi
+accelAngle = numpy.pi/10
+
+def angle(sin, cos):
+    if sin > 0:
+        return numpy.arccos(cos)
+    else:
+        return -numpy.arccos(cos)
+
+
+def DampenedOscillator2(entity, dt):
+    allyMaxSpeed = 7*numpy.sqrt(entity.mass)
+    k = 1
+
+    dx = entity.posTarget - entity.pos
+    dist = numpy.linalg.norm(dx)
+    velSet = False
+    if not entity.unit.enemyClose:
+        if entity.unit.allyClose:
+            entity.setDamp(allyMaxSpeed)
+            entity.knockVel *= 0
+    mu = 20*entity.Damp
+    entity.vel += entity.knockVel
+    speed = numpy.linalg.norm(entity.vel)
+    knockSpeed = numpy.linalg.norm(entity.knockVel)
+    reverseRot = numpy.array([[entity.rot[0, 0], entity.rot[1, 0]], \
+                              [entity.rot[0, 1], entity.rot[0, 0]]])
+    if dist < 0.5*numpy.sqrt(entity.maxSpeed) and speed < entity.maxSpeed/3 and knockSpeed < 0.05:
+        newPos = entity.posTarget
+        newVel = numpy.array([0., 0.])
+        speed = 0.
+        velSet = True
+        #print("Reached target.")
+        toRotate = numpy.dot(entity.rotTarget, reverseRot)
+    else:
+        newPos = entity.pos + dt*entity.vel
+        ndx = dx/dist
+        dxRot = numpy.array([[ndx[0], -ndx[1]], \
+                             [ndx[1], ndx[0]]])
+        toRotate = numpy.dot(dxRot, reverseRot)                             
+    toTurn = angle(toRotate[1, 0], toRotate[0, 0])
+    phi = entity.turn*dt / numpy.sqrt(speed + 1)
+    if toTurn < 0:
+        phi = max(-phi, toTurn)
+    else:
+        phi = min(phi, toTurn)
+    sin = numpy.sin(phi)
+    cos = numpy.cos(phi)
+    rot = numpy.array([[cos, -sin], [sin, cos]])
+    entity.rot = numpy.dot(rot, entity.rot)
+    if speed > 0:
+        entity.vel = numpy.dot(rot, entity.vel)
+        entity.vel *= cos#/speed
+    if abs(toTurn) - abs(phi) < accelAngle:
+        strength = k*dist
+        newForce = strength*numpy.array([entity.rot[0, 0], entity.rot[1, 0]])
+        if strength > entity.Force:
+            newForce *= (entity.Force/strength)
+            mu = entity.Damp
+    else:
+        newForce = numpy.array([0., 0.])
+    newForce += mu*entity.vel*speed
+    if not velSet:
+        newVel = entity.vel + dt*entity.force
+    entity.pos = newPos
+    entity.force = newForce
+    entity.vel = newVel
+    entity.knockVel = numpy.array([0., 0.])
+    if entity.unit.allyClose:
+        entity.setDamp(entity.defaultMaxSpeed)
+    entity.allyClose = False
+    entity.enemyClose = False
+
+    
 
 def DampenedOscillator(entity, dt):
     allyMaxSpeed = 5*numpy.sqrt(entity.mass)
-    allyMaxKnock = 2 / entity.mass
+    #allyMaxKnock = 2 / entity.mass
     k = 1
     
     dx = entity.posTarget - entity.pos
     dist = numpy.linalg.norm(dx)
-    speed = numpy.linalg.norm(entity.vel)
+    ##speed = numpy.linalg.norm(entity.vel)
     velSet = False
     knockSpeed = numpy.linalg.norm(entity.knockVel)
-    if not entity.enemyClose:
-        if knockSpeed > allyMaxKnock:
-            entity.knockVel *= allyMaxKnock / knockSpeed
-            knockSpeed = 5
-        if entity.allyPassing:
-            entity.setTempDamp(allyMaxSpeed)
+    if not entity.unit.enemyClose:
+    #    if knockSpeed > allyMaxKnock:
+    #        entity.knockVel *= allyMaxKnock / knockSpeed
+    #        knockSpeed = 5
+        if entity.unit.allyClose:
+            entity.setDamp(allyMaxSpeed)
+            entity.knockVel *= 0.
             #entity.knockVel *= 10
     mu = 20*entity.tempDamp#-0.6
     entity.vel += entity.knockVel
     speed = numpy.linalg.norm(entity.vel)
-    if entity.allyPassing and not entity.enemyClose:
-        if knockSpeed:
-            entity.vel *= allyMaxSpeed/speed
-            speed = allyMaxSpeed
-            #print("passing")
-    if dist < 0.5 and speed < 1 and knockSpeed < 0.5:
+    #if entity.allyClose and not entity.enemyClose:
+    #    if knockSpeed:
+    #        entity.vel *= allyMaxSpeed/speed
+    #        speed = allyMaxSpeed
+    #        #print("passing")
+    if dist < 1 and speed < entity.maxSpeed/10. and knockSpeed < 0.5:
         newPos = entity.posTarget
         newVel = numpy.array([0., 0.])
         velSet = True
     else:
         newPos = entity.pos + dt*entity.vel
         #newVel = entity.vel + dt*entity.force
-    #if numpy.linalg.norm(newVel) > entity.maxSpeed:
-    #    newVel *= entity.maxSpeed/speed
+    #if numpy.linalg.norm(newVel) > entity.defaultMaxSpeed:
+    #    newVel *= entity.defaultMaxSpeed/speed
     newForce = k*dx
     strength = numpy.linalg.norm(newForce)
     if strength > entity.Force:
         newForce *= (entity.Force/strength)
         mu = entity.tempDamp
-        #if knockSpeed > 0.1*entity.maxSpeed:
-        #    mu *= 1 + knockSpeed/entity.maxSpeed
+        #if knockSpeed > 0.1*entity.defaultMaxSpeed:
+        #    mu *= 1 + knockSpeed/entity.defaultMaxSpeed
     newForce += mu*entity.vel*speed
-    if dist == 0:
-        vpar = 0.
-    else:
-        vpar = numpy.dot(entity.vel, dx)/dist
-    if vpar > entity.tempMaxSpeed:
-        newForce *= 0
+    #if dist == 0:
+    #    vpar = 0.
+    #else:
+    #    vpar = numpy.dot(entity.vel, dx)/dist
+    #if vpar > entity.maxSpeed:
+    #    newForce *= 0
     entity.pos = newPos
     entity.force = newForce
     if not velSet:
         newVel = entity.vel + dt*entity.force
     entity.vel = newVel
     entity.knockVel = numpy.array([0., 0.])
-    if entity.allyPassing:
-        entity.setTempDamp(entity.maxSpeed)
-    entity.allyPassing = False
+    if entity.unit.allyClose:
+        entity.setDamp(entity.defaultMaxSpeed)
+    entity.allyClose = False
     entity.enemyClose = False
 
 
@@ -159,70 +234,48 @@ def paddNone(soldiers, width):
         soldiers[-1].append(None)
 
 
-def RepulsiveForceField(pos1, pos2, rad1, rad2, pID1, pID2, unitID1, unitID2):
-
-    K = 10
-    LJ_disp = 2**(1/6) - 1 # relative leonard jones displacement
-    minDist = rad1 + rad2
-    if pID1 == pID2:
-        minDist *= 0.7
-    direction = pos2 - pos1
-    dist = numpy.linalg.norm(direction)
-
-    def force(dist):    
-        force = 0
-        #force = numpy.array([0,0,0])
-        #minDist *= 0.7
-        if pID1 == pID2 or pID1 != pID2:
-            #print(dist, minDist)
-            if dist < minDist:
-                minDist6 = minDist**6
-                d2 = dist**2
-                d6 = d2**3
-                d7 = d6 * dist
-                d13 = d7 * d6
-                md2 = minDist**2
-                md6 = md2**3
-                md12 = md6**2
-                force += K * (12*md12/d13 - 6*md6/d7)
-        return force
-
-    f = force(dist + LJ_disp*minDist)
-    #print(f, dist, direction)
-    return -force(dist + LJ_disp*minDist) / dist * direction
-
 def CollisionCalculation(entity1, entity2, pID1, pID2, uID1, uID2, dt):
     v1, v2 = numpy.array([0., 0.]), numpy.array([0., 0.])
     minDist = entity1.rad + entity2.rad
     dx = entity2.pos - entity1.pos
     dv = entity2.vel - entity1.vel
-    dxdv = numpy.dot(dx, dv)
-    movingAway = dxdv > 0
+    #dxdv = numpy.dot(dx, dv)
+    #movingAway = dxdv >= 0
     if pID1 == pID2:
         #minDist *= 0.8
-        if uID1 != uID2 and not movingAway:
-            entity1.allyPassing = True
-            entity2.allyPassing = True
+        if uID1 != uID2: # and not movingAway:
+            entity1.allyClose = True
+            entity2.allyClose = True
+            if not entity1.unit.allyClose:
+                entity1.unit.allyClose = True
+            if not entity2.unit.allyClose:
+                entity2.unit.allyClose = True
             #entity1.unit.allyClose = True
             #entity2.unit.allyClose = True
     else:
         #minDist *= 1.1
         entity1.enemyClose = True
         entity2.enemyClose = True
-        entity1.unit.EnemyClose()
-        entity2.unit.EnemyClose()
+        if not entity1.unit.enemyClose:
+            entity1.unit.enemyClose = True
+        if not entity2.unit.enemyClose:
+            entity2.unit.enemyClose = True
+        #entity1.unit.enemyClose = True
+        #entity2.unit.enemyClose = True
     if pID1 == pID2:
-        if uID1 != uID2 and not entity1.unit.enemyClose and not entity2.unit.enemyClose:
-            minDist *= 0.5
-            entity1.unit.AllyPassing()
-            entity2.unit.AllyPassing()
-        else:
-            minDist *= 0.8
+        #if uID1 != uID2 and not entity1.unit.enemyClose and not entity2.unit.enemyClose:
+        #    minDist *= 0.5
+        #    #entity1.unit.AllyClose()
+        #    #entity2.unit.AllyClose()
+        #else:
+        minDist *= 0.85
     else:
         minDist *= 1.1
     dist = numpy.linalg.norm(dx)
     if dist > minDist:
         return v1, v2
+    dxdv = numpy.dot(dx, dv)
+    movingAway = dxdv >= 0
     if movingAway:    # checks if they are moving away from each other (post-collision)
         return v1, v2
     M = entity1.mass + entity2.mass

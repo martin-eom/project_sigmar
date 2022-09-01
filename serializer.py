@@ -20,6 +20,9 @@ def ModelToDump(model):
                     if not soldier is None:
                         for number in soldier.pos:
                             dump.append(float(number))
+                        for row in soldier.rot:
+                            for number in row:
+                                dump.append(float(number))
             dump.append("]")
         dump.append("]")
     return dump
@@ -73,6 +76,7 @@ def OrganizeModelDump(dump, simplemodel):
                 soldiers.append(ViewSoldier())
             soldier = soldiers[nsoldiers - 1]
             soldier.pos = array([symbol, dump.pop(0)])
+            soldier.rot = array([[dump.pop(0), dump.pop(0)], [dump.pop(0), dump.pop(0)]])
 
 def MapToDump(gamemap):
     return gamemap.dim
