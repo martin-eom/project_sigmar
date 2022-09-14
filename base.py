@@ -136,18 +136,6 @@ class Unit:
         else:
             self.pos = numpy.array([0,0])
 
-    #def adjustSize(self):
-    #    currentSize = countNestedListNotNone(self.soldiers)
-    #    print("current size: %d; previous size: %d; diff: %d"%(currentSize,self.nSoldiers,self.nSoldiers-currentSize))
-    #    if not currentSize == self.nSoldiers:
-    #        print("########### %d soldiers have been killed! ###########"%(self.nSoldiers-currentSize))
-    #        self.nSoldiers = currentSize
-    #        self.soldiers = Reform(self.soldiers, self.width)
-    #        self.posInUnit = posInUnitByIDs(self)
-    #        for i in range(len(self.soldiers)):
-    #            for j in range(len(self.soldiers[i])):
-    #                self.soldiers[i][j].posTarget = self.posTarget + numpy.dot(self.rotTarget, self.posInUnit[i][j])
-
     def ReformForTurn(self):
     # reassigns the soldiers to different array positions to minimize chaos when turning more than 45 degrees
         rot = numpy.dot(self.rotTarget, numpy.linalg.inv(self.rot))
@@ -193,33 +181,3 @@ class Unit:
             for j in range(len(self.soldiers[i])):
                 if not self.soldiers[i][j] is None:
                     self.soldiers[i][j].posTarget = self.posTarget + numpy.dot(self.rotTarget, self.posInUnit[i][j])
-
-    #def EnemyClose(self):
-    #    if not self.enemyClose:
-    #        print("Enemy close.")
-    #        self.enemyClose = True
-    #        #self.ChangeSpacing(self.spacing)
-    #        #self.tempSpacing = self.spacing
-    #        #self.MoveTarget(self.posTarget, self.rotTarget)
-    #        #self.spacingTicks = 0
-    #        #self.spacingChange = True
-
-    #def AllyClose(self):
-    #    if not self.allyClose:
-    #        print("Ally close.")
-    #        self.allyClose = True
-    #        #self.ChangeSpacing(self.wideSpacing)
-    #        #self.tempSpacing = self.wideSpacing
-    #        #self.MoveTarget(self.posTarget, self.rotTarget)
-    #        #self.spacingTicks = 0
-    #        #self.spacingChange = True
-
-    #def ChangeSpacing(self, spacing):
-    #    if not self.spacingChange:
-    #        for soldier in list(chain(*self.soldiers)):
-    #            soldier.oldPosTarget = soldier.posTarget.copy()
-    #        self.tempSpacing = spacing
-    #        self.MoveTarget(self.posTarget, self.rotTarget)
-    #        self.spacingTicks = 0
-    #        self.spacingChange = True
-    #        print("Changing unit spacing.")

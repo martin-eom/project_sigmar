@@ -77,7 +77,7 @@ def DampenedOscillator2(entity, dt):
     entity.enemyClose = False
 
     
-
+### movement without orientation, will probably be removed as other movement is refined
 def DampenedOscillator(entity, dt):
     allyMaxSpeed = 5*numpy.sqrt(entity.mass)
     #allyMaxKnock = 2 / entity.mass

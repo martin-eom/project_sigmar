@@ -140,6 +140,14 @@ class Model:
         self.tickNum = 0
         self.tps = int(ceil(1 / self.dt)) # ticks per second
         self.time = time()
+        # performance measurement
+        self.tick_time = 0.
+        self.oscillator_time = 0.
+        self.map_grid_time = 0.
+        self.resolution_time = 0.
+        self.clean_time = 0.
+        self.physics_time = 0.
+        self.t0 = time()
 
     def NeighbourForces(self):
         for i, map_row in enumerate(self.map.grid):
@@ -166,10 +174,30 @@ class Model:
                             #sold2[0].knockForce = -f
 
     def CollisionResolution(self):
+        def step(i, map_row, j, tile, sid1, sold1):
+            #for sid1, sold1 in enumerate(tile):
+            #    pool.apply_async(step, [i, map_row, j, tile, sid1, sold1])
+            for sid2, sold2 in enumerate(tile[(sid1 + 1):len(tile)]):
+                v1, v2 = physics.CollisionCalculation(sold1[0], sold2[0], sold1[1], sold2[1], sold1[2], sold2[2], self.dt)
+                sold1[0].knockVel += v1
+                sold2[0].knockVel += v2
+                for neighbourIDs in (((i+1)%self.map.griddim[0], j), \
+                                    (i, (j+1)%self.map.griddim[1]), \
+                                    ((i+1)%self.map.griddim[0], \
+                                    (j+1)%self.map.griddim[1])):
+                    tile = self.map.grid[neighbourIDs[0]][neighbourIDs[1]]
+                    for sid2, sold2 in enumerate(tile):
+                        v1, v2 = physics.CollisionCalculation(sold1[0], sold2[0], sold1[1], sold2[1], sold1[2], sold2[2], self.dt)
+                        sold1[0].knockVel += v1
+                        sold2[0].knockVel += v2
+        
+        results = []
+        
         for i, map_row in enumerate(self.map.grid):
             for j, tile in enumerate(map_row):
                 for sid1, sold1 in enumerate(tile):
-                    for sid2, sold2 in enumerate(tile[(sid1 + 1):len(tile)]):
+                    step(i, map_row, j, tile, sid1, sold1)
+                    """for sid2, sold2 in enumerate(tile[(sid1 + 1):len(tile)]):
                         v1, v2 = physics.CollisionCalculation(sold1[0], sold2[0], sold1[1], sold2[1], sold1[2], sold2[2], self.dt)
                         sold1[0].knockVel += v1
                         sold2[0].knockVel += v2
@@ -181,7 +209,7 @@ class Model:
                         for sid2, sold2 in enumerate(tile):
                             v1, v2 = physics.CollisionCalculation(sold1[0], sold2[0], sold1[1], sold2[1], sold1[2], sold2[2], self.dt)
                             sold1[0].knockVel += v1
-                            sold2[0].knockVel += v2
+                            sold2[0].knockVel += v2"""
 
     def DetectEnemies(self):
         for player in self.players:
@@ -270,6 +298,7 @@ class Model:
             else:
                 print("[WARNING:] Tried to move unit that was not in player unit list.")
         elif isinstance(event, TickEvent):
+            t_tick_0 = time()
             self.tickNum += 1
             """for pID, player in enumerate(self.players):
                 for uID, unit in enumerate(player.units):
@@ -285,28 +314,62 @@ class Model:
                 self.DetectAllies()
                 t = time()
                 print("Game speed: %.2f tps"%(self.tps/(t - self.time)))
+                print("Usage of tick time per function:")
+                t_cur = time() - self.t0
+                #print("Dampened Oscillator:     %.2f"%(self.oscillator_time / self.tick_time))
+                #print("Making map grid:         %.2f"%(self.map_grid_time / self.tick_time))
+                print("Physics:                 %.2f"%(self.physics_time / self.tick_time))
+                print("Collision Resolution:    %.2f"%(self.resolution_time / self.tick_time))
+                print("Cleaning map grid:       %.2f"%(self.clean_time / self.tick_time))
+                print("Usage of total time on TickEvent: %.2f"%(self.tick_time / t_cur))
                 self.time = t
+            if self.tickNum % (5*self.tps) == 0:
+                self.tick_time = 0.
+                self.oscialltor_time = 0.
+                self.map_grid_time = 0.
+                self.resolution_time = 0.
+                self.clean_time = 0.
+                self.physics_time = 0.
+                self.t0 = time()
+
             self.SpacingChange()
+            results = []
+            def physics_step(soldier, pID, uID):
+                if soldier is not None and soldier.pos is not None:
+                    physics.DampenedOscillator2(soldier, self.dt)
+                    soldier.gridpos = self.map.Assign(soldier, pID, uID)
+            t_0 = time()
             for pID, player in enumerate(self.players):
                 for uID, unit in enumerate(player.units):
                     if unit.placed:
                         # soldierIDs?
                         for rID, row in enumerate(unit.soldiers):
                             for cID, soldier in enumerate(row):
-                                if soldier is not None and soldier.pos is not None:                                    
+                                physics_step(soldier, pID, uID)
+                                """if soldier is not None and soldier.pos is not None:
+                                    t_0 = time()
                                     physics.DampenedOscillator2(soldier, self.dt)
+                                    self.oscillator_time += time() - t_0
+                                    t_0 = time()
                                     soldier.gridpos = self.map.Assign(soldier, pID, uID)
-                                    # iterate displacement from special force
+                                    self.map_grid_time += time() - t_0
+                                    # iterate displacement from special force"""
                         unit.updatePos()
+            self.physics_time += time() - t_0
             # combat
+            t_0 = time()
             self.CollisionResolution()
+            self.resolution_time += time() - t_0
             #for player in self.players:
             #    for unit in player.units:
             #        for row in unit.soldiers:
             #            for soldier in row:
             #                if soldier is not None and soldier.pos is not None:
             #                    KnockUpdate(soldier, self.dt)
+            t_0 = time()
             self.map.cleangrid()
+            self.clean_time += time() - t_0
+            self.tick_time += time() - t_tick_0
         elif isinstance(event, KillEvent):
             soldierFound = False
             for row in event.unit.soldiers:
