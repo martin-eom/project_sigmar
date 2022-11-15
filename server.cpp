@@ -90,6 +90,21 @@ int main(int argc, char* argv[1]) {
 	// Creating Input Controller object
 	KeyboardAndMouseController* controller = new KeyboardAndMouseController(em, model, SCREEN_HEIGHT);
 
+	// Extra Debug section
+	/*Eigen::Matrix2d rec;
+	Eigen::Matrix2d rot;
+	Eigen::Vector2d pos;
+	rec << -1., 0.5, 1., -0.5;
+	rot << cos(0.78539816339), -sin(0.78539816339), cos(0.78539816339), sin(0.78539816339);
+	rot << 1, 0, 0, 1;
+	pos << 0.6, 0.6;
+	if(PointInRectangle(pos, rec, rot)) {
+		std::cout << "The point is in the thing!\n";
+	}
+	else {
+		std::cout << "Disappointing...\n";
+	}*/
+
 	// Main loop
 	bool quit = false;
 	SDL_Event e;
@@ -105,7 +120,7 @@ int main(int argc, char* argv[1]) {
 			if (e.type == SDL_QUIT) {
 				quit = true;
 			}
-			else if((e.type == SDL_MOUSEBUTTONUP) || (e.type == SDL_KEYUP)) {
+			else if((e.type == SDL_MOUSEBUTTONUP) || (e.type == SDL_KEYUP) || (e.type == SDL_KEYDOWN)) {
 				SDLEvent ev(e);
 				em->Post(&ev);
 			}

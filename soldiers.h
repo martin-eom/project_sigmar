@@ -45,6 +45,8 @@ class Soldier {
 		virtual int type() {return SOLDIER_SOLDIER;}
 		double Force, damp, defaultDamp;
 		bool placed = false;
+		int currentOrder;
+		bool arrived;
 		//bool allyClose, enemyClose;
 		Eigen::Vector2i gridpos;
 		Eigen::Vector2d pos;
@@ -113,6 +115,7 @@ class InfantryMan : public Soldier {
 		double _squareDamp;	//coefficient for square dampening
 		double _onTargetDamp = 3.;	//dampening when close to posTarget
 	public:
+		int currentOrder;
 		double rad() {return _rad;}
 		double mass() {return _mass;}
 		double turn() {return _turn;}

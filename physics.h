@@ -1,5 +1,8 @@
 #define PHYSICS
 
+#ifndef MATH
+#include "math.h"
+#endif
 #ifndef BASE
 #include "base.h"
 #endif
@@ -8,6 +11,9 @@
 #endif
 #ifndef UNITS
 #include "units.h"
+#endif
+#ifndef ORDERS
+#include "orders.h"
 #endif
 #ifndef MAP
 #include "map.h"
@@ -24,7 +30,7 @@
 #include <cmath>
 
 
-void ReformUnit(Unit* unit, Eigen::Matrix2d rot) {
+void ReformUnit(Unit* unit) {
 	struct RebasedSoldier {
 		Soldier* soldier;
 		Eigen::Vector2d rebasedPos;
@@ -35,19 +41,33 @@ void ReformUnit(Unit* unit, Eigen::Matrix2d rot) {
 		}
 	};
 
-	Eigen::Matrix2d rotDiff = rot.transpose() * unit->rot;
+	//Eigen::Matrix2d rotDiff = rot.transpose() * unit->rot;
 	std::vector<std::vector<Soldier*>>* soldiers = unit->soldiers();
 	LinkedList<RebasedSoldier*> temp1;
 	LinkedList<RebasedSoldier*> temp2;
 	// Sorting soldiers by new "y coordinate" (front-back in formation)
 	for(int i = 0; i < unit->nrows(); i++) {
 		for(int j = 0; j < unit->width(); j++) {
-			if (soldiers->at(i).at(j)) {
-				RebasedSoldier* r = new RebasedSoldier(soldiers->at(i).at(j), rotDiff, unit->rot.transpose() * (soldiers->at(i).at(j)->pos - unit->pos));
+			Soldier* soldier = soldiers->at(i).at(j);
+			if (soldier) {
+				Eigen::Matrix2d rot;
+				Order* o = unit->orders.at(soldier->currentOrder);
+				if(o->type == ORDER_MOVE) {
+					MoveOrder* mo = dynamic_cast<MoveOrder*>(o);
+					rot = mo->rot;
+				}
+				else {rot = unit->rot;}
+				Eigen::Matrix2d rotDiff = rot.transpose() * unit->rot;
+				RebasedSoldier* r = new RebasedSoldier(soldier, rotDiff, rot.transpose() * (soldier->pos - unit->pos));
 				int n = 0;
 				Node<RebasedSoldier*>* current = temp1.head;
 				while(current) {
-					if (r->rebasedPos[0] < current->data->rebasedPos[0]) {
+					if (r->soldier->currentOrder < current->data->soldier->currentOrder) {
+						current = current->next;
+						n++;
+					}
+					else if (r->soldier->currentOrder == current->data->soldier->currentOrder && 
+						r->rebasedPos[0] < current->data->rebasedPos[0]) {
 						current = current->next;
 						n++;
 					}
@@ -57,7 +77,7 @@ void ReformUnit(Unit* unit, Eigen::Matrix2d rot) {
 			}
 		}
 	}
-	// Grabbing rows of soldiers and sorting them by new "x coordinate" (left-right in formation)
+	// Grabbing rows of soldiers and sorting them by currentOrder and new "x coordinate" (left-right in formation)
 	while(temp1.length()) {
 		LinkedList<RebasedSoldier*> tempRow;
 		// Filling tempRow
@@ -93,6 +113,7 @@ void ReformUnit(Unit* unit, Eigen::Matrix2d rot) {
 	}
 	PosInUnitByID(unit);
 }
+
 
 void DampenedHarmonicOscillator(Soldier* soldier, double dt) {	//deprecated / only for testing purposes
 	double k = 1;
@@ -196,6 +217,26 @@ void TimeStep(Soldier* soldier, double dt) {
 	soldier->vel = newVel;
 	soldier->force = newForce;
 	soldier->knockVel << 0., 0.;
+	//check if order complete
+	bool newestOrder = (soldier->currentOrder == soldier->unit->currentOrder);
+	Order* o = soldier->unit->orders.at(soldier->currentOrder);
+	if(o->type = ORDER_MOVE) {
+		MoveOrder* mo = dynamic_cast<MoveOrder*>(o);
+		if(!soldier->arrived) {
+			if(newestOrder) {
+				if(closeToTarget) {
+					soldier->arrived = true;
+					soldier->unit->nSoldiersArrived++;
+				}
+			}
+			else {
+				std::vector<Eigen::Matrix2d> rectangle = Rectangle(soldier);
+				if(PointInRectangle(soldier->pos - mo->pos, rectangle.at(0), rectangle.at(1))) {
+					soldier->arrived = true;
+				}
+			}
+		}
+	}
 }
 
 void KnockKnock(Soldier* sold1, Soldier* sold2) {
@@ -214,6 +255,14 @@ void KnockKnock(Soldier* sold1, Soldier* sold2) {
 			Eigen::Vector2d prod = 2. * dxdv * dx / (totalMass * pow(d,2));
 			sold1->knockVel += sold2->mass() * prod;
 			sold2->knockVel -= sold1->mass() * prod;
+			if(sold1->unit->player == sold2->unit->player && sold1->unit == sold2->unit) {
+				if(sold1->currentOrder < sold2->currentOrder) {
+					sold1->arrived = true;
+				}
+				else if(sold1->currentOrder > sold2->currentOrder) {
+					sold2->arrived = true;
+				}
+			}
 		}
 	}
 }
