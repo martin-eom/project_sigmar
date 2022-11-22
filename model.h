@@ -84,6 +84,34 @@ class Model : public Listener{
 					}
 				}
 			}
+			if(ev->type == APPEND_ORDERS_REQUEST) {
+				AppendOrdersRequest* oev = dynamic_cast<AppendOrdersRequest*>(ev);
+				Unit* unit = oev->unit;
+				if(unit) {
+					//unit->orders.clear();
+					//unit->orders = oev->orders;
+					for(auto order : oev->orders) {
+						unit->orders.push_back(order);
+					}
+					/*unit->currentOrder = 0;
+					/unit->nSoldiersArrived = 0;
+					/Order* o = unit->orders.at(0);
+					/std::vector<std::vector<Soldier*>>* soldiers = unit->soldiers();
+					for(int i = 0; i < unit->nrows(); i++) {
+						for(int j = 0; j < unit->width(); j++) {
+							Soldier* soldier = soldiers->at(i).at(j);
+							if(soldier) {
+								soldier->currentOrder = 0;
+								soldier->arrived = false;
+							}
+						}
+					}
+					if(o->type == ORDER_MOVE && unit->placed) {
+						ReformUnit(unit);
+						MoveTarget(unit);
+					}*/
+				}
+			}
 			else if(ev->type == UNIT_PLACE_REQUEST) {
 				UnitPlaceRequest* pev = dynamic_cast<UnitPlaceRequest*>(ev);
 				if(pev->unit) {
@@ -181,6 +209,7 @@ class Model : public Listener{
 					while(currentUnit) {
 						Unit* unit = currentUnit->data;
 						if(unit->placed) {
+							if(!unit->nSoldiersOnFirstOrder) {DeleteObsoleteOrder(unit);}
 							CollisionScrying(map, unit);
 						}
 						currentUnit = currentUnit->next;
@@ -188,6 +217,7 @@ class Model : public Listener{
 					currentPlayer = currentPlayer->next;
 				}
 				CollisionResolution(map);
+				MapObjectCollisionHandling(map);	//resolution handled in timestep
 				map->Cleangrid();
 				currentPlayer = players.head;
 				while(currentPlayer) {

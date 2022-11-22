@@ -79,8 +79,12 @@ class KeyboardAndMouseController : public Listener {
 					if(e.key.keysym.sym == SDLK_RETURN) {
 						if(model->selectedUnitNode) {
 							if(orders.size() > 0) {
-								nev = new GiveOrdersRequest(model->selectedUnitNode->data, orders);
-								std::cout << "You did something.\n";
+								if(queueingOrders) {
+									nev = new AppendOrdersRequest(model->selectedUnitNode->data, orders);
+								}
+								else {
+									nev = new GiveOrdersRequest(model->selectedUnitNode->data, orders);
+								}
 							}
 							else {std::cout << "No orders sent, order list is empty.\n";}
 						}

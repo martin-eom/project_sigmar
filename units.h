@@ -46,6 +46,7 @@ class Unit {
 		int nSoldiers;
 		int currentOrder;
 		int nSoldiersArrived;
+		int nSoldiersOnFirstOrder;
 		bool placed;
 		Eigen::Vector2d pos;
 		Eigen::Vector2d posTarget;
@@ -208,6 +209,7 @@ void Place(Unit* unit, Eigen::Vector2d pos, Eigen::Matrix2d rot) {
 	unit->vel << 0., 0.;
 	unit->placed = true;
 	unit->nSoldiersArrived = 0;
+	unit->nSoldiersOnFirstOrder = unit->nSoldiers;
 }
 
 
@@ -306,7 +308,24 @@ void UnitNextOrder(Unit* unit) {
 	std::cout << "Onwards!\n";
 }
 
+void DeleteObsoleteOrder(Unit* unit) {
+	if(unit->orders.size() > 1) {
+		unit->orders.erase(unit->orders.begin());
+		unit->currentOrder--;
+		std::vector<std::vector<Soldier*>> soldiers = *(unit->soldiers());
+		for(auto row : soldiers) {
+			for(auto soldier: row) {
+				soldier->currentOrder--;
+				if(soldier->currentOrder == 0 && soldier->placed) {
+					unit->nSoldiersOnFirstOrder++;
+				}
+			}
+		}
+	}
+}
+
 void SoldierNextOrder(Soldier* soldier, Eigen::Vector2d posInUnit) {
+	if(soldier->currentOrder == 0) {soldier->unit->nSoldiersOnFirstOrder--;}
 	soldier->currentOrder++;
 	soldier->arrived = false;
 	Order* o = soldier->unit->orders.at(soldier->currentOrder);
@@ -318,39 +337,31 @@ void SoldierNextOrder(Soldier* soldier, Eigen::Vector2d posInUnit) {
 	}
 }
 
-std::vector<Eigen::Matrix2d> Rectangle(Soldier* soldier) {	//rectangle is defined by unrotated top left and bottom right points
-	Eigen::Matrix2d rec;
-	Eigen::Matrix2d rot;
-	std::vector<Eigen::Matrix2d> rectangle;
+Rrectangle SoldierRectangle(Soldier* soldier) {
 	Unit* unit = soldier->unit;
 	double halfWidth = (unit->width() - 1) * unit->spacing() * 0.5 + 1.*soldier->rad();
 	double halfDepth = (unit->nrows() - 1) * unit->spacing() * 0.5 + 1.*soldier->rad();
 	Order* o = unit->orders.at(soldier->currentOrder);
+	Eigen::Vector2d pos;
+	Eigen::Matrix2d rot;
 	if(o->type == ORDER_MOVE) {
 		MoveOrder* mo = dynamic_cast<MoveOrder*>(o);
-		rec << - halfDepth, + halfWidth,
-			   halfDepth, - halfWidth;
+		pos = mo->pos;
 		rot = mo->rot;
 	}
-	rectangle.push_back(rec);
-	rectangle.push_back(rot);
-	return rectangle;
+	return Rrectangle(halfWidth, halfDepth, pos, rot);
 }
 
-std::vector<Eigen::Matrix2d> Rectangle(Unit* unit, int orderID) {	//translated to 0 0
-	Eigen::Matrix2d rec;
-	Eigen::Matrix2d rot;
-	std::vector<Eigen::Matrix2d> rectangle;
+Rrectangle UnitRectangle(Unit* unit, int orderID) {
 	double halfWidth = (unit->width() - 1) * unit->spacing() * 0.5;
 	double halfDepth = (unit->nrows() - 1) * unit->spacing() * 0.5;
 	Order* o = unit->orders.at(orderID);
+	Eigen::Vector2d pos;
+	Eigen::Matrix2d rot;
 	if(o->type == ORDER_MOVE) {
 		MoveOrder* mo = dynamic_cast<MoveOrder*>(o);
-		rec << - halfDepth, halfWidth,
-			   halfDepth, - halfWidth;
+		pos = mo->pos;
 		rot = mo->rot;
 	}
-	rectangle.push_back(rec);
-	rectangle.push_back(rot);
-	return rectangle;
+	return Rrectangle(halfWidth, halfDepth, pos, rot);
 }

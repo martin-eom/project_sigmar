@@ -1,5 +1,9 @@
 #define SHAPES
 
+#ifndef MATH
+#include "math.h"
+#endif
+
 #include <SDL.h>
 #include <stdio.h>
 #include <cmath>
@@ -63,4 +67,18 @@ void DrawUnitArrow(Eigen::Vector2d pos, Eigen::Matrix2d rot, SDL_Renderer* rende
 	SDL_RenderDrawLine(renderer, p0.coeff(0), p0.coeff(1), p1.coeff(0), p1.coeff(1));
 	SDL_RenderDrawLine(renderer, p1.coeff(0), p1.coeff(1), p2.coeff(0), p2.coeff(1));
 	SDL_RenderDrawLine(renderer, p1.coeff(0), p1.coeff(1), p3.coeff(0), p3.coeff(1));
+}
+
+void DrawRectangle(Rrectangle* rec, SDL_Renderer* renderer, unsigned int color[4], int SCREEN_HEIGHT) {
+	SDL_SetRenderDrawColor(renderer, color[0], color[1], color[2], color[3]);
+	Eigen::Vector2d p0, p1, p2, p3;	//top left->top right->bottom right->bottom left
+	p0 << rec->corners.at(0)->pos.coeff(0), rec->corners.at(0)->pos.coeff(1);
+	p1 << rec->corners.at(1)->pos.coeff(0), rec->corners.at(1)->pos.coeff(1);
+	p2 << rec->corners.at(2)->pos.coeff(0), rec->corners.at(2)->pos.coeff(1);
+	p3 << rec->corners.at(3)->pos.coeff(0), rec->corners.at(3)->pos.coeff(1);
+	SDL_RenderDrawLine(renderer, p0.coeff(0), SCREEN_HEIGHT - p0.coeff(1), p1.coeff(0), SCREEN_HEIGHT - p1.coeff(1));
+	SDL_RenderDrawLine(renderer, p1.coeff(0), SCREEN_HEIGHT - p1.coeff(1), p2.coeff(0), SCREEN_HEIGHT - p2.coeff(1));
+	SDL_RenderDrawLine(renderer, p2.coeff(0), SCREEN_HEIGHT - p2.coeff(1), p3.coeff(0), SCREEN_HEIGHT - p3.coeff(1));
+	SDL_RenderDrawLine(renderer, p3.coeff(0), SCREEN_HEIGHT - p3.coeff(1), p0.coeff(0), SCREEN_HEIGHT - p0.coeff(1));
+
 }

@@ -46,6 +46,16 @@ int main(int argc, char* argv[1]) {
 	// Setting up game objects
 	EventManager* em = new EventManager(30);
 	Map* map = new Map(SCREEN_WIDTH,SCREEN_HEIGHT,31);
+	Eigen::Vector2d recPos;
+	recPos << 400., 400.;
+	Eigen::Matrix2d recRot;
+	recRot << 1, 0, 0, 1;
+	recRot << cos(M_PI/4.), -sin(M_PI/4.), sin(M_PI/4.), cos(M_PI/4.);
+	Rrectangle* rec1 = new Rrectangle(200, 200, recPos, recRot);
+	map->AddMapRectangle(rec1);
+	Eigen::Vector2d circPos; circPos << 800, 400;
+	Circle* tht = new Circle(circPos, 100.);
+	map->AddMapCircle(tht);
 	Model* model = new Model(em, map);
 	Player* player1 = new Player();
 	model->players.Append(new Node<Player*>(player1));
@@ -91,19 +101,16 @@ int main(int argc, char* argv[1]) {
 	KeyboardAndMouseController* controller = new KeyboardAndMouseController(em, model, SCREEN_HEIGHT);
 
 	// Extra Debug section
-	/*Eigen::Matrix2d rec;
-	Eigen::Matrix2d rot;
-	Eigen::Vector2d pos;
-	rec << -1., 0.5, 1., -0.5;
-	rot << cos(0.78539816339), -sin(0.78539816339), cos(0.78539816339), sin(0.78539816339);
-	rot << 1, 0, 0, 1;
-	pos << 0.6, 0.6;
-	if(PointInRectangle(pos, rec, rot)) {
-		std::cout << "The point is in the thing!\n";
-	}
-	else {
-		std::cout << "Disappointing...\n";
-	}*/
+	/*Eigen::Vector2d rpos; rpos << 0, 0;
+	Eigen::Vector2d rpos2; rpos2 << 2., 0;
+	Eigen::Vector2d cpos; cpos << -1.5, 1.5;
+	Eigen::Matrix2d rot; rot << 1, 0, 0, 1;
+	Rrectangle rec(1., 1., rpos, rot);
+	Rrectangle rec2(1.5, 0.5, rpos2, rot);
+	Circle circ(cpos, 1.);
+	std::cout << "-----------------------------------------------\n";
+	std::cout << RectangleRectangleCollision(&rec2, &rec) << std::endl;
+	std::cout << "-----------------------------------------------\n";*/
 
 	// Main loop
 	bool quit = false;

@@ -37,6 +37,22 @@ class View : public Listener {
 			unsigned int colorArrow[4] = {0xff, 0xff, 0xff, 0xff};
 			unsigned int colorUnitArrow[4] = {40, 252, 3, 0xff};
 			unsigned int colorPurple[4] = {0xff, 0x00, 0xff, 0xff};
+			//drawing map objects
+			for(auto circ : map->circles) {
+				DrawCircle(circ->pos.coeff(0), SCREEN_HEIGHT - circ->pos.coeff(1), circ->rad, renderer, colorPurple);
+			}
+			for(auto rec : map->rectangles) {
+				DrawRectangle(rec, renderer, colorPurple, SCREEN_HEIGHT);
+			}
+			for(auto row : map->tiles) {
+				for(auto tile : row) {
+					if(tile->circles.size() or tile->rectangles.size()) {
+						Rrectangle* rec = tile->rec;
+						DrawRectangle(rec, renderer, colorUnitArrow, SCREEN_HEIGHT);
+					}
+				}
+			}
+			//drawing soldiers and unit markers
 			Node<Player*>* player = model->players.head;
 			int nplayers = model->players.length();
 			int nplayer = 0;
@@ -66,26 +82,8 @@ class View : public Listener {
 									Order* o = unit->orders.at(i);
 									if(o->type == ORDER_MOVE) {
 										MoveOrder* mo = dynamic_cast<MoveOrder*>(o);
-										std::vector<Eigen::Matrix2d> rectangle = Rectangle(unit, i);
-										Eigen::Matrix2d rec = rectangle.at(0);
-										Eigen::Matrix2d rot = rectangle.at(1);
-										Eigen::Vector2d p0, p1, p2, p3;	//top left->top right->bottom right->bottom left
-										p0 << rec.coeff(0,0), rec.coeff(0,1);
-										p1 << rec.coeff(1,0), rec.coeff(0,1);
-										p2 << rec.coeff(1,0), rec.coeff(1,1);
-										p3 << rec.coeff(0,0), rec.coeff(1,1);
-										p0 = mo->rot * p0 + mo->pos;
-										p1 = mo->rot * p1 + mo->pos;
-										p2 = mo->rot * p2 + mo->pos;
-										p3 = mo->rot * p3 + mo->pos;
-										SDL_RenderDrawLine(renderer, p0.coeff(0), SCREEN_HEIGHT - p0.coeff(1), 
-											p1.coeff(0), SCREEN_HEIGHT - p1.coeff(1));
-										SDL_RenderDrawLine(renderer, p1.coeff(0), SCREEN_HEIGHT - p1.coeff(1), 
-											p2.coeff(0), SCREEN_HEIGHT - p2.coeff(1));
-										SDL_RenderDrawLine(renderer, p2.coeff(0), SCREEN_HEIGHT - p2.coeff(1), 
-											p3.coeff(0), SCREEN_HEIGHT - p3.coeff(1));
-										SDL_RenderDrawLine(renderer, p3.coeff(0), SCREEN_HEIGHT - p3.coeff(1), 
-											p0.coeff(0), SCREEN_HEIGHT - p0.coeff(1));
+										Rrectangle rec = UnitRectangle(unit, i);
+										DrawRectangle(&rec, renderer, colorUnitArrow, SCREEN_HEIGHT);
 										if(i > 0) {
 											Order* prevo = unit->orders.at(i-1);
 											if(prevo->type == ORDER_MOVE) {
@@ -118,7 +116,9 @@ class View : public Listener {
 										DrawFacingArrowhead(viewPos, viewRot, soldier->rad(), renderer, colorPurple);
 									}
 									else {
-										DrawFacingArrowhead(viewPos, viewRot, soldier->rad(), renderer, colorArrow);									
+										DrawFacingArrowhead(viewPos, viewRot, soldier->rad(), renderer, colorArrow);
+										/*Rrectangle rec = SoldierRectangle(soldier);
+										DrawRectangle(&rec, renderer, colorPurple, SCREEN_HEIGHT);*/
 									}
 								}
 							}

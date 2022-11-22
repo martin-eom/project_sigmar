@@ -129,6 +129,8 @@ void DampenedHarmonicOscillator(Soldier* soldier, double dt) {	//deprecated / on
 	soldier->force = newForce;
 }
 
+
+
 void TimeStep(Soldier* soldier, double dt) {
 	Eigen::Vector2d newPos, newVel;
 	Eigen::Matrix2d newRot;
@@ -230,8 +232,9 @@ void TimeStep(Soldier* soldier, double dt) {
 				}
 			}
 			else {
-				std::vector<Eigen::Matrix2d> rectangle = Rectangle(soldier);
-				if(PointInRectangle(soldier->pos - mo->pos, rectangle.at(0), rectangle.at(1))) {
+				Rrectangle rec = SoldierRectangle(soldier);
+				Point p(soldier->pos);
+				if(PointRectangleCollision(&p, &rec)) {
 					soldier->arrived = true;
 				}
 			}
@@ -317,6 +320,28 @@ void CollisionResolution(Map* map) {
 					neighbour = neighbour->next;
 				}
 				soldNode1 = soldNode1->next;
+			}
+		}
+	}
+}
+
+void MapObjectCollisionHandling(Map* map) {
+	for(int i = 0; i < map->nrows; i++) {
+		for(int j = 0; j < map->ncols; j++) {
+			gridpiece* tile = map->tiles.at(i).at(j);
+			Node<Soldier*>* soldNode;
+			soldNode = tile->soldiers.head;
+			while(soldNode) {
+				Soldier* soldier = soldNode->data;
+				if(soldier) {
+					for(auto rec : tile->rectangles) {
+						SoldierRectangleCollision(soldier, rec);
+					}
+					for(auto circ: tile->circles) {
+						SoldierCircleCollision(soldier, circ);
+					}
+				}
+				soldNode = soldNode->next;
 			}
 		}
 	}

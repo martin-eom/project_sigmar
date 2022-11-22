@@ -18,6 +18,7 @@ enum EVENT_IDS {
 	QUIT_EVENT,
 	CLICK_EVENT,
 	GIVE_ORDERS_REQUEST,
+	APPEND_ORDERS_REQUEST,
 	UNIT_MOVE_REQUEST,
 	UNIT_PLACE_REQUEST,
 	KILL_EVENT,
@@ -94,6 +95,19 @@ class GiveOrdersRequest : public Event {
 		GiveOrdersRequest(Unit* unit, std::vector<Order*> orders) : Event(){
 			name = "GiveOrdersRequest";
 			type = GIVE_ORDERS_REQUEST;
+			this->unit = unit;
+			this->orders = orders;
+		}
+};
+
+class AppendOrdersRequest : public Event {
+	public:
+		Unit* unit;
+		std::vector<Order*> orders;
+
+		AppendOrdersRequest(Unit* unit, std::vector<Order*> orders) : Event(){
+			name = "AppendOrdersRequest";
+			type = APPEND_ORDERS_REQUEST;
 			this->unit = unit;
 			this->orders = orders;
 		}
