@@ -1,3 +1,4 @@
+#ifndef LINKEDLISTS
 #define LINKEDLISTS
 
 #include <iostream>
@@ -262,3 +263,5 @@ template <typename T> class LinkedList {
 			std::cout << std::endl;
 		}
 };
+
+#endif

@@ -1,8 +1,7 @@
+#ifndef ORDERS
 #define ORDERS
 
-#ifndef BASE
-#include "base.h"
-#endif
+#include <base.h>
 
 #include <Dense>
 
@@ -34,7 +33,6 @@ class MoveOrder : public Order {
 		Eigen::Vector2d pos;
 		Eigen::Matrix2d rot;
 		double angleTarget;
-		//bool pathFound;
 
 		MoveOrder(Eigen::Vector2d pos, Eigen::Matrix2d rot, int moveType) : Order() {
 			type = ORDER_MOVE;
@@ -42,6 +40,7 @@ class MoveOrder : public Order {
 			this->pos = pos;
 			this->rot = rot;
 			angleTarget = Angle(rot.coeff(0,1), rot.coeff(0,0));
-			//pathFound = false;
 		}
 };
+
+#endif

@@ -1,8 +1,7 @@
+#ifndef SOLDIERS
 #define SOLDIERS
 
-#ifndef MATH
-#include "math.h"
-#endif
+#include <extra_math.h>
 
 #ifndef _USE_MATH_DEFINES
 #define _USE_MATH_DEFINES
@@ -187,3 +186,5 @@ class Monster : public Soldier {
 			_squareDamp = Force / pow(_defaultMaxSpeed, 2);
 		};
 };
+
+#endif

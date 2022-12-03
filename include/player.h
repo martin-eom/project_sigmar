@@ -1,8 +1,7 @@
+#ifndef PLAYER
 #define PLAYER
 
-#ifndef BASE
-#include "base.h"
-#endif
+#include <base.h>
 
 class Player {
 	public:
@@ -10,3 +9,5 @@ class Player {
 		
 		Player() {};
 };
+
+#endif

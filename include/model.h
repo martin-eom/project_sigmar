@@ -1,23 +1,12 @@
+#ifndef MODEL
 #define MODEL
 
-#ifndef BASE
-#include "base.h"
-#endif
-#ifndef SOLDIERS
-#include "soldiers.h"
-#endif
-#ifndef UNITS
-#include "units.h"
-#endif
-#ifndef MAP
-#include "map.h"
-#endif
-#ifndef PHYSICS
-#include "physics.h"
-#endif
-#ifndef PLAYER
-#include "player.h"
-#endif
+#include <base.h>
+#include <soldiers.h>
+#include <units.h>
+#include <map.h>
+#include <physics.h>
+#include <player.h>
 
 class Model : public Listener{
 	public:
@@ -88,28 +77,9 @@ class Model : public Listener{
 				AppendOrdersRequest* oev = dynamic_cast<AppendOrdersRequest*>(ev);
 				Unit* unit = oev->unit;
 				if(unit) {
-					//unit->orders.clear();
-					//unit->orders = oev->orders;
 					for(auto order : oev->orders) {
 						unit->orders.push_back(order);
 					}
-					/*unit->currentOrder = 0;
-					/unit->nSoldiersArrived = 0;
-					/Order* o = unit->orders.at(0);
-					/std::vector<std::vector<Soldier*>>* soldiers = unit->soldiers();
-					for(int i = 0; i < unit->nrows(); i++) {
-						for(int j = 0; j < unit->width(); j++) {
-							Soldier* soldier = soldiers->at(i).at(j);
-							if(soldier) {
-								soldier->currentOrder = 0;
-								soldier->arrived = false;
-							}
-						}
-					}
-					if(o->type == ORDER_MOVE && unit->placed) {
-						ReformUnit(unit);
-						MoveTarget(unit);
-					}*/
 				}
 			}
 			else if(ev->type == UNIT_PLACE_REQUEST) {
@@ -235,7 +205,6 @@ class Model : public Listener{
 							}
 						}
 						if(unit->placed) {
-							//bool unitNextOrder = false;
 							if(unit->orders.size() > (unit->currentOrder + 1) && CurrentOrderCompleted(unit)) {
 								UnitNextOrder(unit);
 								Order* o = unit->orders.at(unit->currentOrder);
@@ -244,7 +213,6 @@ class Model : public Listener{
 									ReformUnit(unit);
 									MoveTarget(unit);
 								}
-								//unitNextOrder = true;
 							}
 							std::vector<std::vector<Soldier*>>* soldiers = unit->soldiers();
 							std::vector<std::vector<Eigen::Vector2d>>* posInUnit = unit->posInUnit();
@@ -267,3 +235,5 @@ class Model : public Listener{
 			}
 		}
 };
+
+#endif

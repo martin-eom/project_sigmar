@@ -1,41 +1,68 @@
+#ifndef MAP
 #define MAP
 
-#ifndef BASE
-#include "base.h"
-#endif
-#ifndef SOLDIERS
-#include "soldiers.h"
-#endif
+#include <base.h>
+#include <soldiers.h>
+#include <extra_math.h>
 
 #include <vector>
+#include <algorithm>
 #include <Dense>
 
+enum MAP_OBJECT_TYPES {
+	MAP_NONE,
+	MAP_RECTANGLE,
+	MAP_BORDER,
+	MAP_CIRCLE
+};
+
+class MapObject {
+public:
+	virtual int type() {return MAP_NONE;}
+	MapObject() {}
+};
+
+class MapCircle : public MapObject, public Circle {
+public:
+	int type() {return MAP_CIRCLE;}
+	MapCircle(Eigen::Vector2d pos, double rad) : MapObject(), Circle(pos, rad) {}
+};
+
+class MapRectangle : public MapObject, public Rrectangle {
+public:
+	int type() {return MAP_RECTANGLE;}
+	MapRectangle(double hl, double hw, Eigen::Vector2d pos, Eigen::Matrix2d rot) : MapObject(), Rrectangle(hl, hw, pos, rot) {}
+};
+
+class MapBorder : public MapObject, public Rrectangle {
+public:
+	int type() {return MAP_BORDER;}
+	MapBorder(double hl, double hw, Eigen::Vector2d pos, Eigen::Matrix2d rot) : MapObject(), Rrectangle(hl, hw, pos, rot) {}
+};
 
 class gridpiece{
 	public:
 		LinkedList<Soldier*> soldiers;
-		std::vector<Rrectangle*> rectangles;
-		std::vector<Circle*> circles;
+		std::vector<MapObject*> mapObjects;
 		LinkedList<gridpiece*> neighbours;
 		Rrectangle* rec;
 };
 
 class Map {
 	public:
+		const static int optimalTileSize = 31;
 		int tilesize;
 		int width;
-		int heigth;
+		int height;
 		int nrows;
 		int ncols;
 		std::vector<std::vector<gridpiece*>> tiles;
-		std::vector<Rrectangle*> rectangles;
-		std::vector<Circle*> circles;
+		std::vector<MapObject*> mapObjects;
+		std::vector<MapBorder*> borders;
 		
-		Map(int width, int heigth, int tilesize) {
-			this->width = width;
-			this->heigth = heigth;
-			this->tilesize = tilesize;
-			nrows = heigth / tilesize + bool(heigth % tilesize);
+	private:
+		void init() {
+			nrows = height / tilesize + bool(height % tilesize);
 			ncols = width / tilesize + bool(width % tilesize);
 			tiles = std::vector<std::vector<gridpiece*>>(nrows, std::vector<gridpiece*>(ncols, NULL));
 			for(int i = 0; i < nrows; i++) {
@@ -59,7 +86,33 @@ class Map {
 				}
 				tiles.at(i).at(ncols-1)->neighbours.Append(new Node<gridpiece*>(tiles.at(i+1).at(ncols-1)));
 			}
+			//creating map borders, but not adding them to objects yet
+			double hw = 0.5*width;
+			double hl = 0.5*height;
+			double ht = 0.5*tilesize;
+			Eigen::Vector2d pos;
+			Eigen::Matrix2d rot; rot << 1, 0, 0, 1;
+			pos << hw, height + ht;
+			borders.push_back(new MapBorder(ht, hw, pos, rot));
+			pos << width + ht, hl;
+			borders.push_back(new MapBorder(hl, ht, pos, rot));
+			pos << hw, -ht;
+			borders.push_back(new MapBorder(ht, hw, pos, rot));
+			pos << -ht, hl;
+			borders.push_back(new MapBorder(hl, ht, pos, rot));
 		}
+		
+	public:
+		Map(int width, int height, int tilesize) {
+			this->width = width;
+			this->height = height;
+			this->tilesize = tilesize;
+			init();
+		}
+
+		Map(int width, int height) : Map(width, height, optimalTileSize) {}
+
+		Map(std::string filename);	//defined in fileio.h
 		
 		void Cleangrid() {
 			for(int i = 0; i < nrows; i++) {
@@ -73,31 +126,71 @@ class Map {
 			tiles.at(i).at(j)->soldiers.Append(new Node<Soldier*>(soldier));
 		}
 
-		void AddMapRectangle(Rrectangle* rec) {
-			rectangles.push_back(rec);
-			Rrectangle extended(rec->hl + 0.5*tilesize, rec->hw + 0.5*tilesize, rec->pos, rec->rot);
-			for(int i = 0; i < this->nrows; i++) {
-				for(int j = 0; j < this->ncols; j++) {
-					if(RectangleRectangleCollision(&extended, tiles.at(i).at(j)->rec)) {
-						tiles.at(i).at(j)->rectangles.push_back(rec);
+		void AddMapObject(MapObject* obj) {
+			switch(obj->type()) {
+			case MAP_CIRCLE: {
+				Circle* circ = dynamic_cast<Circle*>(obj);
+				Circle extended = Circle(circ->pos, circ->rad + 0.5*tilesize);
+				for(auto row : tiles) {
+					for(auto tile : row) {
+						if(CircleRectangleCollision(&extended, tile->rec)) {
+							tile->mapObjects.push_back(obj);
+						}
 					}
+				}
+				break;}
+			case MAP_BORDER:
+			case MAP_RECTANGLE: {
+				Rrectangle* rec = dynamic_cast<Rrectangle*>(obj);
+				Rrectangle extended = Rrectangle(rec->hl + 0.5*tilesize, rec->hw + 0.5*tilesize, rec->pos, rec->rot);
+				for(auto row : tiles) {
+					for(auto tile : row) {
+						if(RectangleRectangleCollision(&extended, tile->rec)) {
+							tile->mapObjects.push_back(obj);
+						}
+					}
+				}
+				break;}
+			}
+			mapObjects.push_back(obj);
+		}
+
+		void RemoveMapObject(MapObject* obj) {
+			std::erase(mapObjects, obj);
+			for(auto row : tiles) {
+				for(auto tile : row) {
+					std::erase(tile->mapObjects, obj);
 				}
 			}
 		}
 
-		void AddMapCircle(Circle* circle) {
-			Circle extended = Circle(circle->pos, circle->rad + 0.5*tilesize);
-			circles.push_back(circle);
-			int i = 0;
-			for(auto row : tiles) {
-				for(auto tile : row) {
-					if(CircleRectangleCollision(&extended, tile->rec)) {
-						tile->circles.push_back(circle);
-						i++;
-					}
+		bool Borders() {
+			for(auto border : borders) {
+				for(auto obj : mapObjects) {
+					if(border == obj) return true;
 				}
 			}
-			std::cout << "circle collides with " << i << " tiles\n";
+			return false;
+		}
+
+		void toggelBorders() {
+			if(Borders()) {
+				for(auto border : borders) {
+					std::erase(mapObjects, border);
+					for(auto row : tiles) {
+						for(auto tile : row) {
+							std::erase(tile->mapObjects, border);
+						}
+					}
+				}
+				std::cout << "Toggled on map borders.\n";
+			}
+			else {
+				for(auto border : borders) {
+					AddMapObject(border);
+				}
+				std::cout << "Toggled off map borders.\n";
+			}
 		}
 };
 
@@ -249,3 +342,5 @@ void SoldierRectangleCollision(Soldier* soldier, Rrectangle* rec) {
 	soldier->knockVel += knockVel;
 	soldier->pos += soldierPosCorrection;
 }
+
+#endif

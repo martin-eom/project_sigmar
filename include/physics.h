@@ -1,26 +1,13 @@
+#ifndef PHYSICS
 #define PHYSICS
 
-#ifndef MATH
-#include "math.h"
-#endif
-#ifndef BASE
-#include "base.h"
-#endif
-#ifndef SOLDIERS
-#include "soldiers.h"
-#endif
-#ifndef UNITS
-#include "units.h"
-#endif
-#ifndef ORDERS
-#include "orders.h"
-#endif
-#ifndef MAP
-#include "map.h"
-#endif
-#ifndef PLAYER
-#include "player.h"
-#endif
+#include <extra_math.h>
+#include <base.h>
+#include <soldiers.h>
+#include <units.h>
+#include <orders.h>
+#include <map.h>
+#include <player.h>
 
 #ifndef _USE_MATH_DEFINES
 #define _USE_MATH_DEFINES
@@ -334,11 +321,21 @@ void MapObjectCollisionHandling(Map* map) {
 			while(soldNode) {
 				Soldier* soldier = soldNode->data;
 				if(soldier) {
-					for(auto rec : tile->rectangles) {
+					/*for(auto rec : tile->rectangles) {
 						SoldierRectangleCollision(soldier, rec);
 					}
 					for(auto circ: tile->circles) {
 						SoldierCircleCollision(soldier, circ);
+					}*/
+					for(auto object : tile->mapObjects) {
+						switch(object->type()) {
+						case MAP_RECTANGLE:
+							SoldierRectangleCollision(soldier, dynamic_cast<MapRectangle*>(object));
+							break;
+						case MAP_CIRCLE:
+							SoldierCircleCollision(soldier, dynamic_cast<MapCircle*>(object));
+							break;
+						}
 					}
 				}
 				soldNode = soldNode->next;
@@ -346,3 +343,5 @@ void MapObjectCollisionHandling(Map* map) {
 		}
 	}
 }
+
+#endif

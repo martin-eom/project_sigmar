@@ -1,14 +1,10 @@
+#ifndef BASE
 #define BASE
 
-#ifndef LINKEDLISTS
-#include "linkedlists.h"
-#endif
-#ifndef EVENTS
-#include "events.h"
-#endif
-#ifndef UNITS
-#include "units.h"
-#endif
+#include <linkedlists.h>
+#include <events.h>
+#include <units.h>
+#include <debug.h>
 
 #ifndef _USE_MATH_DEFINES
 #define _USE_MATH_DEFINES
@@ -19,6 +15,7 @@
 #include <algorithm>
 #include <string>
 #include <cmath>
+
 
 
 
@@ -72,3 +69,5 @@ void EventManager::Post(Event* ev) {
 			(*it)->Notify(ev);
 	}
 }
+
+#endif

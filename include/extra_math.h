@@ -1,4 +1,5 @@
-#define MATH
+#ifndef EXTRA_MATH
+#define EXTRA_MATH
 
 #ifndef _USE_MATH_DEFINES
 #define _USE_MATH_DEFINES
@@ -65,7 +66,6 @@ class Rrectangle;
 
 class Corner : public Point {
 public:
-	//Eigen::Vector2d pos;
 	Rrectangle* rec;
 
 	Corner(Eigen::Vector2d pos, Rrectangle* rec) : Point(pos) {
@@ -96,6 +96,36 @@ public:
 		corners.push_back(new Corner(cornerPos, this));
 		cornerPos << -hw, -hl; cornerPos = rot*cornerPos + pos;
 		corners.push_back(new Corner(cornerPos, this));
+	}
+
+	void Reposition(Eigen::Vector2d pos) {
+		Eigen::Vector2d dist = pos - this->pos;
+		for(auto corner : corners) {
+			corner->pos += dist;
+		}
+		this->pos += dist;
+	}
+
+	void Rotate(Eigen::Matrix2d rot) {
+		Eigen::Matrix2d rotDiff = rot * this->rot.transpose();
+		for(auto corner : corners) {
+			corner->pos = rotDiff * (corner->pos - pos) + pos;
+		}
+		this->rot = rot;
+	}
+
+	void Reshape(double hl, double hw) {
+		Eigen::Vector2d cornerPos;
+		cornerPos << -hw, hl; cornerPos = rot*cornerPos + pos;
+		corners.at(0)->pos = cornerPos;
+		cornerPos << hw, hl; cornerPos = rot*cornerPos + pos;
+		corners.at(1)->pos = cornerPos;
+		cornerPos << hw, -hl; cornerPos = rot*cornerPos + pos;
+		corners.at(2)->pos = cornerPos;
+		cornerPos << -hw, -hl; cornerPos = rot*cornerPos + pos;
+		corners.at(3)->pos = cornerPos;
+		this->hl = hl;
+		this->hw = hw;
 	}
 };
 
@@ -144,3 +174,12 @@ double Angle(double sin, double cos) {
 		return -acos(cos);
 	}
 }
+
+Eigen::Matrix2d Rotation(double angle) {
+	double _cos = cos(angle);
+	double _sin = sin(angle);
+	Eigen::Matrix2d rot; rot << _cos, -_sin, _sin, _cos;
+	return rot;
+}
+
+#endif

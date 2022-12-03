@@ -1,14 +1,9 @@
+#ifndef UNITS
 #define UNITS
 
-#ifndef SOLDIERS
-#include "soldiers.h"
-#endif
-#ifndef ORDERS
-#include "orders.h"
-#endif
-#ifndef MATH
-#include "math.h"
-#endif
+#include <soldiers.h>
+#include <orders.h>
+#include <extra_math.h>
 
 #include <iostream>
 #include <vector>
@@ -300,6 +295,7 @@ bool CurrentOrderCompleted(Unit* unit) {
 			return false;
 		}
 	}
+	else {return false;}
 }
 
 void UnitNextOrder(Unit* unit) {
@@ -365,3 +361,5 @@ Rrectangle UnitRectangle(Unit* unit, int orderID) {
 	}
 	return Rrectangle(halfWidth, halfDepth, pos, rot);
 }
+
+#endif

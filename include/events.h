@@ -1,8 +1,7 @@
+#ifndef EVENTS
 #define EVENTS
 
-#ifndef LINKEDLISTS
-#include "linkedlists.h"
-#endif
+#include <linkedlists.h>
 
 #include <list>
 #include <string>
@@ -179,3 +178,5 @@ class PlayerSelectEvent : public Event {
 			playerID = pID;
 		}
 };
+
+#endif
