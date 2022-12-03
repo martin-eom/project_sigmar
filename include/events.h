@@ -1,9 +1,13 @@
+#ifndef EVENTS
 #define EVENTS
+
+#include <linkedlists.h>
 
 #include <list>
 #include <string>
 #include <Dense>
 #include <SDL.h>
+#include <vector>
 
 enum EVENT_IDS {
 	GENERIC_EVENT,
@@ -12,6 +16,8 @@ enum EVENT_IDS {
 	REFORM_EVENT,
 	QUIT_EVENT,
 	CLICK_EVENT,
+	GIVE_ORDERS_REQUEST,
+	APPEND_ORDERS_REQUEST,
 	UNIT_MOVE_REQUEST,
 	UNIT_PLACE_REQUEST,
 	KILL_EVENT,
@@ -78,6 +84,33 @@ class ClickEvent : public Event {
 };
 
 class Unit;
+class Order;
+
+class GiveOrdersRequest : public Event {
+	public:
+		Unit* unit;
+		std::vector<Order*> orders;
+
+		GiveOrdersRequest(Unit* unit, std::vector<Order*> orders) : Event(){
+			name = "GiveOrdersRequest";
+			type = GIVE_ORDERS_REQUEST;
+			this->unit = unit;
+			this->orders = orders;
+		}
+};
+
+class AppendOrdersRequest : public Event {
+	public:
+		Unit* unit;
+		std::vector<Order*> orders;
+
+		AppendOrdersRequest(Unit* unit, std::vector<Order*> orders) : Event(){
+			name = "AppendOrdersRequest";
+			type = APPEND_ORDERS_REQUEST;
+			this->unit = unit;
+			this->orders = orders;
+		}
+};
 
 class UnitMoveRequest : public Event {
 	public:
@@ -145,3 +178,5 @@ class PlayerSelectEvent : public Event {
 			playerID = pID;
 		}
 };
+
+#endif

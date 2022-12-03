@@ -1,26 +1,17 @@
 #define NOMINMAX
 #include <Windows.h>	// this line is very dangerous, moving this statement to a different location causes all sorts of problems
 
-#ifndef SERVER
-#include "server.h"
-#endif
-#ifndef SHAPES
-#include "shapes.h"
-#endif
-#ifndef VIEW
-#include "view.h"
-#endif
-#ifndef INPUT
-#include "input.h"
-#endif
+#include <server.h>
+#include <shapes.h>
+#include <view.h>
+#include <input.h>
 
 #include <SDL.h>
 #include <stdio.h>
+#include <SDL_ttf.h>
 
 
 // Declaring variables
-const int SCREEN_WIDTH = 1200;
-const int SCREEN_HEIGHT = 750;
 SDL_Window* window = NULL;
 SDL_Renderer* renderer = NULL;
 Uint32 CURRENT_TICK;
@@ -45,7 +36,20 @@ int main(int argc, char* argv[1]) {
 
 	// Setting up game objects
 	EventManager* em = new EventManager(30);
-	Map* map = new Map(SCREEN_WIDTH,SCREEN_HEIGHT,31);
+	//Map* map = new Map(SCREEN_WIDTH,SCREEN_HEIGHT);
+	Map* map = new Map("maps/testmap.json");
+	int SCREEN_WIDTH = map->width;
+	int SCREEN_HEIGHT = map->height;
+	Eigen::Vector2d recPos;
+	recPos << 400., 400.;
+	Eigen::Matrix2d recRot;
+	recRot << 1, 0, 0, 1;
+	recRot << cos(M_PI/4.), -sin(M_PI/4.), sin(M_PI/4.), cos(M_PI/4.);
+	MapRectangle* rec1 = new MapRectangle(200, 200, recPos, recRot);
+	//map->AddMapObject(rec1);
+	Eigen::Vector2d circPos; circPos << 800, 400;
+	MapCircle* tht = new MapCircle(circPos, 100.);
+	//map->AddMapObject(tht);
 	Model* model = new Model(em, map);
 	Player* player1 = new Player();
 	model->players.Append(new Node<Player*>(player1));
@@ -90,6 +94,18 @@ int main(int argc, char* argv[1]) {
 	// Creating Input Controller object
 	KeyboardAndMouseController* controller = new KeyboardAndMouseController(em, model, SCREEN_HEIGHT);
 
+	// Extra Debug section
+	/*Eigen::Vector2d rpos; rpos << 0, 0;
+	Eigen::Vector2d rpos2; rpos2 << 2., 0;
+	Eigen::Vector2d cpos; cpos << -1.5, 1.5;
+	Eigen::Matrix2d rot; rot << 1, 0, 0, 1;
+	Rrectangle rec(1., 1., rpos, rot);
+	Rrectangle rec2(1.5, 0.5, rpos2, rot);
+	Circle circ(cpos, 1.);
+	std::cout << "-----------------------------------------------\n";
+	std::cout << RectangleRectangleCollision(&rec2, &rec) << std::endl;
+	std::cout << "-----------------------------------------------\n";*/
+
 	// Main loop
 	bool quit = false;
 	SDL_Event e;
@@ -105,7 +121,7 @@ int main(int argc, char* argv[1]) {
 			if (e.type == SDL_QUIT) {
 				quit = true;
 			}
-			else if((e.type == SDL_MOUSEBUTTONUP) || (e.type == SDL_KEYUP)) {
+			else if((e.type == SDL_MOUSEBUTTONUP) || (e.type == SDL_KEYUP) || (e.type == SDL_KEYDOWN)) {
 				SDLEvent ev(e);
 				em->Post(&ev);
 			}

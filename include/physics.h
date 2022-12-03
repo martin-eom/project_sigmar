@@ -1,20 +1,13 @@
+#ifndef PHYSICS
 #define PHYSICS
 
-#ifndef BASE
-#include "base.h"
-#endif
-#ifndef SOLDIERS
-#include "soldiers.h"
-#endif
-#ifndef UNITS
-#include "units.h"
-#endif
-#ifndef MAP
-#include "map.h"
-#endif
-#ifndef PLAYER
-#include "player.h"
-#endif
+#include <extra_math.h>
+#include <base.h>
+#include <soldiers.h>
+#include <units.h>
+#include <orders.h>
+#include <map.h>
+#include <player.h>
 
 #ifndef _USE_MATH_DEFINES
 #define _USE_MATH_DEFINES
@@ -24,7 +17,7 @@
 #include <cmath>
 
 
-void ReformUnit(Unit* unit, Eigen::Matrix2d rot) {
+void ReformUnit(Unit* unit) {
 	struct RebasedSoldier {
 		Soldier* soldier;
 		Eigen::Vector2d rebasedPos;
@@ -35,19 +28,33 @@ void ReformUnit(Unit* unit, Eigen::Matrix2d rot) {
 		}
 	};
 
-	Eigen::Matrix2d rotDiff = rot.transpose() * unit->rot;
+	//Eigen::Matrix2d rotDiff = rot.transpose() * unit->rot;
 	std::vector<std::vector<Soldier*>>* soldiers = unit->soldiers();
 	LinkedList<RebasedSoldier*> temp1;
 	LinkedList<RebasedSoldier*> temp2;
 	// Sorting soldiers by new "y coordinate" (front-back in formation)
 	for(int i = 0; i < unit->nrows(); i++) {
 		for(int j = 0; j < unit->width(); j++) {
-			if (soldiers->at(i).at(j)) {
-				RebasedSoldier* r = new RebasedSoldier(soldiers->at(i).at(j), rotDiff, unit->rot.transpose() * (soldiers->at(i).at(j)->pos - unit->pos));
+			Soldier* soldier = soldiers->at(i).at(j);
+			if (soldier) {
+				Eigen::Matrix2d rot;
+				Order* o = unit->orders.at(soldier->currentOrder);
+				if(o->type == ORDER_MOVE) {
+					MoveOrder* mo = dynamic_cast<MoveOrder*>(o);
+					rot = mo->rot;
+				}
+				else {rot = unit->rot;}
+				Eigen::Matrix2d rotDiff = rot.transpose() * unit->rot;
+				RebasedSoldier* r = new RebasedSoldier(soldier, rotDiff, rot.transpose() * (soldier->pos - unit->pos));
 				int n = 0;
 				Node<RebasedSoldier*>* current = temp1.head;
 				while(current) {
-					if (r->rebasedPos[0] < current->data->rebasedPos[0]) {
+					if (r->soldier->currentOrder < current->data->soldier->currentOrder) {
+						current = current->next;
+						n++;
+					}
+					else if (r->soldier->currentOrder == current->data->soldier->currentOrder && 
+						r->rebasedPos[0] < current->data->rebasedPos[0]) {
 						current = current->next;
 						n++;
 					}
@@ -57,7 +64,7 @@ void ReformUnit(Unit* unit, Eigen::Matrix2d rot) {
 			}
 		}
 	}
-	// Grabbing rows of soldiers and sorting them by new "x coordinate" (left-right in formation)
+	// Grabbing rows of soldiers and sorting them by currentOrder and new "x coordinate" (left-right in formation)
 	while(temp1.length()) {
 		LinkedList<RebasedSoldier*> tempRow;
 		// Filling tempRow
@@ -94,6 +101,7 @@ void ReformUnit(Unit* unit, Eigen::Matrix2d rot) {
 	PosInUnitByID(unit);
 }
 
+
 void DampenedHarmonicOscillator(Soldier* soldier, double dt) {	//deprecated / only for testing purposes
 	double k = 1;
 	double damp = 2;
@@ -107,6 +115,8 @@ void DampenedHarmonicOscillator(Soldier* soldier, double dt) {	//deprecated / on
 	soldier->vel = newVel;
 	soldier->force = newForce;
 }
+
+
 
 void TimeStep(Soldier* soldier, double dt) {
 	Eigen::Vector2d newPos, newVel;
@@ -196,6 +206,27 @@ void TimeStep(Soldier* soldier, double dt) {
 	soldier->vel = newVel;
 	soldier->force = newForce;
 	soldier->knockVel << 0., 0.;
+	//check if order complete
+	bool newestOrder = (soldier->currentOrder == soldier->unit->currentOrder);
+	Order* o = soldier->unit->orders.at(soldier->currentOrder);
+	if(o->type = ORDER_MOVE) {
+		MoveOrder* mo = dynamic_cast<MoveOrder*>(o);
+		if(!soldier->arrived) {
+			if(newestOrder) {
+				if(closeToTarget) {
+					soldier->arrived = true;
+					soldier->unit->nSoldiersArrived++;
+				}
+			}
+			else {
+				Rrectangle rec = SoldierRectangle(soldier);
+				Point p(soldier->pos);
+				if(PointRectangleCollision(&p, &rec)) {
+					soldier->arrived = true;
+				}
+			}
+		}
+	}
 }
 
 void KnockKnock(Soldier* sold1, Soldier* sold2) {
@@ -214,6 +245,14 @@ void KnockKnock(Soldier* sold1, Soldier* sold2) {
 			Eigen::Vector2d prod = 2. * dxdv * dx / (totalMass * pow(d,2));
 			sold1->knockVel += sold2->mass() * prod;
 			sold2->knockVel -= sold1->mass() * prod;
+			if(sold1->unit->player == sold2->unit->player && sold1->unit == sold2->unit) {
+				if(sold1->currentOrder < sold2->currentOrder) {
+					sold1->arrived = true;
+				}
+				else if(sold1->currentOrder > sold2->currentOrder) {
+					sold2->arrived = true;
+				}
+			}
 		}
 	}
 }
@@ -272,3 +311,37 @@ void CollisionResolution(Map* map) {
 		}
 	}
 }
+
+void MapObjectCollisionHandling(Map* map) {
+	for(int i = 0; i < map->nrows; i++) {
+		for(int j = 0; j < map->ncols; j++) {
+			gridpiece* tile = map->tiles.at(i).at(j);
+			Node<Soldier*>* soldNode;
+			soldNode = tile->soldiers.head;
+			while(soldNode) {
+				Soldier* soldier = soldNode->data;
+				if(soldier) {
+					/*for(auto rec : tile->rectangles) {
+						SoldierRectangleCollision(soldier, rec);
+					}
+					for(auto circ: tile->circles) {
+						SoldierCircleCollision(soldier, circ);
+					}*/
+					for(auto object : tile->mapObjects) {
+						switch(object->type()) {
+						case MAP_RECTANGLE:
+							SoldierRectangleCollision(soldier, dynamic_cast<MapRectangle*>(object));
+							break;
+						case MAP_CIRCLE:
+							SoldierCircleCollision(soldier, dynamic_cast<MapCircle*>(object));
+							break;
+						}
+					}
+				}
+				soldNode = soldNode->next;
+			}
+		}
+	}
+}
+
+#endif
