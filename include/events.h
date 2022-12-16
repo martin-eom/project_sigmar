@@ -1,7 +1,6 @@
 #ifndef EVENTS
 #define EVENTS
 
-#include <linkedlists.h>
 
 #include <list>
 #include <string>
@@ -17,12 +16,20 @@ enum EVENT_IDS {
 	QUIT_EVENT,
 	CLICK_EVENT,
 	GIVE_ORDERS_REQUEST,
+	REMEMBER_ORDERS,
 	APPEND_ORDERS_REQUEST,
 	UNIT_MOVE_REQUEST,
 	UNIT_PLACE_REQUEST,
 	KILL_EVENT,
 	UNIT_SELECT_EVENT,
-	PLAYER_SELECT_EVENT
+	UNIT_ADD_EVENT,
+	UNIT_DELETE_EVENT,
+	PLAYER_SELECT_EVENT,
+	PLAYER_ADD_EVENT,
+	PLAYER_DELETE_EVENT,
+	CTRL_STATE_EVENT,
+	INPUT_RECEIVED_EVENT,
+	CHANGE_TEXTBOX_EVENT
 };
 
 class Event {
@@ -99,6 +106,17 @@ class GiveOrdersRequest : public Event {
 		}
 };
 
+class RememberOrders : public Event {
+	public:
+		std::vector<Order*> orders;
+
+		RememberOrders(std::vector<Order*> orders) : Event() {
+			name = "RememberOrders";
+			type = REMEMBER_ORDERS;
+			this->orders = orders;
+		}
+};
+
 class AppendOrdersRequest : public Event {
 	public:
 		Unit* unit;
@@ -168,6 +186,25 @@ class UnitSelectEvent : public Event {
 		}
 };
 
+class UnitAddEvent : public Event {
+	public:
+		int unitType;
+
+		UnitAddEvent(int type) : Event() {
+			name = "UnitAddEvent";
+			this->type = UNIT_ADD_EVENT;
+			unitType = type;
+		}
+};
+
+class UnitDeleteEvent : public Event {
+	public:
+		UnitDeleteEvent() : Event() {
+			name = "UnitDeleteEvent";
+			type = UNIT_DELETE_EVENT;
+		}
+};
+
 class PlayerSelectEvent : public Event {
 	public:
 		int playerID;
@@ -177,6 +214,52 @@ class PlayerSelectEvent : public Event {
 			type = PLAYER_SELECT_EVENT;
 			playerID = pID;
 		}
+};
+
+class PlayerAddEvent : public Event {
+	public:
+		PlayerAddEvent() : Event() {
+			name = "PlayerAddEvent";
+			type = PLAYER_ADD_EVENT;
+		}
+};
+
+class PlayerDeleteEvent : public Event {
+	public:
+		PlayerDeleteEvent() : Event() {
+			name = "PlayerDeleteEvent";
+			type = PLAYER_DELETE_EVENT;
+		}
+};
+
+class CtrlStateEvent : public Event {
+public:
+	int state;
+
+	CtrlStateEvent(int state) : Event() {
+		name = "CtrlStateEvent";
+		type = CTRL_STATE_EVENT;
+		this->state = state;
+	}
+};
+
+class InputReceivedEvent : public Event {
+public:
+	InputReceivedEvent() : Event() {
+		name = "InputReceivedEvent";
+		type = INPUT_RECEIVED_EVENT;
+	}
+};
+
+class ChangeTextboxEvent : public Event {
+public:
+	std::string text;
+
+	ChangeTextboxEvent(std::string text) : Event() {
+		name = "ChangeTextboxEvent";
+		type = CHANGE_TEXTBOX_EVENT;
+		this->text = text;
+	}
 };
 
 #endif
