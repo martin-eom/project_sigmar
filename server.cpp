@@ -20,7 +20,14 @@ Uint32 T_OF_NEXT_FPS_UPDATE;
 Uint32 T_OF_NEXT_REFORM;
 int TICKS_SINCE_LAST_FPS_UPDATE;
 int TICKS_SINCE_LAST_REFORM;
+int SCREEN_WIDTH;
+int SCREEN_HEIGHT;
 
+GameEventManager* em;
+KeyboardAndMouseController* ctrl;
+View* view;
+Map* map;
+Model* model;
 
 void close() {
 	SDL_DestroyRenderer(renderer);
@@ -29,82 +36,74 @@ void close() {
 	renderer = NULL;
 }
 
-int main(int argc, char* argv[1]) {
-	AllocConsole();
-	freopen("CONOUT$", "w", stdout);
-	freopen("CONOUT$", "w", stderr);
-
-	// Setting up game objects
-	EventManager* em = new EventManager(30);
-	//Map* map = new Map(SCREEN_WIDTH,SCREEN_HEIGHT);
-	Map* map = new Map("maps/testmap.json");
-	int SCREEN_WIDTH = map->width;
-	int SCREEN_HEIGHT = map->height;
-	Eigen::Vector2d recPos;
-	recPos << 400., 400.;
-	Eigen::Matrix2d recRot;
-	recRot << 1, 0, 0, 1;
-	recRot << cos(M_PI/4.), -sin(M_PI/4.), sin(M_PI/4.), cos(M_PI/4.);
-	MapRectangle* rec1 = new MapRectangle(200, 200, recPos, recRot);
-	//map->AddMapObject(rec1);
-	Eigen::Vector2d circPos; circPos << 800, 400;
-	MapCircle* tht = new MapCircle(circPos, 100.);
-	//map->AddMapObject(tht);
-	Model* model = new Model(em, map);
+void OpenWindow(Map* map) {
+	em = new GameEventManager(30);
+	SCREEN_WIDTH = map->width;
+	SCREEN_HEIGHT = map->height;
+	model = new Model(em, map);
 	Player* player1 = new Player();
-	model->players.Append(new Node<Player*>(player1));
-	player1->units.Append(new Node<Unit*>(new Infantry(player1)));
-	player1->units.Append(new Node<Unit*>(new Infantry(player1)));
-	player1->units.Append(new Node<Unit*>(new Infantry(player1)));
-	player1->units.Append(new Node<Unit*>(new Cavalry(player1)));
-	player1->units.Append(new Node<Unit*>(new MonsterUnit(player1)));
+	model->players.push_back(player1);
+	player1->units.push_back(new Infantry(player1));
+	player1->units.push_back(new Cavalry(player1));
+	player1->units.push_back(new MonsterUnit(player1));
 	Player* player2 = new Player();
-	model->players.Append(new Node<Player*>(player2));
-	player2->units.Append(new Node<Unit*>(new Infantry(player2)));
-	player2->units.Append(new Node<Unit*>(new Infantry(player2)));
-	player2->units.Append(new Node<Unit*>(new Infantry(player2)));
-	player2->units.Append(new Node<Unit*>(new Cavalry(player2)));
-	player2->units.Append(new Node<Unit*>(new MonsterUnit(player2)));
+	model->players.push_back(player2);
+	player2->units.push_back(new Infantry(player2));
+	player2->units.push_back(new Cavalry(player2));
+	player2->units.push_back(new MonsterUnit(player2));
 	model->SetPlayer();
 	model->SetUnit();
-	
-	// Initializing SDL
-	if(SDL_Init(SDL_INIT_EVERYTHING) != 0) {
-		std::cout << "Failed to initialize SDL!\n";
-		return -1;
-	}
-	
+	ctrl = new KeyboardAndMouseController(em, model, SCREEN_HEIGHT);
+	em->ctrl = ctrl;
+	em->model = model;
+
 	// Creating Window and Renderer
 	window = SDL_CreateWindow("Game",
 			SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED, 
 			SCREEN_WIDTH, SCREEN_HEIGHT, SDL_WINDOW_SHOWN);
 	if(!window) {
 		std::printf("Could not create window: %s", SDL_GetError());
-		return -1;
 	}
 	renderer = SDL_CreateRenderer(window, -1, SDL_RENDERER_ACCELERATED);
 	if(!renderer) {
 		std::printf("Could not create renderer: %s", SDL_GetError());
-		return -1;
 	}
 
-	// Creating View object
-	View* view = new View(em, map, model, window, renderer, SCREEN_HEIGHT);
+	view = new View(em, map, model, window, renderer, SCREEN_HEIGHT);
 
-	// Creating Input Controller object
-	KeyboardAndMouseController* controller = new KeyboardAndMouseController(em, model, SCREEN_HEIGHT);
+}
+
+void ResetTextbox(std::string text, bool input) {
+	if(input) {
+		if(!SDL_IsTextInputActive()) SDL_StartTextInput();
+	}
+	else {
+		if(SDL_IsTextInputActive()) SDL_StopTextInput();
+	}
+	em->Post(new ChangeTextboxEvent(text));
+}
+
+
+int main(int argc, char* argv[1]) {
+	AllocConsole();
+	freopen("CONOUT$", "w", stdout);
+	freopen("CONOUT$", "w", stderr);
+
+	// Initializing SDL
+	if(SDL_Init(SDL_INIT_EVERYTHING) != 0) {
+		std::cout << "Failed to initialize SDL!\n";
+		return -1;
+	}
+	if(TTF_Init() != 0) {
+		std::cout << "Failed to initialize TTF!\n";
+		return -1;
+	}
+	SDL_StopTextInput();
+
+	map = new Map("maps/testmap.json");
+	OpenWindow(map);
 
 	// Extra Debug section
-	/*Eigen::Vector2d rpos; rpos << 0, 0;
-	Eigen::Vector2d rpos2; rpos2 << 2., 0;
-	Eigen::Vector2d cpos; cpos << -1.5, 1.5;
-	Eigen::Matrix2d rot; rot << 1, 0, 0, 1;
-	Rrectangle rec(1., 1., rpos, rot);
-	Rrectangle rec2(1.5, 0.5, rpos2, rot);
-	Circle circ(cpos, 1.);
-	std::cout << "-----------------------------------------------\n";
-	std::cout << RectangleRectangleCollision(&rec2, &rec) << std::endl;
-	std::cout << "-----------------------------------------------\n";*/
 
 	// Main loop
 	bool quit = false;
@@ -121,7 +120,7 @@ int main(int argc, char* argv[1]) {
 			if (e.type == SDL_QUIT) {
 				quit = true;
 			}
-			else if((e.type == SDL_MOUSEBUTTONUP) || (e.type == SDL_KEYUP) || (e.type == SDL_KEYDOWN)) {
+			else if((e.type == SDL_MOUSEBUTTONUP) || (e.type == SDL_KEYUP) || (e.type == SDL_KEYDOWN) ||(e.type == SDL_TEXTINPUT) || (e.type == SDL_MOUSEMOTION)) {
 				SDLEvent ev(e);
 				em->Post(&ev);
 			}
@@ -145,9 +144,30 @@ int main(int argc, char* argv[1]) {
 			TICKS_SINCE_LAST_REFORM = 0;
 			T_OF_NEXT_REFORM = CURRENT_TICK + 5000;
 		}
+		Event* ev = NULL;
+		switch(ctrl->state()) {
+		case CTRL_IDLE:
+			ResetTextbox("", false);
+			break;
+		case CTRL_LOADING:
+			if(!SDL_IsTextInputActive()) {
+				ResetTextbox("Loading new map. Enter file name: ", true);
+			}
+			if(ctrl->inputConfirmed()) {
+				map = new Map("maps/" + ctrl->input());
+				close();
+				OpenWindow(map);
+			}
+			break;
+		case CTRL_QUITTING:
+			quit = true;
+			break;
+		}
+		if(ev) em->Post(ev);
 	}
 
 	// Cleanup
 	close();
 	SDL_Quit();
+	return -1;
 }

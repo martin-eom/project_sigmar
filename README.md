@@ -43,8 +43,4 @@ For installation on Windows an installer will be included in all releases starti
 ### Map Editor
 At any stage hold down h to view the available contols.
 ### Game
-There are two players. Swap between them with arroykey up/down.
-Every player currently has 3 infantry units, 1 cavalry unit and 1 monster in that order. Switch between the units with arrowkey left/right.
-At the beginning none of the units are placed on the map. They will be placed when they receive their first order.
-Orders are created by clicking one the map twice to specify first the position and then the direction they will be looking in (as the line between first and second click). Orders are handled in a queue. Just clicking normally will replace all orders in the queue. Holding l-Shift  while clicking will instead append the new order to the queue. Pressing enter will send the orders to the currently selected unit and replace their order queue. Holding l-Shifr while pressing enter will instead append all orders from the queue to their order queue.
-Pressing p will toggle between two different movement modes applied to orders that are created while a mode is active. The first is form-up: Units will wait before going to the next order in their queue until at least 90% pf their soldiers have completed their current order. The second is passing-through: Soldiers will immediately go to the next order when they complete a current one.
+The controls being shown on screen can be toggled by pressing h.

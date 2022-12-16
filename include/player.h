@@ -2,10 +2,11 @@
 #define PLAYER
 
 #include <base.h>
+#include <vector>
 
 class Player {
 	public:
-		LinkedList<Unit*> units;
+		std::vector<Unit*> units;
 		
 		Player() {};
 };

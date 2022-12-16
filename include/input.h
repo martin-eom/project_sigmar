@@ -14,33 +14,303 @@
 #include <string.h>
 
 
+enum CONTROLLER_STATES {
+	CTRL_IDLE,
+	CTRL_LOADING,
+	CTRL_QUITTING,
+	CTRL_SELECTING_PLAYER,
+	CTRL_SELECTING_UNIT,
+	CTRL_ADDING_UNIT,
+	CTRL_GIVING_ORDERS
+};
 
 class KeyboardAndMouseController : public Listener {
 	private:
 		int SCREEN_HEIGHT;
-		Eigen::Vector2d p0, p1;
-		Eigen::Matrix2d rot;
 		bool firstPointSet;
 		bool queueingOrders;
-		bool passingThrough;
+		bool _inputConfirmed;
 		Model* model;
-		std::vector<Order*> orders;
+		std::string _input;
+		int _state;
+		bool _help;
+		bool _shift;
+		bool _ctrl;
 	public:
+		std::vector<Order*> orders;
+		Eigen::Vector2d p0, p1;
+		Eigen::Matrix2d rot;
+		bool passingThrough;
+		bool help() {return _help;}
+		int state() {return _state;}
+		bool shift() {return _shift;}
+		bool ctrl() {return _ctrl;}
+		bool inputConfirmed() {return _inputConfirmed;}
+		std::string input() {return _input;}
+		int newUnitType;
+
 		KeyboardAndMouseController(EventManager* em, Model* model,int SCREEN_HEIGHT) : Listener(em) {
 			this->SCREEN_HEIGHT = SCREEN_HEIGHT;
 			this->model = model;
+
+			_state = CTRL_IDLE;
+			_help = false;
+			_shift = false;
+			_ctrl = false;
 			firstPointSet = false;
-			queueingOrders = false;
 			passingThrough = false;
+			queueingOrders = false;
+			_inputConfirmed = false;
+			newUnitType = 0;
+			rot << 1, 0, 0, 1;
 		};
 	private:
 		void Notify(Event* ev) {
-			if(ev->type == SDL_EVENT) {
+			GameEventManager* gem = dynamic_cast<GameEventManager*>(em);
+			if(ev->type == CTRL_STATE_EVENT) {
+				CtrlStateEvent* cev = dynamic_cast<CtrlStateEvent*>(ev);
+				_state = cev->state;
+			}
+			else if(ev->type == INPUT_RECEIVED_EVENT) {
+				_inputConfirmed = false;
+				_input = "";
+			}
+			else if(ev->type == REMEMBER_ORDERS) {
+				debug("Remembered Orders!");
+				RememberOrders* rem = dynamic_cast<RememberOrders*>(ev);
+				orders = rem->orders;
+			}
+			else if(ev->type == SDL_EVENT) {
 				SDL_Event e = dynamic_cast<SDLEvent*>(ev)->event;
 				if(e.type == SDL_MOUSEBUTTONUP) {
 					int x, y;
 					x = e.button.x;
 					y = SCREEN_HEIGHT - e.button.y;
+					switch(_state) {
+					case CTRL_GIVING_ORDERS:
+						if(firstPointSet) {
+							p1 << x, y;
+							double dx = p1.coeff(0) - p0.coeff(0);
+							double dy = p1.coeff(1) - p0.coeff(1);
+							double dp = sqrt(dx*dx + dy*dy);
+							if(dp !=0 ) {
+								double cos = dx / dp;
+								double sin = dy / dp;
+								rot << cos, -sin, sin, cos;
+								MoveOrder* mo = new MoveOrder(p0, rot, MOVE_FORMUP);
+								if(passingThrough) {mo->moveType = MOVE_PASSINGTHROUGH;}
+								if(!queueingOrders) {orders.clear();}
+								orders.push_back(mo);
+								std::cout << orders.size() << " orders queued\n";
+							}
+							else {
+								std::cout << "First and second point are identical, can't get angel.\n";
+							}
+						}
+						else {
+							p0 << x, y;
+						}
+						firstPointSet = !firstPointSet;
+						break;
+					case CTRL_SELECTING_UNIT:
+						double dist;
+						double minDist = 1000000;	//infinity
+						Eigen::Vector2d mouse; mouse << x, y;
+						for(auto unit : model->selectedPlayer->units) {
+							if(unit->placed) {
+								dist = (unit->pos - mouse).norm();
+								if(dist < minDist) {
+									gem->model->selectedUnit = unit;
+									em->Post(new RememberOrders(unit->orders));
+									minDist = dist;
+								}
+							}
+						}
+					}
+				}
+
+				else if(e.type == SDL_KEYDOWN) {
+					switch(e.key.keysym.sym) {
+					case SDLK_LSHIFT:
+						_shift = true;
+						break;
+					case SDLK_LCTRL:
+						_ctrl = true;
+						if(!e.key.repeat) {
+							queueingOrders = true;
+							std::cout << "Queueing orders...\n";
+						}
+						break;
+					}
+				}
+				else if(e.type == SDL_KEYUP) {
+					Event* nev = new Event();
+					switch(e.key.keysym.sym) {
+					case SDLK_RETURN:
+						debug(std::to_string(_state));
+						switch(_state) {
+						case CTRL_IDLE:
+							break;
+						case CTRL_GIVING_ORDERS:
+							if(model->selectedUnit) {
+								if(orders.size() > 0) {
+									if(queueingOrders) {
+										nev = new AppendOrdersRequest(model->selectedUnit, orders);
+									}
+									else {
+										nev = new GiveOrdersRequest(model->selectedUnit, orders);
+									}
+									debug(std::to_string(_state));
+								}
+								else {std::cout << "No orders sent, order list is empty.\n";}
+							}
+							else {
+								std::cout << "No unit was selected. Attempting to set unit..\n";
+								model->SetUnit();
+							}
+							debug(std::to_string(_state));
+							break;
+						case CTRL_LOADING:
+							_inputConfirmed = true;
+							break;
+						case CTRL_ADDING_UNIT:
+							switch(newUnitType) {
+							case 0:
+								em->Post(new UnitAddEvent(UNIT_INFANTRY)); break;
+							case 1:
+								em->Post(new UnitAddEvent(UNIT_CAVALRY)); break;
+							case 2:
+								em->Post(new UnitAddEvent(UNIT_MONSTER)); break;
+							}
+							_state = CTRL_SELECTING_UNIT;
+							break;
+						}
+						break;
+					case SDLK_BACKSPACE:
+						switch(SDL_IsTextInputActive()) {
+						case true:
+							if(_input.size() > 0) _input.pop_back(); break;
+						}
+						break;
+					case SDLK_ESCAPE:
+						switch(_state) {
+						case CTRL_LOADING:
+							_state = CTRL_IDLE;
+							_inputConfirmed = false;
+							_input = "";
+							break;
+						case CTRL_SELECTING_PLAYER:
+						case CTRL_SELECTING_UNIT:
+						case CTRL_GIVING_ORDERS:
+							_state = CTRL_IDLE;
+							break;
+						case CTRL_ADDING_UNIT:
+							_state = CTRL_SELECTING_UNIT;
+							break;
+						case CTRL_IDLE:
+							gem->model->selectedUnit = NULL;
+							break;
+						}break;
+					case SDLK_LEFT:
+						switch(_state) {
+						case CTRL_SELECTING_UNIT:
+							nev = new UnitSelectEvent(-1);
+							break;
+						}break;
+					case SDLK_RIGHT:
+						switch(_state) {
+						case CTRL_SELECTING_UNIT:
+							nev = new UnitSelectEvent(1);
+							break;
+						}break;
+					case SDLK_UP:
+						switch(_state) {
+						case CTRL_SELECTING_PLAYER:
+							nev = new PlayerSelectEvent(-1);
+							break;
+						case CTRL_ADDING_UNIT:
+							newUnitType = (newUnitType - 1) % 3;
+							break;
+						}break;
+					case SDLK_DOWN:
+						switch(_state) {
+						case CTRL_SELECTING_PLAYER:
+							nev = new PlayerSelectEvent(1);
+							break;
+						case CTRL_ADDING_UNIT:
+							newUnitType = (newUnitType + 1) % 3;
+							break;
+						}break;
+					case SDLK_LSHIFT:
+						_shift = false;
+						break;
+					case SDLK_LCTRL:
+						_ctrl = false;
+						queueingOrders = false;
+						std::cout << "...done.\n";
+						break;
+					case SDLK_a:
+						switch(_state) {
+						case CTRL_SELECTING_PLAYER:
+							em->Post(new PlayerAddEvent()); break;
+						case CTRL_SELECTING_UNIT:
+							_state = CTRL_ADDING_UNIT; break;
+						}
+						break;
+					case SDLK_d:
+						switch(_state) {
+						case CTRL_SELECTING_PLAYER:
+							em->Post(new PlayerDeleteEvent()); break;
+						case CTRL_SELECTING_UNIT:
+							em->Post(new UnitDeleteEvent()); break;
+						}
+						break;
+					case SDLK_h:
+						if(!SDL_IsTextInputActive())
+							_help = !_help; break;
+					case SDLK_l:
+						if(_shift) _state = CTRL_LOADING;
+						break;
+					case SDLK_o:
+						switch(_state) {
+						case CTRL_IDLE:
+							_state = CTRL_GIVING_ORDERS;
+							break;
+						}
+						break;
+					case SDLK_p:
+						switch(_state) {
+						case CTRL_IDLE:
+							_state = CTRL_SELECTING_PLAYER;
+							break;
+						case CTRL_GIVING_ORDERS:
+							passingThrough = !passingThrough;
+							if(passingThrough) {std::cout << "moveType: passing through\n";}
+							else {std::cout << "moveType: forming up\n";}
+							break;
+						}
+						break;
+					case SDLK_q:
+						if(_shift) _state = CTRL_QUITTING;
+						break;
+					case SDLK_u:
+						switch(_state) {
+						case CTRL_IDLE:
+							_state = CTRL_SELECTING_UNIT;
+							break;
+						}
+					}
+					if(nev->type != GENERIC_EVENT) {
+						em->Post(nev);
+					}
+				}
+				if(e.type == SDL_TEXTINPUT) {
+					_input += e.text.text;
+				}
+				if(e.type == SDL_MOUSEMOTION) {
+					int x, y;
+					x = e.motion.x;
+					y = SCREEN_HEIGHT - e.motion.y;
 					if(firstPointSet) {
 						p1 << x, y;
 						double dx = p1.coeff(0) - p0.coeff(0);
@@ -50,69 +320,14 @@ class KeyboardAndMouseController : public Listener {
 							double cos = dx / dp;
 							double sin = dy / dp;
 							rot << cos, -sin, sin, cos;
-							MoveOrder* mo = new MoveOrder(p0, rot, MOVE_FORMUP);
-							if(passingThrough) {mo->moveType = MOVE_PASSINGTHROUGH;}
-							if(!queueingOrders) {orders.clear();}
-							orders.push_back(mo);
-							std::cout << orders.size() << " orders queued\n";
-						}
-						else {
-							std::cout << "First and second point are identical, can't get angel.\n";
 						}
 					}
-					else {
-						p0 << x, y;
-					}
-					firstPointSet = !firstPointSet;
-				}
-				else if(e.type == SDL_KEYDOWN) {
-					if(e.key.keysym.sym == SDLK_LSHIFT && !e.key.repeat) {
-						queueingOrders = true;
-						std::cout << "Queueing orders...\n";
-					}
-				}
-				else if(e.type == SDL_KEYUP) {
-					Event* nev = new Event();
-					if(e.key.keysym.sym == SDLK_RETURN) {
-						if(model->selectedUnitNode) {
-							if(orders.size() > 0) {
-								if(queueingOrders) {
-									nev = new AppendOrdersRequest(model->selectedUnitNode->data, orders);
-								}
-								else {
-									nev = new GiveOrdersRequest(model->selectedUnitNode->data, orders);
-								}
-							}
-							else {std::cout << "No orders sent, order list is empty.\n";}
+					else p0 << x, y;
+					if(_state == CTRL_GIVING_ORDERS && gem->model->selectedUnit) {
+						if(!gem->model->selectedUnit->placed) {
+							gem->model->selectedUnit->pos << x, y;
+							gem->model->selectedUnit->rot = rot;
 						}
-						else {
-							std::cout << "No unit was selected. Attempting to set unit..\n";
-							model->SetUnit();
-						}
-					}
-					else if(e.key.keysym.sym == SDLK_LEFT) {
-						nev = new UnitSelectEvent(-1);
-					}
-					else if(e.key.keysym.sym == SDLK_RIGHT) {
-						nev = new UnitSelectEvent(1);
-					}
-					else if(e.key.keysym.sym == SDLK_UP) {
-						nev = new PlayerSelectEvent(-1);
-					}
-					else if(e.key.keysym.sym == SDLK_DOWN) {
-						nev = new PlayerSelectEvent(1);
-					}
-					else if(e.key.keysym.sym == SDLK_LSHIFT) {
-						queueingOrders = false;
-						std::cout << "...done.\n";
-					}
-					else if(e.key.keysym.sym == SDLK_p) {
-						passingThrough = !passingThrough;
-						if(passingThrough) {std::cout << "moveType: passing through\n";}
-						else {std::cout << "moveType: forming up\n";}
-					}
-					if(nev->type != GENERIC_EVENT) {
-						em->Post(nev);
 					}
 				}
 			}

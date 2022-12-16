@@ -1,7 +1,7 @@
 #ifndef BASE
 #define BASE
 
-#include <linkedlists.h>
+
 #include <events.h>
 #include <units.h>
 #include <debug.h>
@@ -24,10 +24,11 @@ class Listener;
 
 class EventManager {
 	public:
-		std::list<int> noPrint = {GENERIC_EVENT, TICK_EVENT, SDL_EVENT};
+		std::list<int> noPrint = {GENERIC_EVENT, TICK_EVENT, SDL_EVENT, CHANGE_TEXTBOX_EVENT};
 		std::list<Listener*> listeners;
 		int fps = 30;
 		double dt = 1./30.;
+		virtual void _polymorphism(){};	//necessary to make the class polymorphic
 		
 		EventManager() {};
 		EventManager(int fps){
@@ -65,9 +66,23 @@ void EventManager::Post(Event* ev) {
 	if(std::find(noPrint.begin(), noPrint.end(), ev->type)==noPrint.end()) {
 		std::cout << " - posted " << ev->name << "\n";
 	}
-	for (std::list<Listener*>::iterator it = listeners.begin(); it != listeners.end(); it++) {
-			(*it)->Notify(ev);
+	for(auto listener : listeners) {
+		listener->Notify(ev);
 	}
 }
+
+class KeyboardAndMouseController;
+class Model;
+
+class GameEventManager : public EventManager {
+public:
+	KeyboardAndMouseController* ctrl;
+	Model* model;
+
+	GameEventManager(int fps) : EventManager(fps){
+		ctrl = NULL;
+		model = NULL;
+	}
+};
 
 #endif

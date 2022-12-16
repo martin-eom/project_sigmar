@@ -15,6 +15,7 @@
 
 #include <Dense>
 #include <cmath>
+#include <deque>
 
 
 void ReformUnit(Unit* unit) {
@@ -30,8 +31,8 @@ void ReformUnit(Unit* unit) {
 
 	//Eigen::Matrix2d rotDiff = rot.transpose() * unit->rot;
 	std::vector<std::vector<Soldier*>>* soldiers = unit->soldiers();
-	LinkedList<RebasedSoldier*> temp1;
-	LinkedList<RebasedSoldier*> temp2;
+	std::deque<RebasedSoldier*> temp1;
+	std::deque<RebasedSoldier*> temp2;
 	// Sorting soldiers by new "y coordinate" (front-back in formation)
 	for(int i = 0; i < unit->nrows(); i++) {
 		for(int j = 0; j < unit->width(); j++) {
@@ -46,55 +47,51 @@ void ReformUnit(Unit* unit) {
 				else {rot = unit->rot;}
 				Eigen::Matrix2d rotDiff = rot.transpose() * unit->rot;
 				RebasedSoldier* r = new RebasedSoldier(soldier, rotDiff, rot.transpose() * (soldier->pos - unit->pos));
-				int n = 0;
-				Node<RebasedSoldier*>* current = temp1.head;
-				while(current) {
-					if (r->soldier->currentOrder < current->data->soldier->currentOrder) {
-						current = current->next;
-						n++;
+				auto current = temp1.begin();
+				while(current != temp1.end()) {
+					if (r->soldier->currentOrder < (*current)->soldier->currentOrder) {
+						current = std::next(current);
 					}
-					else if (r->soldier->currentOrder == current->data->soldier->currentOrder && 
-						r->rebasedPos[0] < current->data->rebasedPos[0]) {
-						current = current->next;
-						n++;
+					else if (r->soldier->currentOrder == (*current)->soldier->currentOrder && 
+						r->rebasedPos[0] < (*current)->rebasedPos[0]) {
+						current = std::next(current);
 					}
 					else break;
 				}
-				temp1.Insert(n, new Node<RebasedSoldier*>(r));
+				temp1.insert(current, r);
 			}
 		}
 	}
 	// Grabbing rows of soldiers and sorting them by currentOrder and new "x coordinate" (left-right in formation)
-	while(temp1.length()) {
-		LinkedList<RebasedSoldier*> tempRow;
+	while(!temp1.empty()) {
+		std::deque<RebasedSoldier*> tempRow;
 		// Filling tempRow
-		while(temp1.length() && tempRow.length() < unit->width()) {
-			Node<RebasedSoldier*>* node = temp1.Pop(0);
-			Node<RebasedSoldier*>* current = tempRow.head;
+		while((!temp1.empty()) && tempRow.size() < unit->width()) {
+			RebasedSoldier* node = temp1.at(0); temp1.pop_front();
+			auto current = tempRow.begin();
 			int n = 0;
-			while(current) {
-				if(node->data->rebasedPos[1] < current->data->rebasedPos[1]) {
+			while(current != tempRow.end()) {
+				if(node->rebasedPos[1] < (*current)->rebasedPos[1]) {
 					n++;
-					current = current->next;
+					current = std::next(current);
 				}
 				else break;
 			}
-			tempRow.Insert(n, node);
+			tempRow.insert(current, node);
 		}
 		// Emptying tempRow
-		while(tempRow.head) {
-			temp2.Append(tempRow.Pop(0));
+		while(!tempRow.empty()) {
+			RebasedSoldier* r = tempRow.at(0); tempRow.pop_front();
+			temp2.push_back(r);
 		}
 	}
 	// Pasting the new order into unit
 	for(int i = 0; i < unit->nrows(); i++) {
 		for(int j = 0; j < unit->width(); j++) {
-			if(temp2.head) {
-				Node<RebasedSoldier*>* node = temp2.Pop(0);
-				RebasedSoldier* r = node->data;
+			if(!temp2.empty()) {
+				RebasedSoldier* r = temp2.at(0); temp2.pop_front();
 				(*soldiers).at(i).at(j) = r->soldier;
 				delete r;
-				delete node;
 			}
 		}
 	}
@@ -277,36 +274,34 @@ void CollisionScrying(Map* map, Unit* unit) {
 void CollisionResolution(Map* map) {
 	for(int i = 0; i < map->nrows; i++) {
 		for(int j = 0; j < map->ncols; j++) {
-			Node<Soldier*>* soldNode1;
 			Soldier* sold1;
-			Node<Soldier*>* soldNode2;
 			Soldier* sold2;
 			gridpiece* tile1 = map->tiles.at(i).at(j);
-			soldNode1 = tile1->soldiers.head;
-			while(soldNode1) {
-				sold1 = soldNode1->data;
-				soldNode2 = soldNode1->next;
-				while(soldNode2) {
-					sold2 = soldNode2->data;
+			auto soldNode1 = tile1->soldiers.begin();
+			while(soldNode1 != tile1->soldiers.end()) {
+				sold1 = (*soldNode1);
+				auto soldNode2 = std::next(soldNode1);
+				while(soldNode2 != tile1->soldiers.end()) {
+					sold2 = (*soldNode2);
 					if((sold2->pos - sold1->pos).norm() < (sold1->rad() + sold2->rad()) || true) {
 						KnockKnock(sold1, sold2);
 					}
-					soldNode2 = soldNode2->next;
+					soldNode2 = std::next(soldNode2);
 				}
-				Node<gridpiece*>* neighbour = tile1->neighbours.head;
-				while(neighbour) {
-					gridpiece* tile2 = neighbour->data;
-					soldNode2 = tile2->soldiers.head;
-					while(soldNode2) {
-						sold2 = soldNode2->data;
+				auto neighbour = tile1->neighbours.begin();
+				while(neighbour != tile1->neighbours.end()) {
+					gridpiece* tile2 = (*neighbour);
+					soldNode2 = tile2->soldiers.begin();
+					while(soldNode2 != tile2->soldiers.end()) {
+						sold2 = (*soldNode2);
 						if((sold2->pos - sold1->pos).norm() < (sold1->rad() + sold2->rad()) ||true) {
 							KnockKnock(sold1, sold2);
 						}
-						soldNode2 = soldNode2->next;
+						soldNode2 = std::next(soldNode2);
 					}
-					neighbour = neighbour->next;
+					neighbour = std::next(neighbour);
 				}
-				soldNode1 = soldNode1->next;
+				soldNode1 = std::next(soldNode1);
 			}
 		}
 	}
@@ -316,17 +311,8 @@ void MapObjectCollisionHandling(Map* map) {
 	for(int i = 0; i < map->nrows; i++) {
 		for(int j = 0; j < map->ncols; j++) {
 			gridpiece* tile = map->tiles.at(i).at(j);
-			Node<Soldier*>* soldNode;
-			soldNode = tile->soldiers.head;
-			while(soldNode) {
-				Soldier* soldier = soldNode->data;
+			for(auto soldier : tile->soldiers) {
 				if(soldier) {
-					/*for(auto rec : tile->rectangles) {
-						SoldierRectangleCollision(soldier, rec);
-					}
-					for(auto circ: tile->circles) {
-						SoldierCircleCollision(soldier, circ);
-					}*/
 					for(auto object : tile->mapObjects) {
 						switch(object->type()) {
 						case MAP_RECTANGLE:
@@ -338,7 +324,6 @@ void MapObjectCollisionHandling(Map* map) {
 						}
 					}
 				}
-				soldNode = soldNode->next;
 			}
 		}
 	}

@@ -7,24 +7,25 @@
 #include <map.h>
 #include <physics.h>
 #include <player.h>
+#include <vector>
 
 class Model : public Listener{
 	public:
-		LinkedList<Player*> players;
+		std::vector<Player*> players;
 		Map* map;
 		double* dt;
-		Node<Player*>* selectedPlayerNode;
-		Node<Unit*>* selectedUnitNode;
+		Player* selectedPlayer;
+		Unit* selectedUnit;
 	
 		Model(EventManager* em, Map* map) : Listener(em) {
 			this->map = map;
 			dt = &(em->dt);
-			selectedPlayerNode = NULL;
-			selectedUnitNode = NULL;
+			selectedPlayer = NULL;
+			selectedUnit = NULL;
 		};
 		void SetPlayer() {
-			if(players.head) {
-				selectedPlayerNode = players.head;
+			if(players.size() > 0) {
+				selectedPlayer = players.at(0);
 				std::cout << "First player was selected.\n";
 			}
 			else {
@@ -32,13 +33,13 @@ class Model : public Listener{
 			}
 		}
 		void SetUnit() {
-			if(selectedPlayerNode) {
-				selectedUnitNode = selectedPlayerNode->data->units.head;
-				if(!selectedUnitNode) {
-					std::cout << "Couldn't select unit, none available.\n";
+			if(selectedPlayer) {
+				if(selectedPlayer->units.size() > 0) {
+					selectedUnit = selectedPlayer->units.at(0);
+					std::cout << "First unit was selected.\n";
 				}
 				else {
-					std::cout << "First unit was selected.\n";
+					std::cout << "Couldn't select unit, none available.\n";				
 				}
 			}
 			else {
@@ -99,24 +100,22 @@ class Model : public Listener{
 			}
 			else if(ev->type == UNIT_SELECT_EVENT) {
 				UnitSelectEvent* uev = dynamic_cast<UnitSelectEvent*>(ev);
-				if(selectedPlayerNode) {
-					if(selectedUnitNode) {
-						if(uev->unitID == -1) {
-							if(selectedUnitNode->prev) {
-								selectedUnitNode = selectedUnitNode->prev;
-							}
-							else {
-								selectedUnitNode = selectedPlayerNode->data->units.tail;
-							}
+				if(selectedPlayer) {
+					if(selectedUnit && !selectedPlayer->units.empty()) {
+						auto it = std::find(selectedPlayer->units.begin(), selectedPlayer->units.end(), selectedUnit);
+						switch(uev->unitID) {
+						case -1: 
+							if(it == selectedPlayer->units.begin()) selectedUnit = *(--selectedPlayer->units.end());
+							else selectedUnit = *std::prev(it);
+							break;
+						case 1:
+							if(it == (--selectedPlayer->units.end())) selectedUnit = *selectedPlayer->units.begin();
+							else selectedUnit = *std::next(it);
+							break;
 						}
-						else if(uev->unitID == 1) {
-							if(selectedUnitNode->next) {
-								selectedUnitNode = selectedUnitNode->next;
-							}
-							else {
-								selectedUnitNode = selectedPlayerNode->data->units.head;
-							}
-						}
+					}
+					else {
+						std::cout << "No unit was selected. Attempting to set unit..\n";
 					}
 				}
 				else {
@@ -125,25 +124,43 @@ class Model : public Listener{
 					std::cout << "Attempting to set unit..\n";
 					SetUnit();
 				}
+				if(selectedUnit) {
+					em->Post(new RememberOrders(selectedUnit->orders));
+				}
+			}
+			else if(ev->type == UNIT_ADD_EVENT) {
+				if(selectedPlayer) {
+					UnitAddEvent* uev = dynamic_cast<UnitAddEvent*>(ev);
+					Unit* unit = NULL;
+					switch(uev->unitType) {
+					case UNIT_INFANTRY:
+						unit = new Infantry(selectedPlayer); break;
+					case UNIT_CAVALRY:
+						unit = new Cavalry(selectedPlayer); break;
+					case UNIT_MONSTER:
+						unit = new MonsterUnit(selectedPlayer); break;
+					}
+					if(unit) selectedPlayer->units.push_back(unit);
+				}
+			}
+			else if(ev->type == UNIT_DELETE_EVENT) {
+				if(selectedPlayer && selectedUnit) {
+					selectedPlayer->units.erase(std::find(selectedPlayer->units.begin(), selectedPlayer->units.end(), selectedUnit));
+					SetUnit();
+				}
 			}
 			else if(ev->type == PLAYER_SELECT_EVENT) {
 				PlayerSelectEvent* pev = dynamic_cast<PlayerSelectEvent*>(ev);
-				if(selectedPlayerNode) {
-					if(pev->playerID == -1) {
-						if(selectedPlayerNode->prev) {
-							selectedPlayerNode = selectedPlayerNode->prev;
-						}
-						else {
-							selectedPlayerNode = players.tail;
-						}
-					}
-					else if(pev->playerID == 1) {
-						if(selectedPlayerNode->next) {
-							selectedPlayerNode = selectedPlayerNode->next;
-						}
-						else {
-							selectedPlayerNode = players.head;
-						}
+				if(selectedPlayer && !players.empty()) {
+					auto it = std::find(players.begin(), (--players.end()), selectedPlayer);
+					switch(pev->playerID) {
+					case -1:
+						if(it == players.begin()) selectedPlayer = *(--players.end());
+						else selectedPlayer = *std::prev(it);
+						break;
+					case 1:
+						if(it == (--players.end())) selectedPlayer = *players.begin();
+						else selectedPlayer = *std::next(it);
 					}
 					SetUnit();
 				}
@@ -153,49 +170,51 @@ class Model : public Listener{
 					SetUnit();
 				}
 			}
+			else if (ev->type == PLAYER_ADD_EVENT) {
+				Player* newP = new Player();
+				players.push_back(newP);
+				newP->units.push_back(new  Infantry(newP));
+				newP->units.push_back(new Cavalry(newP));
+				newP->units.push_back(new MonsterUnit(newP));
+				if(std::find(players.begin(), players.end(), selectedPlayer) == players.end()) {
+					SetPlayer();
+					SetUnit();
+				}
+			}
+			else if (ev->type == PLAYER_DELETE_EVENT) {
+				if(selectedPlayer) {
+					players.erase(std::find(players.begin(), players.end(), selectedPlayer));
+					SetPlayer();
+					SetUnit();
+					if(players.empty()) selectedPlayer = NULL;
+				}
+			}
 			else if (ev->type == REFORM_EVENT) {
-				Node<Player*>* currentPlayer;
-				Node<Unit*>* currentUnit;
-				currentPlayer = players.head;
-				while(currentPlayer) {
-					currentUnit = currentPlayer->data->units.head;
-					while(currentUnit) {
-						Unit* unit = currentUnit->data;
+				for(auto player : players) {
+					for(auto unit : player->units) {
 						if(unit->placed) {
 							ReformUnit(unit);
 							MoveTarget(unit);
 						}
-						currentUnit = currentUnit->next;
 					}
-					currentPlayer = currentPlayer->next;
-				}			
+				}
 			}
 			else if (ev->type == TICK_EVENT) {
-				Node<Player*>* currentPlayer;
-				Node<Unit*>* currentUnit;
-				currentPlayer = players.head;
-				while(currentPlayer) {
-					currentUnit = currentPlayer->data->units.head;
-					while(currentUnit) {
-						Unit* unit = currentUnit->data;
+				for(auto player : players) {
+					for(auto unit : player->units) {
 						if(unit->placed) {
-							if(!unit->nSoldiersOnFirstOrder) {DeleteObsoleteOrder(unit);}
+							if(!unit->nSoldiersOnFirstOrder) DeleteObsoleteOrder(unit);
 							CollisionScrying(map, unit);
 						}
-						currentUnit = currentUnit->next;
 					}
-					currentPlayer = currentPlayer->next;
 				}
 				CollisionResolution(map);
 				MapObjectCollisionHandling(map);	//resolution handled in timestep
 				map->Cleangrid();
-				currentPlayer = players.head;
-				while(currentPlayer) {
-					currentUnit = currentPlayer->data->units.head;
-					while(currentUnit) {
-						Unit* unit = currentUnit->data;
+				for(auto player : players) {
+					for(auto unit : player->units) {
 						if(!unit->placed) {
-							if(unit->orders.size()>0) {
+							if(!unit->orders.empty()) {
 								Order* o = unit->orders.at(0);
 								if(o->type == ORDER_MOVE) {
 									MoveOrder* mo = dynamic_cast<MoveOrder*>(o);
@@ -205,7 +224,7 @@ class Model : public Listener{
 							}
 						}
 						if(unit->placed) {
-							if(unit->orders.size() > (unit->currentOrder + 1) && CurrentOrderCompleted(unit)) {
+							if(unit->orders.size() > (unit->currentOrder +1) && CurrentOrderCompleted(unit)) {
 								UnitNextOrder(unit);
 								Order* o = unit->orders.at(unit->currentOrder);
 								if(o->type == ORDER_MOVE) {
@@ -218,19 +237,21 @@ class Model : public Listener{
 							std::vector<std::vector<Eigen::Vector2d>>* posInUnit = unit->posInUnit();
 							for(int i = 0; i < unit->nrows(); i++) {
 								for(int j = 0; j < unit->width(); j++) {
-									Soldier* soldier = (*soldiers).at(i).at(j);
-									if(soldier->placed) {
-										TimeStep(soldier, *dt);
-									}
-									if(soldier->arrived && soldier->currentOrder < unit->currentOrder) {
-										SoldierNextOrder(soldier, posInUnit->at(i).at(j));
+									Soldier* soldier = soldiers->at(i).at(j);
+									if(soldier) {
+										if(soldier->placed) {
+											TimeStep(soldier, *dt);
+										}
+										if(soldier->arrived && soldier->currentOrder < unit->currentOrder) {
+											SoldierNextOrder(soldier, posInUnit->at(i).at(j));
+										}
 									}
 								}
 							}
+							UpdatePos(unit);
+							UpdateVel(unit);
 						}
-						currentUnit = currentUnit->next;
 					}
-					currentPlayer = currentPlayer->next;
 				}
 			}
 		}

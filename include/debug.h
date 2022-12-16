@@ -4,10 +4,14 @@
 #include <iostream>
 #include <string>
 
-bool _showDebugMessages = false;
+namespace ddebug {
+	bool _showDebugMessages = false;
+	bool _showDebugGraphics = false;
+}
+
 
 void debug(std::string text) {
-	if(_showDebugMessages) {
+	if(ddebug::_showDebugMessages) {
 		std::cout << "[DEBUG:] " << text << "\n";
 	}
 }

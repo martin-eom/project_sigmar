@@ -42,9 +42,9 @@ public:
 
 class gridpiece{
 	public:
-		LinkedList<Soldier*> soldiers;
+		std::vector<Soldier*> soldiers;
 		std::vector<MapObject*> mapObjects;
-		LinkedList<gridpiece*> neighbours;
+		std::vector<gridpiece*> neighbours;
 		Rrectangle* rec;
 };
 
@@ -77,14 +77,14 @@ class Map {
 			}
 			for(int i = 0; i < nrows - 1; i++) {
 				for(int j = 0; j < ncols - 1; j++) {
-					tiles.at(i).at(j)->neighbours.Append(new Node<gridpiece*>(tiles.at(i+1).at(j)));
-					tiles.at(i).at(j)->neighbours.Append(new Node<gridpiece*>(tiles.at(i).at(j+1)));
-					tiles.at(i).at(j)->neighbours.Append(new Node<gridpiece*>(tiles.at(i+1).at(j+1)));
+					tiles.at(i).at(j)->neighbours.push_back(tiles.at(i+1).at(j));
+					tiles.at(i).at(j)->neighbours.push_back(tiles.at(i).at(j+1));
+					tiles.at(i).at(j)->neighbours.push_back(tiles.at(i+1).at(j+1));
 					if(i == 0) {
-						tiles.at(nrows-1).at(j)->neighbours.Append(new Node<gridpiece*>(tiles.at(nrows-1).at(j+1)));
+						tiles.at(nrows-1).at(j)->neighbours.push_back(tiles.at(nrows-1).at(j+1));
 					}
 				}
-				tiles.at(i).at(ncols-1)->neighbours.Append(new Node<gridpiece*>(tiles.at(i+1).at(ncols-1)));
+				tiles.at(i).at(ncols-1)->neighbours.push_back(tiles.at(i+1).at(ncols-1));
 			}
 			//creating map borders, but not adding them to objects yet
 			double hw = 0.5*width;
@@ -117,13 +117,13 @@ class Map {
 		void Cleangrid() {
 			for(int i = 0; i < nrows; i++) {
 				for(int j = 0; j < ncols; j++) {
-					tiles.at(i).at(j)->soldiers.Empty();
+					tiles.at(i).at(j)->soldiers.clear();
 				}
 			}
 		}
 		
 		void Assign(Soldier* soldier, int i, int j) {
-			tiles.at(i).at(j)->soldiers.Append(new Node<Soldier*>(soldier));
+			tiles.at(i).at(j)->soldiers.push_back(soldier);
 		}
 
 		void AddMapObject(MapObject* obj) {
@@ -336,7 +336,6 @@ void SoldierRectangleCollision(Soldier* soldier, Rrectangle* rec) {
 				}
 			}
 		}
-	// missing case for collision with corners
 	}
 	//knockVel << 0., 0.;
 	soldier->knockVel += knockVel;

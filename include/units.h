@@ -20,6 +20,14 @@ void PosInUnitByID(Unit* unit);
 
 //SOLDIER_TYPES (handled in soldiers.h)
 
+enum UNIT_TYPE {
+	UNIT_GENERIC,
+	UNIT_TEMPLATE,
+	UNIT_INFANTRY,
+	UNIT_CAVALRY,
+	UNIT_MONSTER
+};
+
 class Unit {
 	private:
 		//array width and length have to be set manually in every declaration and defintion because there could only be one flexible array member but more would be needed
@@ -28,6 +36,7 @@ class Unit {
 		static const int _width = 1;
 		static const int _nrows = 1;//maxSoldiers / width;	// being not fun
 	public:
+		int type;
 		Player* player;
 		std::vector<std::vector<Soldier*>> _soldiers{_nrows, std::vector<Soldier*>(_width, NULL)};
 		std::vector<std::vector<Eigen::Vector2d>> _posInUnit{_nrows, std::vector<Eigen::Vector2d>(_width, Eigen::Vector2d())};
@@ -58,6 +67,7 @@ class Unit {
 			nSoldiers = 0;
 			placed = false;
 			this->player = player;
+			type = UNIT_GENERIC;
 		}
 		Unit(Player* player) : Unit(false, player) {}
 				
@@ -82,6 +92,7 @@ class UnitSubClassTemplate : public Unit {
 		UnitSubClassTemplate(Player* player) : Unit(true, player) {
 			Populate(this);
 			PosInUnitByID(this);
+			type = UNIT_TEMPLATE;
 		};
 };
 
@@ -104,6 +115,7 @@ class Infantry : public Unit {
 		Infantry(Player* player) : Unit(true, player) {
 			Populate(this);
 			PosInUnitByID(this);
+			type = UNIT_INFANTRY;
 		};
 };
 
@@ -126,6 +138,7 @@ class Cavalry : public Unit {
 		Cavalry(Player* player) : Unit(true, player) {
 			Populate(this);
 			PosInUnitByID(this);
+			type = UNIT_CAVALRY;
 		};
 };
 
@@ -148,6 +161,7 @@ class MonsterUnit : public Unit {
 		MonsterUnit(Player* player) : Unit(true, player) {
 			Populate(this);
 			PosInUnitByID(this);
+			type = UNIT_MONSTER;
 		};
 };
 
@@ -218,6 +232,7 @@ void MoveTarget(Unit* unit) {
 				Order* o = unit->orders.at(soldier->currentOrder);
 				if(o->type == ORDER_MOVE) {
 					MoveOrder* mo = dynamic_cast<MoveOrder*>(o);
+					//soldier->posTarget = mo->pos + mo->rot * posInUnit->at(i).at(j);
 					soldier->posTarget = mo->pos + mo->rot * posInUnit->at(i).at(j);
 					soldier->rotTarget = mo->rot;
 					soldier->angleTarget = mo->angleTarget;
@@ -267,7 +282,7 @@ void UpdateVel(Unit* unit) {
 }
 
 void PosInUnitByID(Unit* unit) {
-	std::vector<std::vector<Soldier*>>* soldiers = unit->soldiers();
+	//std::vector<std::vector<Soldier*>>* soldiers = unit->soldiers();
 	std::vector<std::vector<Eigen::Vector2d>>* posInUnit = unit->posInUnit();
 	double x0 = unit->spacing()*(unit->nrows() - 1)/2.;
 	double y0 = unit->spacing()*(unit->width() - 1)/2.;
@@ -352,6 +367,20 @@ Rrectangle UnitRectangle(Unit* unit, int orderID) {
 	double halfWidth = (unit->width() - 1) * unit->spacing() * 0.5;
 	double halfDepth = (unit->nrows() - 1) * unit->spacing() * 0.5;
 	Order* o = unit->orders.at(orderID);
+	Eigen::Vector2d pos;
+	Eigen::Matrix2d rot;
+	if(o->type == ORDER_MOVE) {
+		MoveOrder* mo = dynamic_cast<MoveOrder*>(o);
+		pos = mo->pos;
+		rot = mo->rot;
+	}
+	return Rrectangle(halfWidth, halfDepth, pos, rot);
+}
+
+Rrectangle UnitRectangle(Unit* unit, int orderID, std::vector<Order*> orders) {
+	double halfWidth = (unit->width() - 1) * unit->spacing() * 0.5;
+	double halfDepth = (unit->nrows() - 1) * unit->spacing() * 0.5;
+	Order* o = orders.at(orderID);
 	Eigen::Vector2d pos;
 	Eigen::Matrix2d rot;
 	if(o->type == ORDER_MOVE) {
