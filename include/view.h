@@ -212,7 +212,7 @@ private:
 							}
 						}
 					}
-					else if(unit == model->selectedUnit) {
+					if(unit == model->selectedUnit) {
 						if(gem->ctrl->state() == CTRL_GIVING_ORDERS) {
 							std::vector<std::vector<Eigen::Vector2d>> posInUnit = *unit->posInUnit();
 							for(int i = 0; i < unit->nrows(); i++) {

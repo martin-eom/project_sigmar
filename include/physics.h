@@ -244,10 +244,14 @@ void KnockKnock(Soldier* sold1, Soldier* sold2) {
 			sold2->knockVel -= sold1->mass() * prod;
 			if(sold1->unit->player == sold2->unit->player && sold1->unit == sold2->unit) {
 				if(sold1->currentOrder < sold2->currentOrder) {
-					sold1->arrived = true;
+					if((sold1->pos - sold2->posTarget).norm() < (sold2->pos - sold2->posTarget).norm()) {
+						sold1->arrived = true;
+					}
 				}
 				else if(sold1->currentOrder > sold2->currentOrder) {
-					sold2->arrived = true;
+					if((sold1->pos - sold1->posTarget).norm() > (sold2->pos - sold1->posTarget).norm()) {
+						sold2->arrived = true;
+					}
 				}
 			}
 		}

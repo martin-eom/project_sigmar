@@ -53,21 +53,39 @@ class Model : public Listener{
 				GiveOrdersRequest* oev = dynamic_cast<GiveOrdersRequest*>(ev);
 				Unit* unit = oev->unit;
 				if(unit) {
-					unit->orders.clear();
-					unit->orders = oev->orders;
-					unit->currentOrder = 0;
-					unit->nSoldiersArrived = 0;
-					Order* o = unit->orders.at(0);
-					std::vector<std::vector<Soldier*>>* soldiers = unit->soldiers();
-					for(int i = 0; i < unit->nrows(); i++) {
-						for(int j = 0; j < unit->width(); j++) {
-							Soldier* soldier = soldiers->at(i).at(j);
-							if(soldier) {
-								soldier->currentOrder = 0;
-								soldier->arrived = false;
+					debug("Beginning order deletion");
+					while(unit->orders.size() > unit->currentOrder) unit->orders.pop_back();
+					debug("Finished order deletion");
+					//unit->orders.clear();
+					for(auto order : oev->orders) unit->orders.push_back(order);
+					debug("Pushed back new orders");
+					if(!unit->placed) unit->currentOrder = 0;
+					std::cout << unit->orders.size() << "\n";
+					std::cout << unit->currentOrder << "\n";
+					Order* o = unit->orders.at(unit->currentOrder);
+					debug("Found new new order");
+					for(auto row : *unit->soldiers()) {
+						for(auto soldier : row) {
+							if(soldier->placed) {
+								if(soldier->currentOrder == unit->currentOrder) {
+									soldier->arrived = false;
+								}
 							}
 						}
 					}
+					//unit->orders = oev->orders;
+					//unit->currentOrder = 0;
+					unit->nSoldiersArrived = 0;
+					//std::vector<std::vector<Soldier*>>* soldiers = unit->soldiers();
+					//for(int i = 0; i < unit->nrows(); i++) {
+					//	for(int j = 0; j < unit->width(); j++) {
+					//		Soldier* soldier = soldiers->at(i).at(j);
+					//		if(soldier) {
+					//			soldier->currentOrder = 0;
+					//			soldier->arrived = false;
+					//		}
+					//	}
+					//}
 					if(o->type == ORDER_MOVE && unit->placed) {
 						ReformUnit(unit);
 						MoveTarget(unit);

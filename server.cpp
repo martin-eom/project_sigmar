@@ -80,7 +80,9 @@ void ResetTextbox(std::string text, bool input) {
 	else {
 		if(SDL_IsTextInputActive()) SDL_StopTextInput();
 	}
-	em->Post(new ChangeTextboxEvent(text));
+	ChangeTextboxEvent cev(text);
+	em->Post(&cev);
+	//em->Post(new ChangeTextboxEvent(text));
 }
 
 
