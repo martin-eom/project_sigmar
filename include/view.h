@@ -18,6 +18,7 @@
 Color* colorBlack = new Color(0x00, 0x00, 0x00, 0xff);
 Color* colorWhite = new Color(0xff, 0xff, 0xff, 0xff);
 Color* colorGreen = new Color(40, 252, 3, 0xff);
+Color* darkGreen = new Color(0x2e, 0x43, 0x28, 0xff);
 Color* colorPurple = new Color(0xff, 0x00, 0xff, 0xff);
 Color* colorRed = new Color(0xff, 0x00, 0x00, 0xff);
 Color* colorBlue = new Color(0x00, 0x00, 0xff, 0xff);
@@ -96,19 +97,27 @@ private:
 			SDL_SetRenderDrawColor(renderer, 0x00, 0x00, 0x00, 0xFF);
 			SDL_RenderClear(renderer);
 			//drawing map objects
-			for(auto object : map->mapObjects) {
-				switch(object->type()) {
+			for(auto obj : map->mapObjects) {
+				switch(obj->type()) {
 				case MAP_CIRCLE: {
-					Circle* circ = dynamic_cast<Circle*>(object);
+					Circle* circ = dynamic_cast<Circle*>(obj);
 					DrawCircle(circ->pos.coeff(0), SCREEN_HEIGHT - circ->pos.coeff(1), circ->rad, renderer, colorPurple);
 					break;}
 				case MAP_BORDER:
 				case MAP_RECTANGLE: {
-					Rrectangle* rec = dynamic_cast<Rrectangle*>(object);
+					Rrectangle* rec = dynamic_cast<Rrectangle*>(obj);
 					DrawRectangle(rec, renderer, colorPurple, SCREEN_HEIGHT);
 					break;}
 				}
 			}
+			//drawing waypoints
+			if(ddebug::_showDebugGraphics) {
+				for(auto obj : map->waypoints) {
+					Circle* circ = dynamic_cast<Circle*>(obj);
+					DrawCircle(circ->pos.coeff(0), SCREEN_HEIGHT - circ->pos.coeff(1), circ->rad, renderer, colorGrey);
+				}
+			}
+			//showing tiles that hold objects
 			if(ddebug::_showDebugGraphics) {
 				for(auto row : map->tiles) {
 					for(auto tile : row) {
@@ -257,7 +266,7 @@ private:
 						break;
 					}
 				}
-				else controls = "hold h - help";
+				else controls = _help_line;
 			}
 			switch(ctrl->state()) {
 			case CTRL_SELECTING_PLAYER:
@@ -272,8 +281,9 @@ private:
 				info = "New unit type: ";
 				switch(gem->ctrl->newUnitType) {
 				case 0: info += "Infantry"; break;
-				case 1: case -2: info += "Cavalry"; break;
-				case 2: case -1: info += "Monster"; break;
+				case 1: case -3: info += "Cavalry"; break;
+				case 2: case -2: info += "Monster"; break;
+				case 3: case -1: info += "Lone Rider"; break;
 				}break;
 			default:
 				info = "";
@@ -317,6 +327,9 @@ class MapEditorView : public Listener {
 	std::string _lshift		= "hold lshift - options menu";
 	std::string _circle		= "c           - select circle";
 	std::string _crad		= "w           - change radius";
+	std::string _wp			= "w           - select circle";
+	std::string _wprad		= "w           - change radius";
+	std::string _pf			= "p           - update pathfinding";
 	std::string _rec		= "r           - select rectangle";
 	std::string _rrot		= "hold ctrl   - rotate rectangle";
 	std::string _rw			= "w           - change width";
@@ -333,10 +346,10 @@ class MapEditorView : public Listener {
 	std::string _scesc		= "esc         - aboart copying";
 	std::string _sdel		= "d           - delete object";
 	std::string _sesc		= "esc         - aboart selection";
-	std::string _help_line	= "h - help";
+	std::string _help_line	= "h - toggle help";
 
 	std::string _options_menu =	_new_map + "\n" + _save_map + "\n" + _load_map + "\n"+ _quit;
-	std::string _control_scheme = _circle + "\n" + _rec + "\n" + _select + "\n" + _lshift;
+	std::string _control_scheme = _circle + "\n" + _rec + "\n" + _wp + "\n" + _select + "\n" + _pf + "\n" + _lshift;
 	std::string _rplace = _rrot + "\n" + _rw + "\n" + _rh + "\n" + _pesc + "\n" + _lshift;
 	std::string _cplace = _crad + "\n" + _pesc + "\n" + _lshift;
 	std::string _select_scheme = _sarrow + "\n" + _sclick + "\n" + _smove + "\n" + _scopy + "\n" + _sdel + "\n" + _sesc + "\n" + _lshift;
@@ -352,7 +365,6 @@ private:
 	int SCREEN_HEIGHT;
 	int textwidth;
 	SDL_Window* window;
-	Map* map;
 	MapEditorController* ctrl;
 	StringTexture* textControls;
 	StringTexture* textInputAdvice;
@@ -360,6 +372,7 @@ private:
 	StringTexture* objDimensions;
 
 public:
+	Map* map;
 	SDL_Renderer* renderer;
 	std::string textbox;
 	MapEditorView(EventManager* em, int width, int height, 
@@ -387,7 +400,7 @@ private:
 			if(object == ctrl->selectedObj) {
 				switch(ctrl->prevState) {
 				case EDITOR_MOVING:
-					objColor = colorGrey; break;
+					objColor = darkGreen; break;
 				case EDITOR_COPYING:
 					objColor = colorBlue; break;
 				default:
@@ -395,6 +408,8 @@ private:
 				}
 			}
 			switch(object->type()) {
+			case MAP_WAYPOINT:
+				if(object != ctrl->selectedObj) objColor = colorGrey;
 			case MAP_CIRCLE: {
 				Circle* circ = dynamic_cast<Circle*>(object);
 				DrawCircle(circ, renderer, objColor, SCREEN_HEIGHT);
@@ -406,6 +421,20 @@ private:
 				break;}
 			}
 		}
+		for(int i = 0; i < map->wp_path_next.size(); i++) {
+			for(int j = i+1; j < map->wp_path_next.at(i).size(); j++) {
+				if(i != j && map->wp_path_next.at(i).at(j) == j && map->waypoints.size() > std::max(i,j)){
+					SDL_SetRenderDrawColor(renderer, 0x00, 0x00, 0xFF, 0xFF);
+					SDL_RenderDrawLine(renderer, map->waypoints.at(i)->pos.coeff(0), SCREEN_HEIGHT - map->waypoints.at(i)->pos.coeff(1), 
+						map->waypoints.at(j)->pos.coeff(0), SCREEN_HEIGHT - map->waypoints.at(j)->pos.coeff(1));
+
+				}
+			}
+		}
+		/*for(auto obj : map->waypoints) {
+			Circle* circ = dynamic_cast<Circle*>(obj);
+			DrawCircle(circ, renderer, colorGrey, SCREEN_HEIGHT);
+		}*/
 		//rendering options menu
 		std::string text;
 		if(ctrl->shift) text = _options_menu;
@@ -415,6 +444,7 @@ private:
 			else text = _bon + "\n" + _control_scheme;
 			switch(ctrl->state) {
 			case EDITOR_PLACING_CIRCLE:
+			case EDITOR_PLACING_WP:
 				text = _cplace; break;
 			case EDITOR_PLACING_RECTANGLE:
 				text = _rplace; break;
@@ -450,7 +480,8 @@ private:
 		//rendering object to be placed
 		if(ctrl->objToPlace) {
 			switch(ctrl->objToPlace->type()) {
-			case MAP_CIRCLE: {
+			case MAP_CIRCLE:
+			case MAP_WAYPOINT: {
 				Circle* circ = dynamic_cast<Circle*>(ctrl->objToPlace);
 				DrawCircle(circ, renderer, colorGreen, SCREEN_HEIGHT);
 				objDimensions->loadFromString(std::format("rectangle\nradius: {}", circ->rad), font, colorText, textwidth);

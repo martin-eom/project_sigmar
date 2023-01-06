@@ -25,7 +25,8 @@ enum UNIT_TYPE {
 	UNIT_TEMPLATE,
 	UNIT_INFANTRY,
 	UNIT_CAVALRY,
-	UNIT_MONSTER
+	UNIT_MONSTER,
+	UNIT_LONE_RIDER
 };
 
 class Unit {
@@ -165,6 +166,29 @@ class MonsterUnit : public Unit {
 		};
 };
 
+class LoneRider : public Unit {
+	private:
+		const int _maxSoldiers = 1;
+		const double _spacing = 0.;
+		static const int _width = 1;
+		static const int _nrows = 1;// keep in mind if this conflicts with _maxSoldiers
+	public:
+		std::vector<std::vector<Soldier*>> _soldiers{_nrows, std::vector<Soldier*>(_width, NULL)};
+		std::vector<std::vector<Eigen::Vector2d>> _posInUnit{_nrows, std::vector<Eigen::Vector2d>(_width, Eigen::Vector2d())};
+		int width() {return _width;}
+		int nrows() {return _nrows;}
+		int maxSoldiers() {return _maxSoldiers;}
+		double spacing() {return _spacing;}
+		int soldierType() {return SOLDIER_RIDER;}	// you have to add a new entry to Populate(unit) when creating a new Unit from a new Soldier class
+		std::vector<std::vector<Soldier*>>* soldiers() {return &_soldiers;}
+		std::vector<std::vector<Eigen::Vector2d>>* posInUnit() {return &_posInUnit;}
+		LoneRider(Player* player) : Unit(true, player) {
+			Populate(this);
+			PosInUnitByID(this);
+			type = UNIT_TEMPLATE;
+		};
+};
+
 void Populate(Unit* unit) {
 	std::vector<std::vector<Soldier*>>* soldiers = unit->soldiers();
 	for(int i = 0; i < unit->nrows(); i++) {
@@ -251,33 +275,41 @@ void MoveTarget(Unit* unit) {
 
 void UpdatePos(Unit* unit) {
 	std::vector<std::vector<Soldier*>>* soldiers = unit->soldiers();
+	int nSoldiers = 0;
 	Eigen::Vector2d pos;
 	pos << 0., 0.;
 	for(int i = 0; i < unit->nrows(); i++) {
 		for(int j = 0; j < unit->width(); j++) {
 			Soldier* soldier = (*soldiers)[i][j];
 			if(soldier->placed) {
-				pos += soldier->pos;
+				if(soldier->currentOrder == unit->currentOrder) {
+					pos += soldier->pos;
+					nSoldiers++;
+				}
 			}
 		}
 	}
-	pos /= unit->nSoldiers;
+	pos /= nSoldiers;
 	unit->pos = pos;
 }
 
 void UpdateVel(Unit* unit) {
 	std::vector<std::vector<Soldier*>>* soldiers = unit->soldiers();
+	int nSoldiers = 0;
 	Eigen::Vector2d vel;
 	vel << 0., 0.;
 	for(int i = 0; i < unit->nrows(); i++) {
 		for(int j = 0; j < unit->width(); j++) {
 			Soldier* soldier = (*soldiers)[i][j];
 			if(soldier->placed) {
-				vel += soldier->vel;
+				if(soldier->currentOrder == unit->currentOrder) {
+					vel += soldier->vel;
+					nSoldiers++;
+				}
 			}
 		}
 	}
-	vel /= unit->nSoldiers;
+	vel /= nSoldiers;
 	unit->vel = vel;
 }
 

@@ -174,15 +174,19 @@ class KeyboardAndMouseController : public Listener {
 							_inputConfirmed = true;
 							break;
 						case CTRL_ADDING_UNIT:
+							debug("unit type:" + std::to_string(newUnitType));
 							switch(newUnitType) {
 							case 0:
 								em->Post(new UnitAddEvent(UNIT_INFANTRY)); break;
-							case 1:
+							case 1: case 1-4:
 								em->Post(new UnitAddEvent(UNIT_CAVALRY)); break;
-							case 2:
+							case 2: case 2-4:
 								em->Post(new UnitAddEvent(UNIT_MONSTER)); break;
+							case 3: case 3-4:
+								em->Post(new UnitAddEvent(UNIT_LONE_RIDER)); break;
 							}
 							_state = CTRL_SELECTING_UNIT;
+							debug("New Unit Type: " + std::to_string(newUnitType));
 							break;
 						}
 						break;
@@ -229,7 +233,7 @@ class KeyboardAndMouseController : public Listener {
 							nev = new PlayerSelectEvent(-1);
 							break;
 						case CTRL_ADDING_UNIT:
-							newUnitType = (newUnitType - 1) % 3;
+							newUnitType = (newUnitType - 1) % 4;
 							break;
 						}break;
 					case SDLK_DOWN:
@@ -238,7 +242,7 @@ class KeyboardAndMouseController : public Listener {
 							nev = new PlayerSelectEvent(1);
 							break;
 						case CTRL_ADDING_UNIT:
-							newUnitType = (newUnitType + 1) % 3;
+							newUnitType = (newUnitType + 1) % 4;
 							break;
 						}break;
 					case SDLK_LSHIFT:
@@ -343,6 +347,8 @@ enum EDITOR_STATES {
 	EDITOR_ENTERING_REC_HEIGHT,
 	EDITOR_PLACING_CIRCLE,
 	EDITOR_ENTERING_CIRCLE_RAD,
+	EDITOR_PLACING_WP,
+	EDITOR_ENTERING_WP_RAD,
 	EDITOR_NEWMAP,
 	EDITOR_NEWMAP_WIDTH,
 	EDITOR_NEWMAP_HEIGHT,
@@ -352,7 +358,8 @@ enum EDITOR_STATES {
 	EDITOR_LOADING,
 	EDITOR_SELECTING,
 	EDITOR_MOVING,
-	EDITOR_COPYING
+	EDITOR_COPYING,
+	EDITOR_PATHFINDING
 };
 
 class MapEditorController : public Listener {
@@ -420,9 +427,9 @@ private:
 				case SDLK_LSHIFT:
 					shift = true;
 					break;
-				case SDLK_h:
+				/*case SDLK_h:
 					help = true;
-					break;
+					break;*/
 				}
 			}
 			
@@ -462,6 +469,10 @@ private:
 									MapRectangle* ref = dynamic_cast<MapRectangle*>(selectedObj);
 									objToPlace = new MapRectangle(ref->hl, ref->hw, ref->pos, ref->rot);
 									}break;
+								case MAP_WAYPOINT: {
+									MapWaypoint* ref = dynamic_cast<MapWaypoint*>(selectedObj);
+									objToPlace = new MapWaypoint(ref->pos, ref->rad);
+									}break;
 								}
 								state = EDITOR_COPYING;
 								prevState = EDITOR_COPYING;
@@ -484,7 +495,7 @@ private:
 						}
 					}
 				case SDLK_h:
-					help = false;
+					help = !help;
 					break;
 				case SDLK_l:
 					if(shift) {
@@ -512,6 +523,10 @@ private:
 									MapRectangle* ref = dynamic_cast<MapRectangle*>(selectedObj);
 									objToPlace = new MapRectangle(ref->hl, ref->hw, ref->pos, ref->rot);
 									}break;
+								case MAP_WAYPOINT: {
+									MapWaypoint* ref = dynamic_cast<MapWaypoint*>(selectedObj);
+									objToPlace = new MapWaypoint(ref->pos, ref->rad);
+									}break;
 								}
 								state = EDITOR_MOVING;
 								prevState = EDITOR_MOVING;
@@ -524,6 +539,16 @@ private:
 				case SDLK_n:
 					if(shift) {
 						state = EDITOR_NEWMAP;
+					}
+					break;
+				case SDLK_p:
+					if(shift) {}
+					else {
+						switch(state) {
+						case EDITOR_IDLE:
+							state = EDITOR_PATHFINDING;
+							break;
+						}
 					}
 					break;
 				case SDLK_q:
@@ -557,8 +582,13 @@ private:
 					if(shift) {}
 					else {
 						switch(state) {
+						case EDITOR_IDLE:
+							objToPlace = new MapWaypoint(mousePos, lastCircleRad);
+							state = EDITOR_PLACING_WP;
+							break;
 						case EDITOR_PLACING_CIRCLE: state = EDITOR_ENTERING_CIRCLE_RAD; break;
 						case EDITOR_PLACING_RECTANGLE: state = EDITOR_ENTERING_REC_WIDTH; break;
+						case EDITOR_PLACING_WP: state = EDITOR_ENTERING_WP_RAD; break;
 						}
 					}
 					break;
@@ -589,6 +619,7 @@ private:
 					case EDITOR_ENTERING_CIRCLE_RAD:
 					case EDITOR_ENTERING_REC_WIDTH:
 					case EDITOR_ENTERING_REC_HEIGHT:
+					case EDITOR_ENTERING_WP_RAD:
 					case EDITOR_SAVING:
 					case EDITOR_LOADING:
 						input_confirmed = true;
@@ -600,8 +631,10 @@ private:
 					case EDITOR_ENTERING_CIRCLE_RAD: state = EDITOR_PLACING_CIRCLE; break;
 					case EDITOR_ENTERING_REC_WIDTH:
 					case EDITOR_ENTERING_REC_HEIGHT: state = EDITOR_PLACING_RECTANGLE; break;
+					case EDITOR_ENTERING_WP_RAD: state = EDITOR_PLACING_WP; break;
 					case EDITOR_PLACING_CIRCLE:
 					case EDITOR_PLACING_RECTANGLE:
+					case EDITOR_PLACING_WP:
 						switch(prevState) {
 						case EDITOR_MOVING:
 						case EDITOR_COPYING:
@@ -634,10 +667,11 @@ private:
 			if(e.type == SDL_MOUSEBUTTONUP) {
 				switch(state) {
 				case EDITOR_PLACING_CIRCLE:
-				case EDITOR_ENTERING_CIRCLE_RAD:
+				//case EDITOR_ENTERING_CIRCLE_RAD:
 				case EDITOR_PLACING_RECTANGLE:
-				case EDITOR_ENTERING_REC_WIDTH:
-				case EDITOR_ENTERING_REC_HEIGHT:
+				//case EDITOR_ENTERING_REC_WIDTH:
+				//case EDITOR_ENTERING_REC_HEIGHT:
+				case EDITOR_PLACING_WP:
 					if(objToPlace) {
 						switch(prevState) {
 						case EDITOR_MOVING:
@@ -656,6 +690,27 @@ private:
 						}
 					}
 					break;
+				/*case EDITOR_PLACING_WP:
+					if(objToPlace) {
+						switch(prevState) {
+						case EDITOR_MOVING:
+							map->RemoveWaypoint(dynamic_cast<MapWaypoint*>(selectedObj));
+						case EDITOR_COPYING:
+							map->AddWaypoint(dynamic_cast<MapWaypoint*>(objToPlace));
+							objToPlace = NULL;
+							selectedObject = map->mapObjects.size()-1;
+							state = EDITOR_SELECTING;
+							break;
+						default:
+							std::cout << bool(objToPlace) << "\n";
+							MapWaypoint* test = dynamic_cast<MapWaypoint*>(objToPlace);
+							std::cout << bool(test) << "\n";
+							map->AddWaypoint(dynamic_cast<MapWaypoint*>(objToPlace));
+							objToPlace = NULL;
+							state = EDITOR_IDLE;
+						}
+					}
+					break;*/
 				case EDITOR_SELECTING: {
 					selectedObject = 0;
 					double dist;
@@ -663,7 +718,8 @@ private:
 					for(int i = 0; i < map->mapObjects.size(); i++) {
 						MapObject* currentObj = map->mapObjects.at(i);
 						switch(currentObj->type()) {
-						case MAP_CIRCLE: {
+						case MAP_CIRCLE:
+						case MAP_WAYPOINT: {
 							Circle* circ = dynamic_cast<Circle*>(currentObj);
 							dist = (circ->pos - mousePos).norm();
 							break;}

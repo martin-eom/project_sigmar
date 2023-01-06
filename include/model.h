@@ -8,6 +8,76 @@
 #include <physics.h>
 #include <player.h>
 #include <vector>
+#include <pathfinding.h>
+
+void OrderPathfinding(Unit* unit, Map* map) {
+	std::vector<Order*> newOrders = std::vector<Order*>();
+	for(int i = unit->currentOrder + 1; i < unit->orders.size(); i++) {
+		debug("Pathfinding for an order started");
+		if(unit->orders.at(i)->type == ORDER_MOVE && unit->orders.at(i-1)->type == ORDER_MOVE) {
+			MoveOrder* mo = dynamic_cast<MoveOrder*>(unit->orders.at(i));
+			MoveOrder* pmo = dynamic_cast<MoveOrder*>(unit->orders.at(i-1));
+			// checking if line of sight between orders
+			if(!FreePath(mo->pos, pmo->pos, map)) {
+				// finding waypoints with line of sight to start and goal
+				std::vector<int> visibleStart = std::vector<int>();
+				std::vector<int> visibleEnd = std::vector<int>();
+				for(int j = 0; j < map->waypoints.size(); j++) {
+					if(FreePath(pmo->pos, map->waypoints.at(j)->pos, map)) {visibleStart.push_back(j);}
+					if(FreePath(mo->pos, map->waypoints.at(j)->pos, map)) {visibleEnd.push_back(j);}
+				}
+				// finding shortest-total-path combination
+				int start, end;
+				float mindist = std::numeric_limits<float>::infinity();
+				for(auto i1 : visibleStart) {
+					for(auto i2 : visibleEnd) {
+						float dist = (pmo->pos - map->waypoints.at(i1)->pos).norm()
+									+ (mo->pos - map->waypoints.at(i2)->pos).norm()
+									+ map->wp_path_dist.at(i1).at(i2);
+						if(dist < mindist) {
+							mindist = dist;
+							start = i1;
+							end = i2;
+						}
+					}
+				}
+				if(mindist != std::numeric_limits<float>::infinity()) {
+					// translating waypoints to orders
+					std::vector<Eigen::Vector2d> positions = std::vector<Eigen::Vector2d>();
+					positions.push_back(map->waypoints.at(start)->pos);
+					int next = map->wp_path_next.at(start).at(end);
+					while(next != end) {
+						positions.push_back(map->waypoints.at(next)->pos);
+						next = map->wp_path_next.at(next).at(end);
+					}
+					positions.push_back(map->waypoints.at(end)->pos);
+					positions.push_back(mo->pos);
+					for(int k = 1; k < positions.size(); k++) {
+						Eigen::Matrix2d Rot;
+						Eigen::Vector2d diff = positions.at(k) - positions.at(k-1);
+						double d = diff.norm();
+						double cos = diff.coeff(0)/d;
+						double sin = diff.coeff(1)/d;
+						if(d > 0)
+							Rot << cos, -sin, sin, cos;
+						else
+							Rot << 1, 0, 0, 1;
+						newOrders.push_back(new MoveOrder(positions.at(k-1), Rot, MOVE_PASSINGTHROUGH));
+					}
+					// interesting to know:
+					//std::cout << (std::numeric_limits<float>::infinity() == 2*std::numeric_limits<float>::infinity()) << "\n";
+					//std::cout << (std::numeric_limits<float>::infinity() < 2*std::numeric_limits<float>::infinity()) << "\n";
+					//std::cout << (std::numeric_limits<float>::infinity() > 2*std::numeric_limits<float>::infinity()) << "\n";
+
+				}
+			}
+		}
+		newOrders.push_back(unit->orders.at(i));
+	}
+	while(unit->orders.size() > unit->currentOrder + 1) unit->orders.pop_back();
+	unit->orders.insert(unit->orders.end(), newOrders.begin(), newOrders.end());
+	debug("Pathfinding done");
+}
 
 class Model : public Listener{
 	public:
@@ -53,15 +123,18 @@ class Model : public Listener{
 				GiveOrdersRequest* oev = dynamic_cast<GiveOrdersRequest*>(ev);
 				Unit* unit = oev->unit;
 				if(unit) {
-					debug("Beginning order deletion");
-					while(unit->orders.size() > unit->currentOrder) unit->orders.pop_back();
-					debug("Finished order deletion");
-					//unit->orders.clear();
+					if(unit->placed) {
+						// deleting all future orders as well as the current one
+						debug("Beginning order deletion");
+						while(unit->orders.size() > unit->currentOrder) unit->orders.pop_back();
+						debug("Finished order deletion");
+						// setting a new current order to the current unit position as starting point for the pathfinding calculation
+						unit->orders.push_back(new MoveOrder(unit->pos, unit->rot, MOVE_PASSINGTHROUGH));
+					}
+					// appending the new orders
 					for(auto order : oev->orders) unit->orders.push_back(order);
 					debug("Pushed back new orders");
 					if(!unit->placed) unit->currentOrder = 0;
-					std::cout << unit->orders.size() << "\n";
-					std::cout << unit->currentOrder << "\n";
 					Order* o = unit->orders.at(unit->currentOrder);
 					debug("Found new new order");
 					for(auto row : *unit->soldiers()) {
@@ -73,19 +146,10 @@ class Model : public Listener{
 							}
 						}
 					}
-					//unit->orders = oev->orders;
-					//unit->currentOrder = 0;
 					unit->nSoldiersArrived = 0;
-					//std::vector<std::vector<Soldier*>>* soldiers = unit->soldiers();
-					//for(int i = 0; i < unit->nrows(); i++) {
-					//	for(int j = 0; j < unit->width(); j++) {
-					//		Soldier* soldier = soldiers->at(i).at(j);
-					//		if(soldier) {
-					//			soldier->currentOrder = 0;
-					//			soldier->arrived = false;
-					//		}
-					//	}
-					//}
+					// doing pathfinding on all orders
+					OrderPathfinding(unit, map);
+					// reforming so that the new position targets are set
 					if(o->type == ORDER_MOVE && unit->placed) {
 						ReformUnit(unit);
 						MoveTarget(unit);
@@ -99,6 +163,7 @@ class Model : public Listener{
 					for(auto order : oev->orders) {
 						unit->orders.push_back(order);
 					}
+					OrderPathfinding(unit, map);
 				}
 			}
 			else if(ev->type == UNIT_PLACE_REQUEST) {
@@ -157,6 +222,8 @@ class Model : public Listener{
 						unit = new Cavalry(selectedPlayer); break;
 					case UNIT_MONSTER:
 						unit = new MonsterUnit(selectedPlayer); break;
+					case UNIT_LONE_RIDER:
+						unit = new LoneRider(selectedPlayer); break;
 					}
 					if(unit) selectedPlayer->units.push_back(unit);
 				}

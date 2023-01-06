@@ -17,38 +17,24 @@ public:
 };
 
 bool LineLineCollision(Point* p00, Point* p01, Point* p10, Point* p11) {
-	double a0, a1, b0, b1;
-	a0 = (p01->pos.coeff(1) - p00->pos.coeff(1)) 
-		/ (p01->pos.coeff(0) - p00->pos.coeff(0));
-	a1 = (p11->pos.coeff(1) - p10->pos.coeff(1)) 
-		/ (p11->pos.coeff(0) - p10->pos.coeff(0));
-	b0 = p00->pos.coeff(1) - a0*p00->pos.coeff(0);
-	b1 = p10->pos.coeff(1) - a1*p10->pos.coeff(0);
-	if(a0 == a1) {
-		if(b0 == b1
-			&& !(
-					(
-						p00->pos.coeff(0) < p10->pos.coeff(0) && p01->pos.coeff(0) < p10->pos.coeff(0)
-						&& p00->pos.coeff(0) < p11->pos.coeff(0) && p01->pos.coeff(0) < p11->pos.coeff(0)
-					)
-					||
-					(
-						p00->pos.coeff(0) > p10->pos.coeff(0) && p01->pos.coeff(0) > p10->pos.coeff(0)
-						&& p00->pos.coeff(0) > p11->pos.coeff(0) && p01->pos.coeff(0) > p11->pos.coeff(0)
-					)
-				)
-			) {return true;}
-		else {return false;}
+	//Bezier parameters
+	double t_numerator = (p00->pos.coeff(0) - p10->pos.coeff(0))*(p10->pos.coeff(1) - p11->pos.coeff(1))
+						- (p00->pos.coeff(1) - p10->pos.coeff(1))*(p10->pos.coeff(0) - p11->pos.coeff(0));
+	double t_denominator = (p00->pos.coeff(0) - p01->pos.coeff(0))*(p10->pos.coeff(1) - p11->pos.coeff(1))
+						- (p00->pos.coeff(1) - p01->pos.coeff(1))*(p10->pos.coeff(0) - p11->pos.coeff(0));
+	double u_numerator = (p00->pos.coeff(0) - p10->pos.coeff(0))*(p00->pos.coeff(1) - p01->pos.coeff(1))
+						- (p00->pos.coeff(1) - p10->pos.coeff(1))*(p00->pos.coeff(0) - p01->pos.coeff(0));
+	double u_denominator = (p00->pos.coeff(0) - p01->pos.coeff(0))*(p10->pos.coeff(1) - p11->pos.coeff(1))
+						- (p00->pos.coeff(1) - p01->pos.coeff(1))*(p10->pos.coeff(0) - p11->pos.coeff(0));
+	bool t_intersect = false;
+	bool u_intersect = false;
+	if((t_numerator < 0 && t_denominator < 0) || (0 <= t_numerator && 0 <= t_denominator)) {
+		if(std::abs(t_denominator) >= std::abs(t_numerator)) t_intersect = true;
 	}
-	double crossing = (b0 - b1) / (a1 - a0);
-	if( ( (p00->pos.coeff(0) <= crossing && crossing <= p01->pos.coeff(0))
-		|| (p01->pos.coeff(0) <= crossing && crossing <= p00->pos.coeff(0)) )
-		&& 
-		( (p10->pos.coeff(0) <= crossing && crossing <= p11->pos.coeff(0))
-		|| (p11->pos.coeff(0) <= crossing && crossing <= p10->pos.coeff(0)) ) ) {
-		return true;
+	if((u_numerator < 0 && u_denominator < 0) || (0 <= u_numerator && 0 <= u_denominator)) {
+		if(std::abs(u_denominator) >= std::abs(u_numerator)) u_intersect = true;
 	}
-	return false;
+	return t_intersect && u_intersect;
 }
 
 class Circle : public Point {
@@ -59,6 +45,11 @@ public:
 	Circle(Eigen::Vector2d pos, double rad) : Point(pos) {
 		this->pos =pos;
 		this->rad = rad;
+	}
+
+	void Reposition(Eigen::Vector2d pos) {
+		dynamic_cast<Point*>(this)->pos = pos;
+		this->pos = pos;
 	}
 };
 
@@ -128,6 +119,22 @@ public:
 		this->hw = hw;
 	}
 };
+
+bool LineCircleCollision(Point* l1, Point* l2, Circle* circ) {
+	if(l1->pos == circ->pos) return true; // prevents division by 0
+	else {
+		Eigen::Vector2d va = l2->pos - l1->pos;
+		Eigen::Vector2d vb = circ->pos - l1->pos;
+		double crossProd = std::abs(va.coeff(0)*vb.coeff(1) - va.coeff(1)*vb.coeff(0));
+		return circ->rad >= crossProd / va.norm();
+	}
+}
+
+bool LineRectangleCollison(Point* l1, Point* l2, Rrectangle* rec) {
+	if(LineLineCollision(l1, l2, rec->corners.at(0), rec->corners.at(2))) return true;
+	if(LineLineCollision(l1, l2, rec->corners.at(1), rec->corners.at(3))) return true;
+	return false;
+}
 
 bool PointRectangleCollision(Point* p, Rrectangle* rec) {
 	Eigen::Vector2d rotPos = rec->rot.transpose() * (p->pos - rec->pos);

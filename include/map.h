@@ -13,7 +13,8 @@ enum MAP_OBJECT_TYPES {
 	MAP_NONE,
 	MAP_RECTANGLE,
 	MAP_BORDER,
-	MAP_CIRCLE
+	MAP_CIRCLE,
+	MAP_WAYPOINT
 };
 
 class MapObject {
@@ -26,6 +27,12 @@ class MapCircle : public MapObject, public Circle {
 public:
 	int type() {return MAP_CIRCLE;}
 	MapCircle(Eigen::Vector2d pos, double rad) : MapObject(), Circle(pos, rad) {}
+};
+
+class MapWaypoint : public MapObject, public Circle {
+public:
+	int type() {return MAP_WAYPOINT;}
+	MapWaypoint(Eigen::Vector2d pos, double rad) : MapObject(), Circle(pos, rad) {}
 };
 
 class MapRectangle : public MapObject, public Rrectangle {
@@ -58,7 +65,10 @@ class Map {
 		int ncols;
 		std::vector<std::vector<gridpiece*>> tiles;
 		std::vector<MapObject*> mapObjects;
+		std::vector<MapWaypoint*> waypoints;
 		std::vector<MapBorder*> borders;
+		std::vector<std::vector<float>> wp_path_dist;
+		std::vector<std::vector<int>> wp_path_next;
 		
 	private:
 		void init() {
@@ -150,17 +160,28 @@ class Map {
 						}
 					}
 				}
-				break;}
+				}break;
+			case MAP_WAYPOINT:
+				waypoints.push_back(dynamic_cast<MapWaypoint*>(obj));
+				break;
 			}
 			mapObjects.push_back(obj);
 		}
 
 		void RemoveMapObject(MapObject* obj) {
 			std::erase(mapObjects, obj);
-			for(auto row : tiles) {
-				for(auto tile : row) {
-					std::erase(tile->mapObjects, obj);
+			switch(obj->type()) {
+			case MAP_CIRCLE:
+			case MAP_RECTANGLE:
+				for(auto row : tiles) {
+					for(auto tile : row) {
+						std::erase(tile->mapObjects, obj);
+					}
 				}
+				break;
+			case MAP_WAYPOINT:
+				std::erase(waypoints, dynamic_cast<MapWaypoint*>(obj));
+				break;
 			}
 		}
 

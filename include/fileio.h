@@ -17,6 +17,7 @@ json MapToJson(Map* map) {
 	j["tilesize"] = map->tilesize;
 	json circles = json::array();
 	json rectangles = json::array();
+	json waypoints = json::array();
 	for(auto obj : map->mapObjects) {
 		switch(obj->type()) {
 		case MAP_CIRCLE: {
@@ -36,11 +37,36 @@ json MapToJson(Map* map) {
 			jrec["rot"] = {rec->rot.coeff(0,0), rec->rot.coeff(0,1), rec->rot.coeff(1,0), rec->rot.coeff(1,1)};
 			rectangles.push_back(jrec);
 			break;}
+		case MAP_WAYPOINT: {
+			Circle* circ = dynamic_cast<Circle*>(obj);
+			json jcirc;
+			jcirc["pos"] = {circ->pos.coeff(0), circ->pos.coeff(1)};
+			jcirc["rad"] = circ->rad;
+			waypoints.push_back(jcirc);
+			break;}
 		}
 	}
 	j["circles"] = circles;
 	j["rectangles"] = rectangles;
-	std::cout << j;
+	j["waypoints"] = waypoints;
+	json wp_dist = json::array();
+	for(auto row : map->wp_path_dist) {
+		json jrow = json::array();
+		for(auto entry : row) {
+			jrow.push_back(entry);
+		}
+		wp_dist.push_back(jrow);
+	}
+	j["wp_dist"] = wp_dist;
+	json wp_next = json::array();
+	for(auto row : map->wp_path_next) {
+		json jrow = json::array();
+		for(auto entry : row) {
+			jrow.push_back(entry);
+		}
+		wp_next.push_back(jrow);
+	}
+	j["wp_next"] = wp_next;
 	return j;
 }
 
@@ -62,6 +88,29 @@ Map::Map(std::string filename) {
 		Eigen::Matrix2d rot; rot << jrec["rot"][0], jrec["rot"][1], jrec["rot"][2], jrec["rot"][3];
 		MapRectangle* rec = new MapRectangle(jrec["hl"], jrec["hw"], pos, rot);
 		AddMapObject(rec);
+	}
+	debug("Non-pathfinding map elements loaded successfully.");
+	if(j.contains("waypoints")) {
+		for(auto jcirc : j["waypoints"]) {
+			debug("Loading waypoint.");
+			Eigen::Vector2d pos; pos << jcirc["pos"][0], jcirc["pos"][1];
+			MapWaypoint* circ = new MapWaypoint(pos, jcirc["rad"]);
+			AddMapObject(circ);
+		}
+		if(j.contains("wp_dist") && j.contains("wp_next")) {
+			for(auto jrow : j["wp_dist"]) {
+				wp_path_dist.push_back(std::vector<float>());
+				for(auto entry : jrow) {
+					wp_path_dist.at(wp_path_dist.size()-1).push_back(entry);
+				}
+			}
+			for(auto jrow : j["wp_next"]) {
+				wp_path_next.push_back(std::vector<int>());
+				for(auto entry : jrow) {
+					wp_path_next.at(wp_path_next.size()-1).push_back(entry);
+				}
+			}
+		}
 	}
 }
 
