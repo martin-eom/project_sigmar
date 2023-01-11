@@ -12,6 +12,7 @@
 #include <SDL_ttf.h>
 #include <string.h>
 #include <fileio.h>
+#include <pathfinding.h>
 
 int initial_SCREEN_WIDTH = 1200;
 int initial_SCREEN_HEIGHT = 750;
@@ -23,10 +24,10 @@ MapEditorController* ctrl;
 Map* map;
 MapEditorView* view;
 
-void OpenWindow(Map* map) {
+void OpenWindow(Map* new_map) {
 	window = SDL_CreateWindow("Game",
 	SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED, 
-	map->width, map->height, SDL_WINDOW_SHOWN);
+	new_map->width, new_map->height, SDL_WINDOW_SHOWN);
 	if(!window) {
 		std::cout << "Could not create window: " << SDL_GetError() << "\n";
 	}
@@ -36,8 +37,8 @@ void OpenWindow(Map* map) {
 	}
 	em = new EventManager(60);
 	ctrl = new MapEditorController(em, &initial_SCREEN_HEIGHT, NULL);
-	ctrl->loadMap(map);
-	view = new MapEditorView(em, map->width, map->height, window, renderer, map, ctrl);
+	ctrl->loadMap(new_map);
+	view = new MapEditorView(em, new_map->width, new_map->height, window, renderer, new_map, ctrl);
 }
 
 void OpenWindow(int SCREEN_WIDTH, int SCREEN_HEIGHT) {
@@ -52,15 +53,15 @@ void CloseWindow() {
 	renderer = NULL;
 }
 
-void ResetTextbox(std::string text, bool input, MapEditorController* ctrl, MapEditorView* view) {
+void ResetTextbox(std::string text, bool input, MapEditorController* a_ctrl, MapEditorView* a_view) {
 	if(input) {
 		if(!SDL_IsTextInputActive()) SDL_StartTextInput();
 	}
 	else {
 		if(SDL_IsTextInputActive()) SDL_StopTextInput();
 	}
-	ctrl->input = "";
-	view->textbox = text;
+	a_ctrl->input = "";
+	a_view->textbox = text;
 }
 
 bool Isint(std::string text) {
@@ -150,9 +151,10 @@ int main(int argc, char* argv[1]) {
 				CloseWindow();
 				OpenWindow(ctrl->new_SCREEN_WIDTH, ctrl->new_SCREEN_HEIGHT);
 				break;
-			case EDITOR_PLACING_CIRCLE: {
+			case EDITOR_PLACING_CIRCLE:
+			case EDITOR_PLACING_WP: {
 				ResetTextbox("", false, ctrl, view);
-				dynamic_cast<Circle*>(ctrl->objToPlace)->pos << ctrl->mousePos.coeff(0), ctrl->mousePos.coeff(1);
+				dynamic_cast<Circle*>(ctrl->objToPlace)->Reposition(ctrl->mousePos);
 				break;}
 			case EDITOR_ENTERING_CIRCLE_RAD:
 				if(!SDL_IsTextInputActive()) {
@@ -165,6 +167,19 @@ int main(int argc, char* argv[1]) {
 						dynamic_cast<Circle*>(ctrl->objToPlace)->rad = stod(ctrl->input);
 					}
 					ctrl->state = EDITOR_PLACING_CIRCLE;
+				}
+				break;
+			case EDITOR_ENTERING_WP_RAD:
+				if(!SDL_IsTextInputActive()) {
+					ResetTextbox("enter new waypoint radius: ", true, ctrl, view);
+				}
+				if(ctrl->input_confirmed) {
+					ctrl->input_confirmed = false;
+					if(Isdouble(ctrl->input)) {
+						ctrl->lastCircleRad = stod(ctrl->input);
+						dynamic_cast<Circle*>(ctrl->objToPlace)->rad = stod(ctrl->input);
+					}
+					ctrl->state = EDITOR_PLACING_WP;
 				}
 				break;
 			case EDITOR_PLACING_RECTANGLE: {
@@ -224,6 +239,8 @@ int main(int argc, char* argv[1]) {
 						ctrl->state = EDITOR_PLACING_CIRCLE; break;
 					case MAP_RECTANGLE:
 						ctrl->state = EDITOR_PLACING_RECTANGLE; break;
+					case MAP_WAYPOINT:
+						ctrl->state = EDITOR_PLACING_WP; break;
 					default:
 						ctrl->state = EDITOR_SELECTING;
 						ctrl->prevState = 0;
@@ -237,11 +254,17 @@ int main(int argc, char* argv[1]) {
 						ctrl->state = EDITOR_PLACING_CIRCLE; break;
 					case MAP_RECTANGLE:
 						ctrl->state = EDITOR_PLACING_RECTANGLE; break;
+					case MAP_WAYPOINT:
+						ctrl->state = EDITOR_PLACING_WP; break;
 					default:
 						ctrl->state = EDITOR_SELECTING;
 						ctrl->prevState = 0;
 					}
 				}
+				break;
+			case EDITOR_PATHFINDING:
+				FloydWarshallWithPathReconstruction(map);
+				ctrl->state = EDITOR_IDLE;
 				break;
 			case EDITOR_SAVING:
 				if(!SDL_IsTextInputActive()) {
@@ -249,6 +272,7 @@ int main(int argc, char* argv[1]) {
 				}
 				if(ctrl->input_confirmed) {
 					ctrl->input_confirmed = false;
+					FloydWarshallWithPathReconstruction(map);
 					std::ofstream out("maps/" + ctrl->input);
 					out << std::setw(4) << MapToJson(ctrl->map) << "\n";
 					ctrl->state = EDITOR_IDLE;
@@ -260,10 +284,11 @@ int main(int argc, char* argv[1]) {
 				}
 				if(ctrl->input_confirmed) {
 					ctrl->input_confirmed = false;
-					Map* newmap = new Map("maps/" + ctrl->input);
+					//Map* newmap = new Map("maps/" + ctrl->input);
+					map = new Map("maps/" + ctrl->input);
 					ctrl->state = EDITOR_IDLE;
 					CloseWindow();
-					OpenWindow(newmap);
+					OpenWindow(map);
 				}
 				break;
 			case EDITOR_CLOSING:

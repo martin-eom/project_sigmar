@@ -124,6 +124,10 @@ void DrawRectangle(Rrectangle* rec, SDL_Renderer* renderer, Color* color, int SC
 	SDL_RenderDrawLine(renderer, p1.coeff(0), SCREEN_HEIGHT - p1.coeff(1), p2.coeff(0), SCREEN_HEIGHT - p2.coeff(1));
 	SDL_RenderDrawLine(renderer, p2.coeff(0), SCREEN_HEIGHT - p2.coeff(1), p3.coeff(0), SCREEN_HEIGHT - p3.coeff(1));
 	SDL_RenderDrawLine(renderer, p3.coeff(0), SCREEN_HEIGHT - p3.coeff(1), p0.coeff(0), SCREEN_HEIGHT - p0.coeff(1));
+	if(ddebug::_showDebugGraphics) {
+		SDL_RenderDrawLine(renderer, p0.coeff(0), SCREEN_HEIGHT - p0.coeff(1), p2.coeff(0), SCREEN_HEIGHT - p2.coeff(1));
+		SDL_RenderDrawLine(renderer, p1.coeff(0), SCREEN_HEIGHT - p1.coeff(1), p3.coeff(0), SCREEN_HEIGHT - p3.coeff(1));	
+	}
 
 }
 

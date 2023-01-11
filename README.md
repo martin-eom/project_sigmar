@@ -14,17 +14,17 @@ Storing maps in json format is done using the [nlohmann/json](https://github.com
 ## Current state
 The basic architecture of the game is implemented. There is a model for having multiple players with units of soldiers, which can be placed and given orders to move on a map.
 Victory/Defeat game logic is not yet present, partially because the conditions have not yet been decided upon.
+
 The soldiers within a unit will organize in a proper formation, which they will reorder and restore when disturbed.
 A version of collision physics has also been implemented and somewhat refined. They can collide with each other and bounce off of map objects.
 For now it is planned to keep all soldiers as circular objects, since this massively simplifies the complexity of the collision model.
 The soldiers can turn and move forwards (or sideways and backwards at low speeds).
-A server-client architecture is planned, but the implementation will be reserved for much later in the development process, since it is not necessary for testing of game mechanics.
+A simple form of pathfinding is implemented for units. Given a well designed map they will choose the shortest path between any 2 points while not running directly into map objects.
+The shortest paths are computed during map creation using the [Floyd-Warshall algorithm](https://en.wikipedia.org/wiki/Floyd%E2%80%93Warshall_algorithm).
 There is a map editor to create and modify maps, which can be loaded into the main game.
 ## (Immediate) to-do list
-* main game ui and controls similar to the map editor
 * zoomable and moveable map
-* pathfinding
-* combat (mechanics and changes to movement, connected to a "state"-variable for every soldier)
+* combat
 * A server-client architecture is planned, but the implementation will be reserved for much later in the development process, since it is not necessary for testing of game mechanics.
 ## Requirements
 * C++20
@@ -39,8 +39,5 @@ All header files are in the *include* folder, so make sure to include this folde
 Additionally you might have to alter the include statements for SDL2 (*SDL.h*) and Eigen3 (*Dense*) to something like *SDL2/SDL.h* and *Eigen/Dense* in all files depending on your setup of the libraries.
 ### Windows
 For installation on Windows an installer will be included in all releases starting with cdev0.2. The map editor, game and *maps* folder have to be within the same installation folder, because the map editor will save to *maps* and both programs will load from *maps*. It is not recommended to install into *Program Files*, despite this being the default suggested installation directory, because then the map editor would require administrator rights to be able to write into the *maps* folder.
-## Controlls
-### Map Editor
-At any stage hold down h to view the available contols.
-### Game
-The controls being shown on screen can be toggled by pressing h.
+## Controls
+For both the map editor and game the controls being shown on screen can be toggled by pressing h.
