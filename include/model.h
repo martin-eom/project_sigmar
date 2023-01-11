@@ -18,13 +18,16 @@ void OrderPathfinding(Unit* unit, Map* map) {
 			MoveOrder* mo = dynamic_cast<MoveOrder*>(unit->orders.at(i));
 			MoveOrder* pmo = dynamic_cast<MoveOrder*>(unit->orders.at(i-1));
 			// checking if line of sight between orders
-			if(!FreePath(mo->pos, pmo->pos, map)) {
+			double rad = unit->width()*(unit->spacing() - 1);
+			MapWaypoint w1 = MapWaypoint(mo->pos, rad);
+			MapWaypoint w2 = MapWaypoint(pmo->pos, rad);
+			if(!FreePath(&w1, &w2, map)) {
 				// finding waypoints with line of sight to start and goal
 				std::vector<int> visibleStart = std::vector<int>();
 				std::vector<int> visibleEnd = std::vector<int>();
 				for(int j = 0; j < map->waypoints.size(); j++) {
-					if(FreePath(pmo->pos, map->waypoints.at(j)->pos, map)) {visibleStart.push_back(j);}
-					if(FreePath(mo->pos, map->waypoints.at(j)->pos, map)) {visibleEnd.push_back(j);}
+					if(FreePath(&w2, map->waypoints.at(j), map)) {visibleStart.push_back(j);}
+					if(FreePath(&w1, map->waypoints.at(j), map)) {visibleEnd.push_back(j);}
 				}
 				// finding shortest-total-path combination
 				int start, end;
