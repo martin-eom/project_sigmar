@@ -14,20 +14,29 @@
 #include <fileio.h>
 #include <pathfinding.h>
 
+Uint32 CURRENT_TICK;
+Uint32 T_OF_NEXT_TICK;
+
 int initial_SCREEN_WIDTH = 1200;
 int initial_SCREEN_HEIGHT = 750;
 SDL_Window* window = NULL;
 SDL_Renderer* renderer = NULL;
 
 EventManager* em;
-MapEditorController* ctrl;
 Map* map;
+MapEditorController* ctrl;
 MapEditorView* view;
 
 void OpenWindow(Map* new_map) {
 	window = SDL_CreateWindow("Game",
 	SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED, 
-	new_map->width, new_map->height, SDL_WINDOW_SHOWN);
+	initial_SCREEN_WIDTH, initial_SCREEN_HEIGHT, SDL_WINDOW_SHOWN);
+	SDL_DisplayMode mode;
+	int displayIndex = SDL_GetWindowDisplayIndex(window);
+	SDL_DestroyWindow(window);
+	SDL_GetDesktopDisplayMode(displayIndex, &mode);
+	window = SDL_CreateWindow("Game", SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED,
+	int((&mode)->w * 0.9), int((&mode)->h * 0.9), SDL_WINDOW_SHOWN);
 	if(!window) {
 		std::cout << "Could not create window: " << SDL_GetError() << "\n";
 	}
@@ -35,10 +44,19 @@ void OpenWindow(Map* new_map) {
 	if(!renderer) {
 		std::cout << "Could not create renderer: " << SDL_GetError() << "\n";
 	}
-	em = new EventManager(60);
-	ctrl = new MapEditorController(em, &initial_SCREEN_HEIGHT, NULL);
-	ctrl->loadMap(new_map);
-	view = new MapEditorView(em, new_map->width, new_map->height, window, renderer, new_map, ctrl);
+	em = new GameEventManager(30);
+	debug("Created GameEventManager");
+	ctrl = new MapEditorController(em, initial_SCREEN_WIDTH, initial_SCREEN_HEIGHT, new_map);
+	debug("Created MapEditorController");
+	debug("zoom: " + std::to_string(ctrl->zoom));
+	dynamic_cast<GameEventManager*>(em)->ctrl = ctrl;
+	debug("Assigned MapEditorController to GameEventManager.");
+	std::cout << ctrl << "\n" << dynamic_cast<GameEventManager*>(em)->ctrl << "\n";
+	view = new MapEditorView(em, window, renderer, new_map);
+	debug("Created MapEditorView");
+	dynamic_cast<GameEventManager*>(em)->view = view;
+	debug("Assigned MapEditorView to GameEventManager.");
+	std::cout << view << "\n" << dynamic_cast<GameEventManager*>(em)->view << "\n";
 }
 
 void OpenWindow(int SCREEN_WIDTH, int SCREEN_HEIGHT) {
@@ -100,20 +118,26 @@ int main(int argc, char* argv[1]) {
 	SDL_StopTextInput();
 	
 	OpenWindow(initial_SCREEN_WIDTH, initial_SCREEN_HEIGHT);
+	CURRENT_TICK = SDL_GetTicks();
+	T_OF_NEXT_TICK = CURRENT_TICK + em->dt * 1000;
 	while (ctrl->state != EDITOR_CLOSING) {
 		SDL_Event e;
 		while (1) {
-			while (SDL_PollEvent(&e)) {
-				if (e.type == SDL_QUIT) {
-					ctrl->state = EDITOR_CLOSING;
+			CURRENT_TICK = SDL_GetTicks();
+			if (CURRENT_TICK >= T_OF_NEXT_TICK) {
+				while (SDL_PollEvent(&e)) {
+					if (e.type == SDL_QUIT) {
+						ctrl->state = EDITOR_CLOSING;
+					}
+					else if(e.type == SDL_KEYUP || e.type == SDL_KEYDOWN || e.type == SDL_TEXTINPUT ||e.type == SDL_MOUSEBUTTONUP || e.type == SDL_MOUSEMOTION) {
+						Event* ev = new SDLEvent(e);
+						em->Post(ev);
+					}
 				}
-				else if(e.type == SDL_KEYUP || e.type == SDL_KEYDOWN || e.type == SDL_TEXTINPUT ||e.type == SDL_MOUSEBUTTONUP || e.type == SDL_MOUSEMOTION) {
-					Event* ev = new SDLEvent(e);
-					em->Post(ev);
-				}
+				TickEvent ev;
+				em->Post(&ev);
+				T_OF_NEXT_TICK = CURRENT_TICK + em->dt * 1000;
 			}
-			TickEvent* ev = new TickEvent();
-			em->Post(ev);
 			switch(ctrl->state) {
 			case EDITOR_IDLE:
 				ResetTextbox("", false, ctrl, view);
@@ -284,7 +308,6 @@ int main(int argc, char* argv[1]) {
 				}
 				if(ctrl->input_confirmed) {
 					ctrl->input_confirmed = false;
-					//Map* newmap = new Map("maps/" + ctrl->input);
 					map = new Map("maps/" + ctrl->input);
 					ctrl->state = EDITOR_IDLE;
 					CloseWindow();
