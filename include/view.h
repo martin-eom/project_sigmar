@@ -2,6 +2,7 @@
 #define VIEW
 
 #include <base.h>
+#include <gui_base.h>
 #include <shapes.h>
 #include <player.h>
 #include <model.h>
@@ -23,8 +24,10 @@ Color* colorPurple = new Color(0xff, 0x00, 0xff, 0xff);
 Color* colorRed = new Color(0xff, 0x00, 0x00, 0xff);
 Color* colorBlue = new Color(0x00, 0x00, 0xff, 0xff);
 Color* colorGrey = new Color(0x88, 0x88, 0x88, 0xff);
+Color* darkGrey = new Color(0x50, 0x50, 0x50, 0xff);
 
-class View : public Listener {
+
+class View : public GeneralView {
 	std::string _new_map	= "shift n - new map";
 	std::string _load_map	= "shift l - load map";
 	std::string _quit		= "shift q - quit";
@@ -49,12 +52,10 @@ class View : public Listener {
 	std::string _oconfirm	= "enter        - send orders to selected unit";
 	std::string _escape     = "esc          - aboart";
 	std::string _eescape	= "esc          - de-select unit";
+	std::string _zoom		= "+/-          - zoom";
+	std::string _zoomMove	= "i/j/k/l      - move zoomed area";
 
 private:
-		int SCREEN_HEIGHT;
-		int SCREEN_WIDTH;
-		SDL_Window* window;
-		SDL_Renderer* renderer;
 		Map* map;
 		Model* model;
 
@@ -72,13 +73,8 @@ private:
 		std::string info;
 
 	public:
-		View(EventManager* em, Map* map, Model* model, SDL_Window* window, SDL_Renderer* renderer, int SCREEN_HEIGHT) : Listener(em) {
-			this->SCREEN_HEIGHT = SCREEN_HEIGHT;
-			this->window = window;
-			this->renderer = renderer;
-			this->model = model;
+		View(EventManager* em, Map* map, SDL_Window* window, SDL_Renderer* renderer) : GeneralView(em, window, renderer) {
 			this->map = map;
-			SDL_GetWindowSize(window, &SCREEN_WIDTH, &SCREEN_HEIGHT);
 			textwidth = SCREEN_WIDTH - 2 * textWindowGap;
 
 			textControls = new StringTexture(renderer);
@@ -91,8 +87,8 @@ private:
 		}
 	private:
 		void Update() {
-			GameEventManager* gem = dynamic_cast<GameEventManager*>(em);
-			auto ctrl = gem->ctrl;
+			GameEventManager* gem = Gem();//dynamic_cast<GameEventManager*>(em);
+			auto ctrl = dynamic_cast<KeyboardAndMouseController*>(gem->ctrl);
 			auto model = gem->model;
 			SDL_SetRenderDrawColor(renderer, 0x00, 0x00, 0x00, 0xFF);
 			SDL_RenderClear(renderer);
@@ -101,12 +97,12 @@ private:
 				switch(obj->type()) {
 				case MAP_CIRCLE: {
 					Circle* circ = dynamic_cast<Circle*>(obj);
-					DrawCircle(circ->pos.coeff(0), SCREEN_HEIGHT - circ->pos.coeff(1), circ->rad, renderer, colorPurple);
+					DrawCircle(circ, renderer, colorPurple, SCREEN_WIDTH, SCREEN_HEIGHT, ctrl->zoom, ctrl->center);
 					break;}
 				case MAP_BORDER:
 				case MAP_RECTANGLE: {
 					Rrectangle* rec = dynamic_cast<Rrectangle*>(obj);
-					DrawRectangle(rec, renderer, colorPurple, SCREEN_HEIGHT);
+					DrawRectangle(rec, renderer, colorPurple, SCREEN_WIDTH, SCREEN_HEIGHT, ctrl->zoom, ctrl->center);
 					break;}
 				}
 			}
@@ -114,7 +110,7 @@ private:
 			if(ddebug::_showDebugGraphics) {
 				for(auto obj : map->waypoints) {
 					Circle* circ = dynamic_cast<Circle*>(obj);
-					DrawCircle(circ->pos.coeff(0), SCREEN_HEIGHT - circ->pos.coeff(1), circ->rad, renderer, colorGrey);
+					DrawCircle(circ, renderer, colorGrey, SCREEN_WIDTH, SCREEN_HEIGHT, ctrl->zoom, ctrl->center);
 				}
 			}
 			//showing tiles that hold objects
@@ -123,7 +119,7 @@ private:
 					for(auto tile : row) {
 						if(!tile->mapObjects.empty()) {
 							Rrectangle* rec = tile->rec;
-							DrawRectangle(rec, renderer, colorGreen, SCREEN_HEIGHT);
+							DrawRectangle(rec, renderer, colorGreen, SCREEN_WIDTH, SCREEN_HEIGHT, ctrl->zoom, ctrl->center);
 						}
 					}
 				}
@@ -139,14 +135,14 @@ private:
 							Order* prevo = ctrl->orders.at(i-1);
 							if(prevo->type == ORDER_MOVE) {
 								MoveOrder* prevmo = dynamic_cast<MoveOrder*>(prevo);
-								SDL_RenderDrawLine(renderer, mo->pos.coeff(0), SCREEN_HEIGHT - mo->pos.coeff(1),
-									prevmo->pos.coeff(0), SCREEN_HEIGHT - prevmo->pos.coeff(1));
+								Point p1(mo->pos); Point p2(prevmo->pos);
+								DrawLine(&p1, &p2, renderer, colorGreen, SCREEN_WIDTH, SCREEN_HEIGHT, ctrl->zoom, ctrl->center);
 							}
 						}
 					}
 					if(model->selectedUnit) {
 						Rrectangle rec = UnitRectangle(model->selectedUnit, i, ctrl->orders);
-						DrawRectangle(&rec, renderer, colorGrey, SCREEN_HEIGHT);
+						DrawRectangle(&rec, renderer, colorGrey, SCREEN_WIDTH, SCREEN_HEIGHT, ctrl->zoom, ctrl->center);
 					}
 				}
 			}
@@ -169,28 +165,23 @@ private:
 					if(unit->placed) {
 						if(ddebug::_showDebugGraphics) {
 							Circle circ = Circle(unit->pos, 30);
-							DrawCircle(&circ, renderer, colorGrey, SCREEN_HEIGHT);
+							DrawCircle(&circ, renderer, colorGrey, SCREEN_WIDTH, SCREEN_HEIGHT, ctrl->zoom, ctrl->center);
 						}
 						if(model->selectedUnit) {
 							if(model->selectedUnit == unit) {
-								Eigen::Vector2d viewPos;
-								viewPos << unit->posTarget.coeff(0), SCREEN_HEIGHT - unit->posTarget.coeff(1);
-								Eigen::Matrix2d viewRot;
-								viewRot << unit->rotTarget.coeff(0,0), -unit->rotTarget.coeff(0,1), 
-									-unit->rotTarget.coeff(1,0), unit->rotTarget.coeff(1,1);
-								DrawUnitArrow(viewPos, viewRot, renderer, colorGreen);
+								DrawUnitArrow(unit->posTarget, unit->rotTarget, renderer, colorGreen, SCREEN_WIDTH, SCREEN_HEIGHT, ctrl->zoom, ctrl->center);
 								for(int i = 0; i < unit->orders.size(); i++) {
 									Order* o = unit->orders.at(i);
 									if(o->type == ORDER_MOVE) {
 										MoveOrder* mo = dynamic_cast<MoveOrder*>(o);
 										Rrectangle rec = UnitRectangle(unit, i);
-										DrawRectangle(&rec, renderer, colorGreen, SCREEN_HEIGHT);
+										DrawRectangle(&rec, renderer, colorGreen, SCREEN_WIDTH, SCREEN_HEIGHT, ctrl->zoom, ctrl->center);
 										if(i > 0) {
 											Order* prevo = unit->orders.at(i-1);
 											if(prevo->type == ORDER_MOVE) {
 												MoveOrder* prevmo = dynamic_cast<MoveOrder*>(prevo);
-												SDL_RenderDrawLine(renderer, mo->pos.coeff(0), SCREEN_HEIGHT - mo->pos.coeff(1),
-													prevmo->pos.coeff(0), SCREEN_HEIGHT - prevmo->pos.coeff(1));
+												Point p1(mo->pos); Point p2(prevmo->pos);
+												DrawLine(&p1, &p2, renderer, colorGreen, SCREEN_WIDTH, SCREEN_HEIGHT, ctrl->zoom, ctrl->center);
 											}
 										}
 									}
@@ -202,37 +193,31 @@ private:
 								Soldier* soldier = (*soldiers)[i][j];
 								if(soldier->placed) {
 									if(model->selectedUnit == unit) {
-										DrawCircle(soldier->pos.coeff(0), SCREEN_HEIGHT - soldier->pos.coeff(1),
-											soldier->rad() + 1, renderer, colorGreen);
+										DrawCircle(soldier->pos.coeff(0), soldier->pos.coeff(1),
+											soldier->rad() + 1, renderer, colorGreen, SCREEN_WIDTH, SCREEN_HEIGHT, ctrl->zoom, ctrl->center);
 									}
-									DrawCircle(soldier->pos.coeff(0), SCREEN_HEIGHT - soldier->pos.coeff(1),
-										soldier->rad(), renderer, &playerColor);
-									Eigen::Vector2d viewPos;
-									viewPos << soldier->pos.coeff(0), SCREEN_HEIGHT - soldier->pos.coeff(1);
-									Eigen::Matrix2d viewRot;
-									viewRot << soldier->rot.coeff(0,0), -soldier->rot.coeff(0,1), -soldier->rot.coeff(1,0), soldier->rot.coeff(1,1);
+									DrawCircle(soldier->pos.coeff(0), soldier->pos.coeff(1),
+										soldier->rad(), renderer, &playerColor, SCREEN_WIDTH, SCREEN_HEIGHT, ctrl->zoom, ctrl->center);
 									if(soldier->currentOrder == soldier->unit->currentOrder) {
-										DrawFacingArrowhead(viewPos, viewRot, soldier->rad(), renderer, colorPurple);
+										DrawFacingArrowhead(soldier->pos, soldier->rot, soldier->rad(), renderer, colorPurple, SCREEN_WIDTH, SCREEN_HEIGHT, ctrl->zoom, ctrl->center);
 									}
 									else {
-										DrawFacingArrowhead(viewPos, viewRot, soldier->rad(), renderer, colorWhite);
+										DrawFacingArrowhead(soldier->pos, soldier->rot, soldier->rad(), renderer, colorWhite, SCREEN_WIDTH, SCREEN_HEIGHT, ctrl->zoom, ctrl->center);
 									}
 								}
 							}
 						}
 					}
 					if(unit == model->selectedUnit) {
-						if(gem->ctrl->state() == CTRL_GIVING_ORDERS) {
+						if(ctrl->state() == CTRL_GIVING_ORDERS) {
 							std::vector<std::vector<Eigen::Vector2d>> posInUnit = *unit->posInUnit();
 							for(int i = 0; i < unit->nrows(); i++) {
 								for(int j = 0; j < unit->width(); j++) {
 									if(i*unit->width() + j < unit->maxSoldiers()) {
 										Soldier* soldier = soldiers->at(i).at(j);
-										Eigen::Vector2d pos = gem->ctrl->rot * posInUnit.at(i).at(j) + gem->ctrl->p0;
-										DrawCircle(pos.coeff(0), SCREEN_HEIGHT - pos.coeff(1), soldier->rad(), renderer, colorGrey);
-										Eigen::Vector2d viewPos; viewPos << pos.coeff(0), SCREEN_HEIGHT - pos.coeff(1);
-										Eigen::Matrix2d viewRot; viewRot << gem->ctrl->rot.transpose();
-										DrawFacingArrowhead(viewPos, viewRot, soldier->rad(), renderer, colorWhite);
+										Eigen::Vector2d pos = ctrl->rot * posInUnit.at(i).at(j) + ctrl->p0;
+										DrawCircle(pos.coeff(0), pos.coeff(1), soldier->rad(), renderer, colorGrey, SCREEN_WIDTH, SCREEN_HEIGHT, ctrl->zoom, ctrl->center);
+										DrawFacingArrowhead(pos, ctrl->rot, soldier->rad(), renderer, colorWhite, SCREEN_WIDTH, SCREEN_HEIGHT, ctrl->zoom, ctrl->center);
 									}
 								}
 							}
@@ -265,6 +250,7 @@ private:
 						controls += "\n" + _oconfirm + "\n" + _escape + "\n" + _lshift;
 						break;
 					}
+					controls += "\n" + _zoom + "\n" + _zoomMove;
 				}
 				else controls = _help_line;
 			}
@@ -279,7 +265,7 @@ private:
 				break;
 			case CTRL_ADDING_UNIT:
 				info = "New unit type: ";
-				switch(gem->ctrl->newUnitType) {
+				switch(ctrl->newUnitType) {
 				case 0: info += "Infantry"; break;
 				case 1: case -3: info += "Cavalry"; break;
 				case 2: case -2: info += "Monster"; break;
@@ -298,7 +284,7 @@ private:
 			if(textbox.length() > 0) {
 				textInputAdvice->loadFromString(textbox, font, colorText, textwidth);
 				textInputAdvice->render(textWindowGap, SCREEN_HEIGHT - textWindowGap - textControls->length() - textInputAdvice->length());
-				std::string input = dynamic_cast<GameEventManager*>(em)->ctrl->input();
+				std::string input = ctrl->input();
 				if(input.length() > 0) {
 					textInput->loadFromString(input, font, colorText, textwidth - textInputAdvice->width());
 					textInput->render(textWindowGap + textInputAdvice->width(), SCREEN_HEIGHT - textWindowGap - textControls->length()
@@ -319,7 +305,7 @@ private:
 };
 
 
-class MapEditorView : public Listener {
+class MapEditorView : public GeneralView {
 	std::string _new_map	= "shift n - new map";
 	std::string _load_map	= "shift l - load map from file";
 	std::string _save_map	= "shift s - save map";
@@ -333,7 +319,7 @@ class MapEditorView : public Listener {
 	std::string _rec		= "r           - select rectangle";
 	std::string _rrot		= "hold ctrl   - rotate rectangle";
 	std::string _rw			= "w           - change width";
-	std::string _rh			= "l           - change height";
+	std::string _rh			= "e           - change height";
 	std::string _pesc		= "esc         - aboart placement";
 	std::string _bon		= "b           - add map borders";
 	std::string _boff		= "b           - remove map borders";
@@ -347,25 +333,24 @@ class MapEditorView : public Listener {
 	std::string _sdel		= "d           - delete object";
 	std::string _sesc		= "esc         - aboart selection";
 	std::string _help_line	= "h - toggle help";
+	std::string _zoom		= "+/-         - zoom";
+	std::string _zoomMove	= "i/j/k/l     - move zoomed area";
+
 
 	std::string _options_menu =	_new_map + "\n" + _save_map + "\n" + _load_map + "\n"+ _quit;
-	std::string _control_scheme = _circle + "\n" + _rec + "\n" + _wp + "\n" + _select + "\n" + _pf + "\n" + _lshift;
-	std::string _rplace = _rrot + "\n" + _rw + "\n" + _rh + "\n" + _pesc + "\n" + _lshift;
-	std::string _cplace = _crad + "\n" + _pesc + "\n" + _lshift;
-	std::string _select_scheme = _sarrow + "\n" + _sclick + "\n" + _smove + "\n" + _scopy + "\n" + _sdel + "\n" + _sesc + "\n" + _lshift;
-	std::string _move_scheme = _smesc + "\n" + _lshift;
-	std::string _copy_scheme = _scesc + "\n" + _lshift;
+	std::string _control_scheme = _circle + "\n" + _rec + "\n" + _wp + "\n" + _select + "\n" + _pf + "\n" + _zoom + "\n" + _zoomMove + "\n" + _lshift;
+	std::string _rplace = _rrot + "\n" + _rw + "\n" + _rh + "\n" + _zoom + "\n" + _zoomMove + "\n" + _pesc + "\n" + _lshift;
+	std::string _cplace = _crad + "\n" + _zoom + "\n" + _zoomMove + "\n" + _pesc + "\n" + _lshift;
+	std::string _select_scheme = _sarrow + "\n" + _sclick + "\n" + _smove + "\n" + _scopy + "\n" + _sdel + "\n" + _zoom + "\n" + _zoomMove + "\n" + _sesc + "\n" + _lshift;
+	std::string _move_scheme =  _zoom + "\n" + _zoomMove + "\n" + _smesc + "\n" + _lshift;
+	std::string _copy_scheme =  _zoom + "\n" + _zoomMove + "\n" + _scesc + "\n" + _lshift;
 
 	SDL_Color colorText = {0xff, 0xff, 0xff};
 	TTF_Font* font = TTF_OpenFont("VeraMono.ttf", 20);
 	int textWindowGap = 50;
 
 private:
-	int SCREEN_WIDTH;
-	int SCREEN_HEIGHT;
 	int textwidth;
-	SDL_Window* window;
-	MapEditorController* ctrl;
 	StringTexture* textControls;
 	StringTexture* textInputAdvice;
 	StringTexture* textInput;
@@ -373,16 +358,14 @@ private:
 
 public:
 	Map* map;
-	SDL_Renderer* renderer;
 	std::string textbox;
-	MapEditorView(EventManager* em, int width, int height, 
-		SDL_Window* window, SDL_Renderer* renderer, Map* map, MapEditorController* ctrl) : Listener(em) {
-		SCREEN_WIDTH = width;
-		SCREEN_HEIGHT = height;
-		this->window = window;
-		this->renderer = renderer;
+
+	MapEditorController* Ctrl() {
+		return dynamic_cast<MapEditorController*>(Gem()->ctrl);
+	}
+
+	MapEditorView(EventManager* em, SDL_Window* window, SDL_Renderer* renderer, Map* map) : GeneralView(em, window, renderer) {
 		this->map = map;
-		this->ctrl = ctrl;
 		textwidth = SCREEN_WIDTH - 2*textWindowGap;
 		textbox = "";
 		textControls = new StringTexture(renderer);
@@ -392,8 +375,13 @@ public:
 	}
 private:
 	void Update() {
+		MapEditorController* ctrl = Ctrl();
 		SDL_SetRenderDrawColor(renderer, 0x00, 0x00, 0x00, 0xFF);
 		SDL_RenderClear(renderer);
+		Eigen::Matrix2d rot; rot << 1, 0, 0, 1;
+		Eigen::Vector2d map_center; map_center << map->width / 2, map->height / 2;
+		Rrectangle map_bg(map->height / 2 - 1, map->width / 2 - 1, map_center, rot);
+		DrawRectangle(&map_bg, renderer, darkGrey, SCREEN_WIDTH, SCREEN_HEIGHT, ctrl->zoom, ctrl->center);
 		//rendering placed objects
 		for(auto object : map->mapObjects) {
 			Color* objColor = colorPurple;
@@ -412,29 +400,24 @@ private:
 				if(object != ctrl->selectedObj) objColor = colorGrey;
 			case MAP_CIRCLE: {
 				Circle* circ = dynamic_cast<Circle*>(object);
-				DrawCircle(circ, renderer, objColor, SCREEN_HEIGHT);
+				DrawCircle(circ, renderer, objColor, SCREEN_WIDTH, SCREEN_HEIGHT, ctrl->zoom, ctrl->center);
 				break;}
 			case MAP_BORDER:
 			case MAP_RECTANGLE: {
 				Rrectangle* rec = dynamic_cast<Rrectangle*>(object);
-				DrawRectangle(rec, renderer, objColor, SCREEN_HEIGHT);
+				DrawRectangle(rec, renderer, objColor, SCREEN_WIDTH, SCREEN_HEIGHT, ctrl->zoom, ctrl->center);
 				break;}
 			}
 		}
 		for(int i = 0; i < map->wp_path_next.size(); i++) {
 			for(int j = i+1; j < map->wp_path_next.at(i).size(); j++) {
 				if(i != j && map->wp_path_next.at(i).at(j) == j && map->waypoints.size() > std::max(i,j)){
-					SDL_SetRenderDrawColor(renderer, 0x00, 0x00, 0xFF, 0xFF);
-					SDL_RenderDrawLine(renderer, map->waypoints.at(i)->pos.coeff(0), SCREEN_HEIGHT - map->waypoints.at(i)->pos.coeff(1), 
-						map->waypoints.at(j)->pos.coeff(0), SCREEN_HEIGHT - map->waypoints.at(j)->pos.coeff(1));
+					Point p1(map->waypoints.at(i)->pos); Point p2(map->waypoints.at(j)->pos);
+					DrawLine(&p1, &p2, renderer, colorBlue, SCREEN_WIDTH, SCREEN_HEIGHT, ctrl->zoom, ctrl->center);
 
 				}
 			}
 		}
-		/*for(auto obj : map->waypoints) {
-			Circle* circ = dynamic_cast<Circle*>(obj);
-			DrawCircle(circ, renderer, colorGrey, SCREEN_HEIGHT);
-		}*/
 		//rendering options menu
 		std::string text;
 		if(ctrl->shift) text = _options_menu;
@@ -483,13 +466,13 @@ private:
 			case MAP_CIRCLE:
 			case MAP_WAYPOINT: {
 				Circle* circ = dynamic_cast<Circle*>(ctrl->objToPlace);
-				DrawCircle(circ, renderer, colorGreen, SCREEN_HEIGHT);
+				DrawCircle(circ, renderer, colorGreen, SCREEN_WIDTH, SCREEN_HEIGHT, ctrl->zoom, ctrl->center);
 				objDimensions->loadFromString(std::format("rectangle\nradius: {}", circ->rad), font, colorText, textwidth);
 				break;}
 			case MAP_BORDER:
 			case MAP_RECTANGLE: {
 				Rrectangle* rec = dynamic_cast<Rrectangle*>(ctrl->objToPlace);
-				DrawRectangle(rec, renderer, colorGreen, SCREEN_HEIGHT);
+				DrawRectangle(rec, renderer, colorGreen, SCREEN_WIDTH, SCREEN_HEIGHT, ctrl->zoom, ctrl->center);
 				objDimensions->loadFromString(std::format("rectangle\nwidth: {}\nheight: {}", rec->hl*2, rec->hw*2), font, colorText, textwidth);
 				break;}
 			}

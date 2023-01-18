@@ -1,10 +1,11 @@
 #ifndef MAP
 #define MAP
 
-#include <base.h>
+//#include <base.h>
 #include <soldiers.h>
 #include <extra_math.h>
 
+#include <iostream>
 #include <vector>
 #include <algorithm>
 #include <Dense>

@@ -20,8 +20,8 @@ Uint32 T_OF_NEXT_FPS_UPDATE;
 Uint32 T_OF_NEXT_REFORM;
 int TICKS_SINCE_LAST_FPS_UPDATE;
 int TICKS_SINCE_LAST_REFORM;
-int SCREEN_WIDTH;
-int SCREEN_HEIGHT;
+int SCREEN_WIDTH = 1250;
+int SCREEN_HEIGHT = 750;
 
 GameEventManager* em;
 KeyboardAndMouseController* ctrl;
@@ -38,9 +38,9 @@ void close() {
 
 void OpenWindow(Map* map) {
 	em = new GameEventManager(30);
-	SCREEN_WIDTH = map->width;
-	SCREEN_HEIGHT = map->height;
+	dynamic_cast<GameEventManager*>(em)->map = map;
 	model = new Model(em, map);
+	dynamic_cast<GameEventManager*>(em)->model = model;
 	Player* player1 = new Player();
 	model->players.push_back(player1);
 	player1->units.push_back(new Infantry(player1));
@@ -53,14 +53,19 @@ void OpenWindow(Map* map) {
 	player2->units.push_back(new MonsterUnit(player2));
 	model->SetPlayer();
 	model->SetUnit();
-	ctrl = new KeyboardAndMouseController(em, model, SCREEN_HEIGHT);
-	em->ctrl = ctrl;
-	em->model = model;
+	ctrl = new KeyboardAndMouseController(em, SCREEN_WIDTH, SCREEN_HEIGHT, map);
+	dynamic_cast<GameEventManager*>(em)->ctrl = ctrl;
 
 	// Creating Window and Renderer
 	window = SDL_CreateWindow("Game",
 			SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED, 
 			SCREEN_WIDTH, SCREEN_HEIGHT, SDL_WINDOW_SHOWN);
+	SDL_DisplayMode mode;
+	int displayIndex = SDL_GetWindowDisplayIndex(window);
+	SDL_DestroyWindow(window);
+	SDL_GetDesktopDisplayMode(displayIndex, &mode);
+	window = SDL_CreateWindow("Game", SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED,
+	int((&mode)->w * 0.9), int((&mode)->h * 0.9), SDL_WINDOW_SHOWN);
 	if(!window) {
 		std::printf("Could not create window: %s", SDL_GetError());
 	}
@@ -69,8 +74,8 @@ void OpenWindow(Map* map) {
 		std::printf("Could not create renderer: %s", SDL_GetError());
 	}
 
-	view = new View(em, map, model, window, renderer, SCREEN_HEIGHT);
-
+	view = new View(em, map, window, renderer);
+	dynamic_cast<GameEventManager*>(em)->view = view;
 }
 
 void ResetTextbox(std::string text, bool input) {
@@ -82,7 +87,6 @@ void ResetTextbox(std::string text, bool input) {
 	}
 	ChangeTextboxEvent cev(text);
 	em->Post(&cev);
-	//em->Post(new ChangeTextboxEvent(text));
 }
 
 

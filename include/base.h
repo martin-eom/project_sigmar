@@ -71,18 +71,26 @@ void EventManager::Post(Event* ev) {
 	}
 }
 
-class KeyboardAndMouseController;
+
+class Map;
 class Model;
+class GeneralView;
+class ZoomableGUIController;
 
 class GameEventManager : public EventManager {
 public:
-	KeyboardAndMouseController* ctrl;
+	Map* map;
+	ZoomableGUIController* ctrl;
 	Model* model;
+	GeneralView* view;
 
 	GameEventManager(int fps) : EventManager(fps){
+		map = NULL;
 		ctrl = NULL;
 		model = NULL;
+		view = NULL;
 	}
 };
+
 
 #endif

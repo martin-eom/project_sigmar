@@ -2,6 +2,7 @@
 #define INPUT
 
 #include <base.h>
+#include <gui_base.h>
 #include <events.h>
 #include <player.h>
 #include <fileio.h>
@@ -24,13 +25,12 @@ enum CONTROLLER_STATES {
 	CTRL_GIVING_ORDERS
 };
 
-class KeyboardAndMouseController : public Listener {
+
+class KeyboardAndMouseController : public ZoomableGUIController {
 	private:
-		int SCREEN_HEIGHT;
 		bool firstPointSet;
 		bool queueingOrders;
 		bool _inputConfirmed;
-		Model* model;
 		std::string _input;
 		int _state;
 		bool _help;
@@ -41,6 +41,7 @@ class KeyboardAndMouseController : public Listener {
 		Eigen::Vector2d p0, p1;
 		Eigen::Matrix2d rot;
 		bool passingThrough;
+		
 		bool help() {return _help;}
 		int state() {return _state;}
 		bool shift() {return _shift;}
@@ -49,10 +50,8 @@ class KeyboardAndMouseController : public Listener {
 		std::string input() {return _input;}
 		int newUnitType;
 
-		KeyboardAndMouseController(EventManager* em, Model* model,int SCREEN_HEIGHT) : Listener(em) {
-			this->SCREEN_HEIGHT = SCREEN_HEIGHT;
-			this->model = model;
 
+		KeyboardAndMouseController(EventManager* em, int SCREEN_WIDTH, int SCREEN_HEIGHT, Map* map) : ZoomableGUIController(em, SCREEN_WIDTH, SCREEN_HEIGHT, map) {
 			_state = CTRL_IDLE;
 			_help = false;
 			_shift = false;
@@ -66,7 +65,10 @@ class KeyboardAndMouseController : public Listener {
 		};
 	private:
 		void Notify(Event* ev) {
-			GameEventManager* gem = dynamic_cast<GameEventManager*>(em);
+			GameEventManager* gem = Gem();
+			Model* model = gem->model;
+			GeneralView* view = gem->view;
+			Map* map = gem->map;
 			if(ev->type == CTRL_STATE_EVENT) {
 				CtrlStateEvent* cev = dynamic_cast<CtrlStateEvent*>(ev);
 				_state = cev->state;
@@ -83,9 +85,13 @@ class KeyboardAndMouseController : public Listener {
 			else if(ev->type == SDL_EVENT) {
 				SDL_Event e = dynamic_cast<SDLEvent*>(ev)->event;
 				if(e.type == SDL_MOUSEBUTTONUP) {
+					Eigen::Vector2d diag; diag << view->SCREEN_WIDTH / 2., view->SCREEN_HEIGHT / 2.;
+					Eigen::Vector2d pos; pos << e.button.x, view->SCREEN_HEIGHT - e.button.y;
+					Eigen::Vector2d mousePos;
+					mousePos = (pos + center - diag) / zoom;
 					int x, y;
-					x = e.button.x;
-					y = SCREEN_HEIGHT - e.button.y;
+					x = mousePos.coeff(0);
+					y = mousePos.coeff(1);
 					switch(_state) {
 					case CTRL_GIVING_ORDERS:
 						if(firstPointSet) {
@@ -120,7 +126,7 @@ class KeyboardAndMouseController : public Listener {
 							if(unit->placed) {
 								dist = (unit->pos - mouse).norm();
 								if(dist < minDist) {
-									gem->model->selectedUnit = unit;
+									model->selectedUnit = unit;
 									em->Post(new RememberOrders(unit->orders));
 									minDist = dist;
 								}
@@ -140,6 +146,30 @@ class KeyboardAndMouseController : public Listener {
 							queueingOrders = true;
 							std::cout << "Queueing orders...\n";
 						}
+						break;
+					case SDLK_PLUS:
+						if(!(_shift || SDL_IsTextInputActive()))
+						zoomSpeedIn = zoomSpeed;
+						break;
+					case SDLK_MINUS:
+						if(!(_shift || SDL_IsTextInputActive()))
+						zoomSpeedOut = zoomSpeed;
+						break;
+					case SDLK_i:
+						if(!(_shift || SDL_IsTextInputActive()))
+						zoomSpeedUp = zoomMoveSpeed;
+						break;
+					case SDLK_j:
+						if(!(_shift || SDL_IsTextInputActive()))
+						zoomSpeedLeft = zoomMoveSpeed;
+						break;
+					case SDLK_k:
+						if(!(_shift || SDL_IsTextInputActive()))
+						zoomSpeedDown = zoomMoveSpeed;
+						break;
+					case SDLK_l:
+						if(!(_shift || SDL_IsTextInputActive()))
+						zoomSpeedRight = zoomMoveSpeed;
 						break;
 					}
 				}
@@ -212,7 +242,7 @@ class KeyboardAndMouseController : public Listener {
 							_state = CTRL_SELECTING_UNIT;
 							break;
 						case CTRL_IDLE:
-							gem->model->selectedUnit = NULL;
+							model->selectedUnit = NULL;
 							break;
 						}break;
 					case SDLK_LEFT:
@@ -253,6 +283,12 @@ class KeyboardAndMouseController : public Listener {
 						queueingOrders = false;
 						std::cout << "...done.\n";
 						break;
+					case SDLK_PLUS:
+						zoomSpeedIn = 0.;
+						break;
+					case SDLK_MINUS:
+						zoomSpeedOut = 0.;
+						break;
 					case SDLK_a:
 						switch(_state) {
 						case CTRL_SELECTING_PLAYER:
@@ -272,8 +308,17 @@ class KeyboardAndMouseController : public Listener {
 					case SDLK_h:
 						if(!SDL_IsTextInputActive())
 							_help = !_help; break;
+					case SDLK_i:
+						zoomSpeedUp = 0.;
+						break;
+					case SDLK_j:
+						zoomSpeedLeft = 0.;
+						break;
+					case SDLK_k:
+						zoomSpeedDown = 0.;
 					case SDLK_l:
 						if(_shift) _state = CTRL_LOADING;
+						zoomSpeedRight = 0.;
 						break;
 					case SDLK_o:
 						switch(_state) {
@@ -312,9 +357,14 @@ class KeyboardAndMouseController : public Listener {
 					_input += e.text.text;
 				}
 				if(e.type == SDL_MOUSEMOTION) {
+					Eigen::Vector2d mousePos;
+					Eigen::Vector2d diag; diag << view->SCREEN_WIDTH / 2., view->SCREEN_HEIGHT / 2.;
+					Eigen::Vector2d pos; pos << e.button.x, view->SCREEN_HEIGHT - e.button.y;
+					mousePos = (pos + center - diag) / zoom;
+
 					int x, y;
-					x = e.motion.x;
-					y = SCREEN_HEIGHT - e.motion.y;
+					x = mousePos.coeff(0);
+					y = mousePos.coeff(1);
 					if(firstPointSet) {
 						p1 << x, y;
 						double dx = p1.coeff(0) - p0.coeff(0);
@@ -327,13 +377,33 @@ class KeyboardAndMouseController : public Listener {
 						}
 					}
 					else p0 << x, y;
-					if(_state == CTRL_GIVING_ORDERS && gem->model->selectedUnit) {
-						if(!gem->model->selectedUnit->placed) {
-							gem->model->selectedUnit->pos << x, y;
-							gem->model->selectedUnit->rot = rot;
+					if(_state == CTRL_GIVING_ORDERS && model->selectedUnit) {
+						if(!model->selectedUnit->placed) {
+							model->selectedUnit->pos << x, y;
+							model->selectedUnit->rot = rot;
 						}
 					}
 				}
+			}
+			else if(ev->type == TICK_EVENT) {
+				double oldZoom = zoom;
+				zoom = zoom * std::pow(maxZoom, em->dt/1*(zoomSpeedIn - zoomSpeedOut));
+				if(zoom < minZoom) zoom = minZoom;
+				else if(zoom > maxZoom) zoom = maxZoom;
+				Eigen::Vector2d newCenter;
+				double x, y;
+				double xmin = view->SCREEN_WIDTH/2. - 200;
+				double xmax = zoom*map->width - view->SCREEN_WIDTH/2. + 200;
+				double ymin = view->SCREEN_HEIGHT/2. - 200;
+				double ymax = zoom*map->height - view->SCREEN_HEIGHT/2. + 200;
+				x = center.coeff(0)*zoom/oldZoom + em->dt * (zoomSpeedRight - zoomSpeedLeft) * view->SCREEN_WIDTH;
+				if(x < xmin) x = xmin;
+				if(x > xmax) x = xmax;
+				y = center.coeff(1)*zoom/oldZoom + em->dt * (zoomSpeedUp - zoomSpeedDown) * view->SCREEN_WIDTH;
+				if(y < ymin) y = ymin;
+				if(y > ymax) y = ymax;
+				newCenter << x, y;
+				center = newCenter;
 			}
 		}
 
@@ -362,12 +432,11 @@ enum EDITOR_STATES {
 	EDITOR_PATHFINDING
 };
 
-class MapEditorController : public Listener {
+class MapEditorController : public ZoomableGUIController {
 private:
 	Eigen::Vector2d p0, p1;
 public:
 	Map* map;
-	int* SCREEN_HEIGHT;
 	int state;
 	int prevState;
 
@@ -389,9 +458,8 @@ public:
 	int new_SCREEN_WIDTH;
 	int new_SCREEN_HEIGHT;
 
-	MapEditorController(EventManager* em, int* SCREEN_HEIGHT, Map* map) : Listener(em) {
+	MapEditorController(EventManager* em, int SCREEN_WIDTH, int SCREEN_HEIGHT, Map* map) : ZoomableGUIController(em, SCREEN_WIDTH, SCREEN_HEIGHT, map) {
 		this->map = map;
-		this->SCREEN_HEIGHT = SCREEN_HEIGHT;
 		rot << 0, -1, 1, 0;
 		state = EDITOR_IDLE;
 		prevState = EDITOR_IDLE;
@@ -409,11 +477,13 @@ public:
 
 	void loadMap(Map* map) {
 		this->map = map;
-		SCREEN_HEIGHT = &map->height;
+		zoom = std::min(Gem()->view->SCREEN_WIDTH / map->width, Gem()->view->SCREEN_HEIGHT / map->height);
+		center << zoom * map->width / 2, zoom * map->height / 2;
 	}
 
 private:
 	void Notify(Event* ev) {
+		GeneralView* view = Gem()->view;
 		if(ev->type == SDL_EVENT) {
 			SDL_Event e = dynamic_cast<SDLEvent*>(ev)->event;
 
@@ -427,9 +497,30 @@ private:
 				case SDLK_LSHIFT:
 					shift = true;
 					break;
-				/*case SDLK_h:
-					help = true;
-					break;*/
+				case SDLK_PLUS:
+					if(!(shift || SDL_IsTextInputActive()))
+					zoomSpeedIn = zoomSpeed;
+					break;
+				case SDLK_MINUS:
+					if(!(shift || SDL_IsTextInputActive()))
+					zoomSpeedOut = zoomSpeed;
+					break;
+				case SDLK_i:
+					if(!(shift || SDL_IsTextInputActive()))
+					zoomSpeedUp = zoomMoveSpeed;
+					break;
+				case SDLK_j:
+					if(!(shift || SDL_IsTextInputActive()))
+					zoomSpeedLeft = zoomMoveSpeed;
+					break;
+				case SDLK_k:
+					if(!(shift || SDL_IsTextInputActive()))
+					zoomSpeedDown = zoomMoveSpeed;
+					break;
+				case SDLK_l:
+					if(!(shift || SDL_IsTextInputActive()))
+					zoomSpeedRight = zoomMoveSpeed;
+					break;
 				}
 			}
 			
@@ -442,6 +533,12 @@ private:
 					if(state == EDITOR_ROTATING_RECTANGLE) {
 						state = EDITOR_PLACING_RECTANGLE;
 					}
+					break;
+				case SDLK_PLUS:
+					zoomSpeedIn = 0.;
+					break;
+				case SDLK_MINUS:
+					zoomSpeedOut = 0.;
 					break;
 				case SDLK_b:
 					if(shift) {}
@@ -494,18 +591,33 @@ private:
 							break;
 						}
 					}
-				case SDLK_h:
-					help = !help;
-					break;
-				case SDLK_l:
+				case SDLK_e:
 					if(shift) {
-						state = EDITOR_LOADING;
 					}
 					else {
 						switch(state) {
 						case EDITOR_PLACING_RECTANGLE: state = EDITOR_ENTERING_REC_HEIGHT; break;
 						}
 					}
+					break;
+				case SDLK_h:
+					help = !help;
+					break;
+				case SDLK_i:
+					zoomSpeedUp = 0.;
+					break;
+				case SDLK_j:
+					zoomSpeedLeft = 0.;
+					break;
+				case SDLK_k:
+					zoomSpeedDown = 0.;
+				case SDLK_l:
+					if(shift) {
+						state = EDITOR_LOADING;
+					}
+					else {
+					}
+					zoomSpeedRight = 0.;
 					break;
 				case SDLK_m:
 					if(shift) {}
@@ -690,27 +802,6 @@ private:
 						}
 					}
 					break;
-				/*case EDITOR_PLACING_WP:
-					if(objToPlace) {
-						switch(prevState) {
-						case EDITOR_MOVING:
-							map->RemoveWaypoint(dynamic_cast<MapWaypoint*>(selectedObj));
-						case EDITOR_COPYING:
-							map->AddWaypoint(dynamic_cast<MapWaypoint*>(objToPlace));
-							objToPlace = NULL;
-							selectedObject = map->mapObjects.size()-1;
-							state = EDITOR_SELECTING;
-							break;
-						default:
-							std::cout << bool(objToPlace) << "\n";
-							MapWaypoint* test = dynamic_cast<MapWaypoint*>(objToPlace);
-							std::cout << bool(test) << "\n";
-							map->AddWaypoint(dynamic_cast<MapWaypoint*>(objToPlace));
-							objToPlace = NULL;
-							state = EDITOR_IDLE;
-						}
-					}
-					break;*/
 				case EDITOR_SELECTING: {
 					selectedObject = 0;
 					double dist;
@@ -738,9 +829,31 @@ private:
 				}
 			}
 			if(e.type == SDL_MOUSEMOTION) {
-				mousePos << e.button.x, *SCREEN_HEIGHT-e.button.y;
+				Eigen::Vector2d diag; diag << view->SCREEN_WIDTH / 2., view->SCREEN_HEIGHT / 2.;
+				Eigen::Vector2d pos; pos << e.button.x, view->SCREEN_HEIGHT - e.button.y;
+				mousePos = (pos + center - diag) / zoom;
 			}
 
+		}
+		else if(ev->type == TICK_EVENT) {
+			double oldZoom = zoom;
+			zoom = zoom * std::pow(maxZoom, em->dt/1*(zoomSpeedIn - zoomSpeedOut));
+			if(zoom < minZoom) zoom = minZoom;
+			else if(zoom > maxZoom) zoom = maxZoom;
+			Eigen::Vector2d newCenter;
+			double x, y;
+			double xmin = view->SCREEN_WIDTH/2. - 200;
+			double xmax = zoom*map->width - view->SCREEN_WIDTH/2. + 200;
+			double ymin = view->SCREEN_HEIGHT/2. - 200;
+			double ymax = zoom*map->height - view->SCREEN_HEIGHT/2. + 200;
+			x = center.coeff(0)*zoom/oldZoom + em->dt * (zoomSpeedRight - zoomSpeedLeft) * view->SCREEN_WIDTH;
+			if(x < xmin) x = xmin;
+			if(x > xmax) x = xmax;
+			y = center.coeff(1)*zoom/oldZoom + em->dt * (zoomSpeedUp - zoomSpeedDown) * view->SCREEN_WIDTH;
+			if(y < ymin) y = ymin;
+			if(y > ymax) y = ymax;
+			newCenter << x, y;
+			center = newCenter;
 		}
 	}
 };
