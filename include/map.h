@@ -4,6 +4,7 @@
 //#include <base.h>
 #include <soldiers.h>
 #include <extra_math.h>
+#include <debug.h>
 
 #include <iostream>
 #include <vector>
@@ -18,9 +19,12 @@ enum MAP_OBJECT_TYPES {
 	MAP_WAYPOINT
 };
 
+class Map;
+
 class MapObject {
 public:
 	virtual int type() {return MAP_NONE;}
+	virtual void AutoWaypoints(double rad, Map* map) {}
 	MapObject() {}
 };
 
@@ -28,18 +32,21 @@ class MapCircle : public MapObject, public Circle {
 public:
 	int type() {return MAP_CIRCLE;}
 	MapCircle(Eigen::Vector2d pos, double rad) : MapObject(), Circle(pos, rad) {}
+	void AutoWaypoints(double rad, Map* map);
 };
 
 class MapWaypoint : public MapObject, public Circle {
 public:
 	int type() {return MAP_WAYPOINT;}
-	MapWaypoint(Eigen::Vector2d pos, double rad) : MapObject(), Circle(pos, rad) {}
+	bool _auto;
+	MapWaypoint(Eigen::Vector2d pos, double rad) : MapObject(), Circle(pos, rad) {_auto = false;}
 };
 
 class MapRectangle : public MapObject, public Rrectangle {
 public:
 	int type() {return MAP_RECTANGLE;}
 	MapRectangle(double hl, double hw, Eigen::Vector2d pos, Eigen::Matrix2d rot) : MapObject(), Rrectangle(hl, hw, pos, rot) {}
+	void AutoWaypoints(double rad, Map* map);
 };
 
 class MapBorder : public MapObject, public Rrectangle {
@@ -187,21 +194,22 @@ class Map {
 		}
 
 		bool Borders() {
-			for(auto border : borders) {
-				for(auto obj : mapObjects) {
-					if(border == obj) return true;
-				}
+			for(auto obj : mapObjects) {
+				if(obj->type() == MAP_BORDER) return true;
 			}
 			return false;
 		}
 
 		void toggelBorders() {
 			if(Borders()) {
-				for(auto border : borders) {
-					std::erase(mapObjects, border);
-					for(auto row : tiles) {
-						for(auto tile : row) {
-							std::erase(tile->mapObjects, border);
+				std::vector<MapObject*> reference = mapObjects;
+				for(auto obj : reference) {
+					if(obj->type() == MAP_BORDER) {
+						std::erase(mapObjects, obj);
+						for(auto row : tiles) {
+							for(auto tile : row) {
+								std::erase(tile->mapObjects, obj);
+							}
 						}
 					}
 				}
@@ -362,6 +370,86 @@ void SoldierRectangleCollision(Soldier* soldier, Rrectangle* rec) {
 	//knockVel << 0., 0.;
 	soldier->knockVel += knockVel;
 	soldier->pos += soldierPosCorrection;
+}
+
+void MapCircle::AutoWaypoints(double rad, Map* map) {
+	double sin = rad / (2 * (rad + this->rad));
+	double cos = std::sqrt(std::pow(rad + this->rad, 2) - std::pow(rad / 2, 2)) / (rad + this->rad);
+	debug(std::to_string(sin));
+	debug(std::to_string(cos));
+	double ang = Angle(sin, cos);
+	int nwaypoints = std::ceil(2*M_PI / ang);
+	nwaypoints = ceil(nwaypoints * 0.75);
+	debug(std::to_string(nwaypoints));
+	debug(std::to_string(M_PI));
+	debug(std::to_string(ang));
+	double dphi = 2*M_PI / nwaypoints;
+	for(int i = 0; i < nwaypoints; i=i+1) {
+		sin = std::sin(i*dphi); cos = std::cos(i*dphi);
+		Eigen::Matrix2d wp_rot; wp_rot << cos, -sin, sin, cos;
+		Eigen::Vector2d wp_pos; wp_pos << rad + this->rad, 0; wp_pos = wp_rot*wp_pos + pos;
+		MapWaypoint* w = new MapWaypoint(wp_pos, rad);
+		w->_auto = true;
+		map->AddMapObject(w);
+	}
+}
+
+void MapRectangle::AutoWaypoints(double rad, Map* map) {
+	std::vector<Eigen::Vector2d> centers;
+	Eigen::Vector2d p1, p2, p3, p4;
+	p1 << hw + rad, hl + rad; p1 = rot*p1 + pos; centers.push_back(p1);
+	p2 << hw + rad, -hl - rad; p2 = rot*p2 + pos; centers.push_back(p2);
+	p3 << -hw - rad, -hl - rad; p3 = rot*p3 + pos; centers.push_back(p3);
+	p4 << -hw - rad, hl + rad; p4 = rot*p4 + pos; centers.push_back(p4);
+	for(auto center : centers) {
+		MapWaypoint* w = new MapWaypoint(center, rad);
+		w->_auto = true;
+		map->AddMapObject(w);
+	}
+}
+
+void AutoWaypoints(double rad, Map* map) {
+	//deleting old automatic waypoints
+	std::vector<MapWaypoint*> wpreference = map->waypoints;
+	for(auto wp : wpreference) {
+		if(wp->_auto) {
+			map->RemoveMapObject(wp);
+		}
+	}
+	//creating new automatic waypoints
+	std::vector<MapObject*> objreference = map->mapObjects;
+	for(auto obj : objreference) {
+		switch(obj->type()) {
+		case MAP_CIRCLE:
+			dynamic_cast<MapCircle*>(obj)->AutoWaypoints(rad, map);
+			break;
+		case MAP_RECTANGLE:
+			dynamic_cast<MapRectangle*>(obj)->AutoWaypoints(rad, map);
+		break;
+		}
+	}
+	//deleting new automatic waypoints if they collide with objects
+	wpreference = map->waypoints;
+	for(auto wp : wpreference) {
+		bool collision = false;
+		for(auto obj : objreference) {
+			switch(obj->type()) {
+			case MAP_CIRCLE:
+				if(LenientCircleCircleCollision(dynamic_cast<Circle*>(obj), dynamic_cast<Circle*>(wp)))
+					collision = true;
+				break;
+			case MAP_RECTANGLE:
+			case MAP_BORDER:
+				if(CircleRectangleCollision(dynamic_cast<Circle*>(wp), dynamic_cast<Rrectangle*>(obj)))
+					collision = true;
+				break;
+			}
+			if(collision) {
+				map->RemoveMapObject(wp);
+				break;
+			}
+		}
+	}
 }
 
 #endif

@@ -313,7 +313,7 @@ class MapEditorView : public GeneralView {
 	std::string _lshift		= "hold lshift - options menu";
 	std::string _circle		= "c           - select circle";
 	std::string _crad		= "w           - change radius";
-	std::string _wp			= "w           - select circle";
+	std::string _wp			= "w           - select waypoint";
 	std::string _wprad		= "w           - change radius";
 	std::string _pf			= "p           - update pathfinding";
 	std::string _rec		= "r           - select rectangle";
@@ -335,10 +335,11 @@ class MapEditorView : public GeneralView {
 	std::string _help_line	= "h - toggle help";
 	std::string _zoom		= "+/-         - zoom";
 	std::string _zoomMove	= "i/j/k/l     - move zoomed area";
+	std::string _awp		= "a           - automatically place waypoints";
 
 
 	std::string _options_menu =	_new_map + "\n" + _save_map + "\n" + _load_map + "\n"+ _quit;
-	std::string _control_scheme = _circle + "\n" + _rec + "\n" + _wp + "\n" + _select + "\n" + _pf + "\n" + _zoom + "\n" + _zoomMove + "\n" + _lshift;
+	std::string _control_scheme = _circle + "\n" + _rec + "\n" + _wp + "\n" + _select + "\n" + _pf + + "\n" + _awp + "\n" + _zoom + "\n" + _zoomMove + "\n" + _lshift;
 	std::string _rplace = _rrot + "\n" + _rw + "\n" + _rh + "\n" + _zoom + "\n" + _zoomMove + "\n" + _pesc + "\n" + _lshift;
 	std::string _cplace = _crad + "\n" + _zoom + "\n" + _zoomMove + "\n" + _pesc + "\n" + _lshift;
 	std::string _select_scheme = _sarrow + "\n" + _sclick + "\n" + _smove + "\n" + _scopy + "\n" + _sdel + "\n" + _zoom + "\n" + _zoomMove + "\n" + _sesc + "\n" + _lshift;

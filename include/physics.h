@@ -197,7 +197,20 @@ void TimeStep(Soldier* soldier, double dt) {
 		double squDamp = soldier->squareDamp() * soldier->vel.norm();
 		damp = std::max(linDamp, squDamp);
 	}
-	newForce -= soldier->vel*damp; //dampening not finalized		
+	Eigen::Vector2d dampForce = soldier->vel*damp;
+	newForce -= dampForce; //dampening not finalized
+	// extra dampening perpendicular to orientation (experimental, when turned on there is less deviation from course, 
+	//												 but collisions with big units are less satisfying)
+	if(false) {
+		Eigen::Vector2d perp; perp << soldier->rot.coeff(1,0), -soldier->rot.coeff(0,0);
+		double perp_fraction = dampForce.dot(perp);
+		if(perp_fraction > 0) {
+			newForce -= perp_fraction * perp;
+		}
+		else {
+			newForce -= perp_fraction * perp;
+		}
+	}
 	//paste new values to soldier
 	soldier->pos = newPos;
 	soldier->vel = newVel;
@@ -320,10 +333,11 @@ void MapObjectCollisionHandling(Map* map) {
 					for(auto object : tile->mapObjects) {
 						switch(object->type()) {
 						case MAP_RECTANGLE:
-							SoldierRectangleCollision(soldier, dynamic_cast<MapRectangle*>(object));
+						case MAP_BORDER:
+							SoldierRectangleCollision(soldier, dynamic_cast<Rrectangle*>(object));
 							break;
 						case MAP_CIRCLE:
-							SoldierCircleCollision(soldier, dynamic_cast<MapCircle*>(object));
+							SoldierCircleCollision(soldier, dynamic_cast<Circle*>(object));
 							break;
 						}
 					}

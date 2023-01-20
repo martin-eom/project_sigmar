@@ -193,6 +193,19 @@ int main(int argc, char* argv[1]) {
 					ctrl->state = EDITOR_PLACING_CIRCLE;
 				}
 				break;
+			case EDITOR_ENTERING_AUTO_WP_RAD:
+				if(!SDL_IsTextInputActive()) {
+					ResetTextbox("enter waypoint radius: ", true, ctrl, view);
+				}
+				if(ctrl->input_confirmed) {
+					ctrl->input_confirmed = false;
+					if(Isdouble(ctrl->input)) {
+						int wp_rad = stod(ctrl->input);
+						AutoWaypoints(wp_rad, map);
+						ctrl->state = EDITOR_IDLE;
+					}
+				}
+				break;
 			case EDITOR_ENTERING_WP_RAD:
 				if(!SDL_IsTextInputActive()) {
 					ResetTextbox("enter new waypoint radius: ", true, ctrl, view);
