@@ -7,6 +7,15 @@
 
 #include <Dense>
 
+double Angle(double sin, double cos) {
+	if(sin > 0) {
+		return acos(cos);
+	}
+	else {
+		return -acos(cos);
+	}
+}
+
 class Point {
 public:
 	Eigen::Vector2d pos;
@@ -173,12 +182,23 @@ bool RectangleRectangleCollision(Rrectangle* rec1, Rrectangle* rec2) {
 	return false;
 }
 
-double Angle(double sin, double cos) {
-	if(sin > 0) {
-		return acos(cos);
-	}
+bool CircleCircleCollision(Circle* circ1, Circle* circ2) {
+	return (circ1->pos - circ2->pos).norm() < circ1->rad + circ2->rad;
+}
+
+bool LenientCircleCircleCollision(Circle* circ1, Circle* circ2) {
+	return (circ1->pos - circ2->pos).norm() < (circ1->rad + circ2->rad)*0.99;
+}
+
+bool LenientToughCircleRectangleCollision(Circle* circ, Rrectangle* rec) {
+	bool collision = CircleRectangleCollision(circ, rec);
+	if(collision) return true;
 	else {
-		return -acos(cos);
+		double diag = std::sqrt(2 * circ->rad * circ->rad);
+		for(auto corner : rec->corners) {
+			if((circ->pos - corner->pos).norm() < diag * 0.95) return true;
+		}
+		return false;
 	}
 }
 

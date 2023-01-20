@@ -70,7 +70,7 @@ void DrawCircle(Circle* circ, SDL_Renderer* renderer, Color* color, int SCREEN_W
 	SDL_SetRenderDrawColor(renderer, color->r, color->g, color->b, color->al);
 	int rad = ccirc.rad;
 	int x = ccirc.pos.coeff(0);
-	int y = ccirc.pos.coeff(1); //SCREEN_HEIGHT - ccirc.pos.coeff(1);
+	int y = ccirc.pos.coeff(1);
 	int i_max = std::ceil(rad);
 	int j_max = std::ceil(rad);
 	int i = 0;

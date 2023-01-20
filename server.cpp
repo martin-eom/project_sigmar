@@ -57,6 +57,7 @@ void OpenWindow(Map* map) {
 	dynamic_cast<GameEventManager*>(em)->ctrl = ctrl;
 
 	// Creating Window and Renderer
+	//	Creating window to get screen size
 	window = SDL_CreateWindow("Game",
 			SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED, 
 			SCREEN_WIDTH, SCREEN_HEIGHT, SDL_WINDOW_SHOWN);
@@ -64,6 +65,7 @@ void OpenWindow(Map* map) {
 	int displayIndex = SDL_GetWindowDisplayIndex(window);
 	SDL_DestroyWindow(window);
 	SDL_GetDesktopDisplayMode(displayIndex, &mode);
+	//  Creating actual game window small enough so that console can be viewed
 	window = SDL_CreateWindow("Game", SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED,
 	int((&mode)->w * 0.9), int((&mode)->h * 0.9), SDL_WINDOW_SHOWN);
 	if(!window) {

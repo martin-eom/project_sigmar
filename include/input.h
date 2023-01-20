@@ -429,7 +429,9 @@ enum EDITOR_STATES {
 	EDITOR_SELECTING,
 	EDITOR_MOVING,
 	EDITOR_COPYING,
-	EDITOR_PATHFINDING
+	EDITOR_PATHFINDING,
+	EDITOR_ENTERING_AUTO_WP_RAD,
+	EDITOR_CALCULATING_AUTO_WP
 };
 
 class MapEditorController : public ZoomableGUIController {
@@ -540,6 +542,17 @@ private:
 				case SDLK_MINUS:
 					zoomSpeedOut = 0.;
 					break;
+				case SDLK_a: {
+					if(shift) {}
+					//if(state == EDITOR_IDLE && !SDL_IsTextInputActive()) {
+					else {
+						switch(state) {
+						case EDITOR_IDLE:
+							state = EDITOR_ENTERING_AUTO_WP_RAD;
+							break;
+						}
+					}break;
+				}
 				case SDLK_b:
 					if(shift) {}
 					else {
@@ -668,6 +681,7 @@ private:
 						state = EDITOR_CLOSING;
 						break;
 					}
+					break;
 				case SDLK_r:
 					if(shift) {}
 					else {
@@ -732,6 +746,7 @@ private:
 					case EDITOR_ENTERING_REC_WIDTH:
 					case EDITOR_ENTERING_REC_HEIGHT:
 					case EDITOR_ENTERING_WP_RAD:
+					case EDITOR_ENTERING_AUTO_WP_RAD:
 					case EDITOR_SAVING:
 					case EDITOR_LOADING:
 						input_confirmed = true;
@@ -758,6 +773,7 @@ private:
 					case EDITOR_SELECTING:
 					case EDITOR_NEWMAP_WIDTH:
 					case EDITOR_NEWMAP_HEIGHT:
+					case EDITOR_ENTERING_AUTO_WP_RAD:
 					case EDITOR_SAVING:
 					case EDITOR_LOADING:
 						state = EDITOR_IDLE;
@@ -779,10 +795,7 @@ private:
 			if(e.type == SDL_MOUSEBUTTONUP) {
 				switch(state) {
 				case EDITOR_PLACING_CIRCLE:
-				//case EDITOR_ENTERING_CIRCLE_RAD:
 				case EDITOR_PLACING_RECTANGLE:
-				//case EDITOR_ENTERING_REC_WIDTH:
-				//case EDITOR_ENTERING_REC_HEIGHT:
 				case EDITOR_PLACING_WP:
 					if(objToPlace) {
 						switch(prevState) {

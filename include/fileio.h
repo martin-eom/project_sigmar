@@ -35,6 +35,8 @@ json MapToJson(Map* map) {
 			jrec["hw"] = rec->hw;
 			jrec["pos"] = {rec->pos.coeff(0), rec->pos.coeff(1)};
 			jrec["rot"] = {rec->rot.coeff(0,0), rec->rot.coeff(0,1), rec->rot.coeff(1,0), rec->rot.coeff(1,1)};
+			if(obj->type() == MAP_BORDER) jrec["b"] = 1;
+			else jrec["b"] = 0;
 			rectangles.push_back(jrec);
 			break;}
 		case MAP_WAYPOINT: {
@@ -42,6 +44,8 @@ json MapToJson(Map* map) {
 			json jcirc;
 			jcirc["pos"] = {circ->pos.coeff(0), circ->pos.coeff(1)};
 			jcirc["rad"] = circ->rad;
+			if(dynamic_cast<MapWaypoint*>(obj)->_auto) jcirc["auto"] = 1;
+			else jcirc["auto"] = 0;
 			waypoints.push_back(jcirc);
 			break;}
 		}
@@ -86,7 +90,12 @@ Map::Map(std::string filename) {
 	for(auto jrec : j["rectangles"]) {
 		Eigen::Vector2d pos; pos << jrec["pos"][0], jrec["pos"][1];
 		Eigen::Matrix2d rot; rot << jrec["rot"][0], jrec["rot"][1], jrec["rot"][2], jrec["rot"][3];
-		MapRectangle* rec = new MapRectangle(jrec["hl"], jrec["hw"], pos, rot);
+		MapObject* rec;
+		if(jrec.contains("b")) {
+			if(int(jrec["b"])) rec = new MapBorder(jrec["hl"], jrec["hw"], pos, rot);
+			else rec = new MapRectangle(jrec["hl"], jrec["hw"], pos, rot);
+		}
+		else rec = new MapRectangle(jrec["hl"], jrec["hw"], pos, rot);
 		AddMapObject(rec);
 	}
 	debug("Non-pathfinding map elements loaded successfully.");
@@ -95,6 +104,9 @@ Map::Map(std::string filename) {
 			debug("Loading waypoint.");
 			Eigen::Vector2d pos; pos << jcirc["pos"][0], jcirc["pos"][1];
 			MapWaypoint* circ = new MapWaypoint(pos, jcirc["rad"]);
+			if(jcirc.contains("auto")) {
+				if(int(jcirc["auto"])) circ->_auto = true;
+			}
 			AddMapObject(circ);
 		}
 		if(j.contains("wp_dist") && j.contains("wp_next")) {
