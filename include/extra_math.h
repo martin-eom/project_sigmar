@@ -48,7 +48,6 @@ bool LineLineCollision(Point* p00, Point* p01, Point* p10, Point* p11) {
 
 class Circle : public Point {
 public:
-	Eigen::Vector2d pos;
 	double rad;
 
 	Circle(Eigen::Vector2d pos, double rad) : Point(pos) {
@@ -134,8 +133,12 @@ bool LineCircleCollision(Point* l1, Point* l2, Circle* circ) {
 	else {
 		Eigen::Vector2d va = l2->pos - l1->pos;
 		Eigen::Vector2d vb = circ->pos - l1->pos;
+		double van = va.norm();
 		double crossProd = std::abs(va.coeff(0)*vb.coeff(1) - va.coeff(1)*vb.coeff(0));
-		return circ->rad >= crossProd / va.norm();
+		double dotProd = va.dot(vb);
+		if(circ->rad >= crossProd / van && dotProd >= 0 && dotProd <= 1)
+			return true;
+		return circ->rad >= vb.norm() || circ->rad >= (circ->pos - l2->pos).norm();
 	}
 }
 
@@ -200,6 +203,26 @@ bool LenientToughCircleRectangleCollision(Circle* circ, Rrectangle* rec) {
 		}
 		return false;
 	}
+}
+
+bool ConeCircleCollision(Eigen::Vector2d conePos, Eigen::Matrix2d coneRot, Eigen::Matrix2d coneAngle, double coneRad, Circle* circ) {
+
+	Eigen::Vector2d base; base << 1, 0;
+	Eigen::Vector2d relPL = coneAngle*coneRot * base;
+	Eigen::Vector2d relPR = coneAngle.transpose()*coneRot * base;
+	Eigen::Vector2d relCPos = circ->pos - conePos;
+	if(-relPL.coeff(1)*relCPos.coeff(0) + relPL.coeff(0)*relCPos.coeff(1) < 0
+		&&
+		-relPR.coeff(1)*relCPos.coeff(0) + relPR.coeff(0)*relCPos.coeff(1) > 0
+		)
+		return true;
+
+	Point p0(conePos);
+	Point p1(conePos + coneRad*relPL);
+	Point p2(conePos + coneRad*relPR);
+	return LineCircleCollision(&p0, &p1, circ) || LineCircleCollision(&p0, &p2, circ);
+	return false;
+
 }
 
 Eigen::Matrix2d Rotation(double angle) {

@@ -8,6 +8,7 @@
 #include <model.h>
 #include <input.h>
 #include <textures.h>
+#include <animations.h>
 
 #include <SDL.h>
 #include <SDL_ttf.h>
@@ -25,6 +26,7 @@ Color* colorRed = new Color(0xff, 0x00, 0x00, 0xff);
 Color* colorBlue = new Color(0x00, 0x00, 0xff, 0xff);
 Color* colorGrey = new Color(0x88, 0x88, 0x88, 0xff);
 Color* darkGrey = new Color(0x50, 0x50, 0x50, 0xff);
+Color* colorOrange = new Color(0xff, 0xa5, 0x00, 0x99);
 
 
 class View : public GeneralView {
@@ -45,7 +47,8 @@ class View : public GeneralView {
 	std::string _utEnter	= "enter        - add unit to player";
 	std::string _uDel		= "d            - delete selected unit";
 	std::string _order		= "o            - enter order mode";
-	std::string _oClick		= "click        - choose location / orientation";
+	std::string _oClick		= "m2           - choose location / orientation\n"
+							  "m1           - attack target";
 	std::string _octrl		= "hold control - append orders when creating and / or sending";
 	std::string _op0		= "p            - toggle from form-up to passing-through";
 	std::string _op1		= "p            - toggle from passing-through to form-up";
@@ -71,6 +74,18 @@ private:
 		StringTexture* textInput;		// displays current text input
 		StringTexture* objInformation;	// displays information about selected objects
 		std::string info;
+		ImgTexture* soldierBlue;
+		ImgTexture* soldierRed;
+		ImgTexture* soldierBlueGreen;
+		ImgTexture* soldierRedGreen;
+		ImgTexture* objCircle;
+		ImgTexture* token;
+		ImgTexture* swordBlue;
+		ImgTexture* swordRed;
+		ImgTexture* swish;
+		ImgTexture* damage;
+
+		std::vector<SoldierAnimation*> animations;
 
 	public:
 		View(EventManager* em, Map* map, SDL_Window* window, SDL_Renderer* renderer) : GeneralView(em, window, renderer) {
@@ -84,10 +99,24 @@ private:
 			textInput = new StringTexture(renderer);
 			objInformation = new StringTexture(renderer);
 			info = "";
+
+			objCircle = new ImgTexture(renderer);
+			objCircle->loadFromImage("textures/circle_purple.bmp");
+			token = new ImgTexture(renderer);
+			token->loadFromImage("textures/circles.bmp");
+			swordBlue = new ImgTexture(renderer);
+			swordBlue->loadFromImage("textures/sword_blue_roll.bmp");
+			swordRed = new ImgTexture(renderer);
+			swordRed->loadFromImage("textures/sword_red_roll.bmp");
+			swish = new ImgTexture(renderer);
+			swish->loadFromImage("textures/sword_swish_roll.bmp");
+			damage = new ImgTexture(renderer);
+			damage->loadFromImage("textures/damage_tick_roll.bmp");
 		}
 	private:
 		void Update() {
-			GameEventManager* gem = Gem();//dynamic_cast<GameEventManager*>(em);
+			// drawing map objects
+			GameEventManager* gem = Gem();
 			auto ctrl = dynamic_cast<KeyboardAndMouseController*>(gem->ctrl);
 			auto model = gem->model;
 			SDL_SetRenderDrawColor(renderer, 0x00, 0x00, 0x00, 0xFF);
@@ -97,7 +126,8 @@ private:
 				switch(obj->type()) {
 				case MAP_CIRCLE: {
 					Circle* circ = dynamic_cast<Circle*>(obj);
-					DrawCircle(circ, renderer, colorPurple, SCREEN_WIDTH, SCREEN_HEIGHT, ctrl->zoom, ctrl->center);
+					objCircle->renderZoomed(circ->pos.coeff(0), circ->pos.coeff(1), circ->rad,
+						SCREEN_WIDTH, SCREEN_HEIGHT, ctrl->zoom, ctrl->center);
 					break;}
 				case MAP_BORDER:
 				case MAP_RECTANGLE: {
@@ -110,7 +140,7 @@ private:
 			if(ddebug::_showDebugGraphics) {
 				for(auto obj : map->waypoints) {
 					Circle* circ = dynamic_cast<Circle*>(obj);
-					DrawCircle(circ, renderer, colorGrey, SCREEN_WIDTH, SCREEN_HEIGHT, ctrl->zoom, ctrl->center);
+					//DrawCircle(circ, renderer, colorGrey, SCREEN_WIDTH, SCREEN_HEIGHT, ctrl->zoom, ctrl->center);
 				}
 			}
 			//showing tiles that hold objects
@@ -124,10 +154,11 @@ private:
 					}
 				}
 			}
-			//drawing orders when ordering
+			//drawing orders when ordering			
 			SDL_SetRenderDrawColor(renderer, 0x88, 0x88, 0x88, 0xFF);
 			if(ctrl->state() == CTRL_GIVING_ORDERS) {
 				for(int i = 0; i < ctrl->orders.size(); i++) {
+					SDL_SetRenderDrawColor(renderer, 0x88, 0x88, 0x88, 0xFF);
 					Order* o = ctrl->orders.at(i);
 					if(o->type == ORDER_MOVE) {
 						MoveOrder* mo = dynamic_cast<MoveOrder*>(o);
@@ -141,17 +172,26 @@ private:
 						}
 					}
 					if(model->selectedUnit) {
+						Color* recColor = colorGrey;
 						Rrectangle rec = UnitRectangle(model->selectedUnit, i, ctrl->orders);
-						DrawRectangle(&rec, renderer, colorGrey, SCREEN_WIDTH, SCREEN_HEIGHT, ctrl->zoom, ctrl->center);
+						if(o->type == ORDER_ATTACK) {
+							AttackOrder* ao = dynamic_cast<AttackOrder*>(o);
+							rec = UnitRectangle(ao->unit, ao->unit->currentOrder);
+							recColor = colorOrange;
+						}
+						DrawRectangle(&rec, renderer, recColor, SCREEN_WIDTH, SCREEN_HEIGHT, ctrl->zoom, ctrl->center);
 					}
 				}
 			}
+			
+			debug("view : drew orders when ordering");
 			//drawing soldiers and unit markers
 			int nplayers = model->players.size();
 			int nplayer = 0;
+			
 			for(auto player : model->players) {
-				Color playerColor = *colorBlack;
-				if(nplayers == 1) {
+				//Color playerColor = *colorBlack;
+				/*if(nplayers == 1) {
 					playerColor.r = 0xff;
 					playerColor.b = 0xff;
 				}
@@ -159,72 +199,131 @@ private:
 					playerColor.r = 0xff * nplayer/(nplayers - 1);
 					playerColor.b = 0xff * ((nplayers - 1) - nplayer)/(nplayers - 1);
 					
-				}
+				}*/
 				for(auto unit : player->units) {
-					std::vector<std::vector<Soldier*>>* soldiers = unit->soldiers();
+					std::vector<std::vector<Soldier*>>* soldiers = &(unit->soldiers);
 					if(unit->placed) {
 						if(ddebug::_showDebugGraphics) {
 							Circle circ = Circle(unit->pos, 30);
-							DrawCircle(&circ, renderer, colorGrey, SCREEN_WIDTH, SCREEN_HEIGHT, ctrl->zoom, ctrl->center);
+							//DrawCircle(&circ, renderer, colorGrey, SCREEN_WIDTH, SCREEN_HEIGHT, ctrl->zoom, ctrl->center);
 						}
+						
 						if(model->selectedUnit) {
 							if(model->selectedUnit == unit) {
 								DrawUnitArrow(unit->posTarget, unit->rotTarget, renderer, colorGreen, SCREEN_WIDTH, SCREEN_HEIGHT, ctrl->zoom, ctrl->center);
 								for(int i = 0; i < unit->orders.size(); i++) {
 									Order* o = unit->orders.at(i);
 									if(o->type == ORDER_MOVE) {
-										MoveOrder* mo = dynamic_cast<MoveOrder*>(o);
 										Rrectangle rec = UnitRectangle(unit, i);
 										DrawRectangle(&rec, renderer, colorGreen, SCREEN_WIDTH, SCREEN_HEIGHT, ctrl->zoom, ctrl->center);
-										if(i > 0) {
-											Order* prevo = unit->orders.at(i-1);
-											if(prevo->type == ORDER_MOVE) {
-												MoveOrder* prevmo = dynamic_cast<MoveOrder*>(prevo);
-												Point p1(mo->pos); Point p2(prevmo->pos);
-												DrawLine(&p1, &p2, renderer, colorGreen, SCREEN_WIDTH, SCREEN_HEIGHT, ctrl->zoom, ctrl->center);
-											}
-										}
+									}
+									else if(o->type == ORDER_ATTACK) {
+										AttackOrder* ao = dynamic_cast<AttackOrder*>(o);
+										Rrectangle rec = UnitRectangle(ao->unit, ao->unit->currentOrder);
+										DrawRectangle(&rec, renderer, colorOrange, SCREEN_WIDTH, SCREEN_HEIGHT, ctrl->zoom, ctrl->center);
+									}
+									if(i > 0) {
+										Order* prevo = unit->orders.at(i-1);
+										Point p1(o->pos); Point p2(prevo->pos);
+										DrawLine(&p1, &p2, renderer, colorGreen, SCREEN_WIDTH, SCREEN_HEIGHT, ctrl->zoom, ctrl->center);
 									}
 								}
 							}
 						}
-						for(int i = 0; i < unit->nrows(); i++) {
-							for(int j = 0; j < unit->width(); j++) {
-								Soldier* soldier = (*soldiers)[i][j];
-								if(soldier->placed) {
-									if(model->selectedUnit == unit) {
-										DrawCircle(soldier->pos.coeff(0), soldier->pos.coeff(1),
-											soldier->rad() + 1, renderer, colorGreen, SCREEN_WIDTH, SCREEN_HEIGHT, ctrl->zoom, ctrl->center);
-									}
-									DrawCircle(soldier->pos.coeff(0), soldier->pos.coeff(1),
-										soldier->rad(), renderer, &playerColor, SCREEN_WIDTH, SCREEN_HEIGHT, ctrl->zoom, ctrl->center);
-									if(soldier->currentOrder == soldier->unit->currentOrder) {
-										DrawFacingArrowhead(soldier->pos, soldier->rot, soldier->rad(), renderer, colorPurple, SCREEN_WIDTH, SCREEN_HEIGHT, ctrl->zoom, ctrl->center);
-									}
-									else {
-										DrawFacingArrowhead(soldier->pos, soldier->rot, soldier->rad(), renderer, colorWhite, SCREEN_WIDTH, SCREEN_HEIGHT, ctrl->zoom, ctrl->center);
-									}
-								}
-							}
-						}
+						
 					}
 					if(unit == model->selectedUnit) {
 						if(ctrl->state() == CTRL_GIVING_ORDERS) {
-							std::vector<std::vector<Eigen::Vector2d>> posInUnit = *unit->posInUnit();
-							for(int i = 0; i < unit->nrows(); i++) {
-								for(int j = 0; j < unit->width(); j++) {
-									if(i*unit->width() + j < unit->maxSoldiers()) {
+							std::vector<std::vector<Eigen::Vector2d>> posInUnit = unit->posInUnit;
+							for(int i = 0; i < unit->nrows; i++) {
+								for(int j = 0; j < unit->width; j++) {
+									if(i*unit->width + j < unit->maxSoldiers) {
 										Soldier* soldier = soldiers->at(i).at(j);
-										Eigen::Vector2d pos = ctrl->rot * posInUnit.at(i).at(j) + ctrl->p0;
-										DrawCircle(pos.coeff(0), pos.coeff(1), soldier->rad(), renderer, colorGrey, SCREEN_WIDTH, SCREEN_HEIGHT, ctrl->zoom, ctrl->center);
-										DrawFacingArrowhead(pos, ctrl->rot, soldier->rad(), renderer, colorWhite, SCREEN_WIDTH, SCREEN_HEIGHT, ctrl->zoom, ctrl->center);
+										if(soldier->alive) {
+											Eigen::Vector2d pos = ctrl->rot * posInUnit.at(i).at(j) + ctrl->p0;
+											DrawCircle(pos.coeff(0), pos.coeff(1), soldier->rad, renderer, colorGrey, SCREEN_WIDTH, SCREEN_HEIGHT, ctrl->zoom, ctrl->center);
+											DrawFacingArrowhead(pos, ctrl->rot, soldier->rad, renderer, colorWhite, SCREEN_WIDTH, SCREEN_HEIGHT, ctrl->zoom, ctrl->center);
+										}
 									}
 								}
 							}
 						}
 					}
 				}
-				nplayer++;
+				//nplayer++;
+			}
+			SDL_Rect segment;
+			SDL_Point center;
+			for(auto anime : animations) {
+				Soldier* soldier = anime->soldier;
+				if(soldier->placed) {
+					double ang = Angle(soldier->rot.coeff(0,1), soldier->rot.coeff(0,0)) * 180 / M_PI;
+					switch(anime->type) {
+					case ANIMATION_ATTACK: {
+						bool player1 = (soldier->unit->player == Gem()->model->players.at(0));
+						if(soldier->alive) {
+							//base circle
+							SDL_SetTextureAlphaMod(token->texture, 255*std::min(double(soldier->hp) / soldier->maxHP, 1.));
+							if(player1) {
+								segment.x = 0; segment.y = 0; segment.w = 32; segment.h = 32;						
+							}
+							else {
+								segment.x = 0; segment.y = 32; segment.w = 32; segment.h = 32;											
+							}
+							token->renderZoomed(anime->soldier->pos.coeff(0), soldier->pos.coeff(1), soldier->rad,
+								SCREEN_WIDTH, SCREEN_HEIGHT, ctrl->zoom, ctrl->center,
+								ang, NULL, &segment);
+							SDL_SetTextureAlphaMod(token->texture, 255);
+						}
+						//green circle
+						if(soldier->alive && soldier->unit == Gem()->model->selectedUnit) {
+							segment.x = 0; segment.y = 64; segment.w = 32; segment.h = 32;																	
+							token->renderZoomed(soldier->pos.coeff(0), soldier->pos.coeff(1), soldier->rad,
+								SCREEN_WIDTH, SCREEN_HEIGHT, ctrl->zoom, ctrl->center,
+								ang, NULL, &segment);
+						}
+						//sword
+						segment.x = 0 + anime->stage * 32; segment.y = 0;
+						segment.w = 32; segment.h = 64;
+						center.x = 16; center.y = 48;
+						if(soldier->alive) {
+							double d_ang = 0;
+							if(soldier->meleeAOE && anime->stage != 0) {
+								d_ang = 180./M_PI*soldier->meleeAngle * (-1 + 2./6 * anime->stage);
+							}
+							else if(soldier->meleeSwingTarget && anime->stage != 0){
+								Eigen::Vector2d dx = soldier->meleeSwingTarget->pos - soldier->pos;
+								double dist = dx.norm();
+								d_ang = 180./M_PI * Angle(-dx.coeff(1)/dist, dx.coeff(0)/dist) - ang;
+							}
+							if(player1) {
+								swordBlue->renderZoomed(soldier->pos.coeff(0), soldier->pos.coeff(1), soldier->rad,
+									SCREEN_WIDTH, SCREEN_HEIGHT, ctrl->zoom, ctrl->center,
+									ang + 90 + d_ang, &center, &segment);
+							}
+							else {
+								swordRed->renderZoomed(soldier->pos.coeff(0), soldier->pos.coeff(1), soldier->rad,
+									SCREEN_WIDTH, SCREEN_HEIGHT, ctrl->zoom, ctrl->center,
+									ang + 90 + d_ang, &center, &segment);						
+							}
+							//swish
+							if(!soldier->meleeAOE) {
+								swish->renderZoomed(soldier->pos.coeff(0), soldier->pos.coeff(1), soldier->rad,
+										SCREEN_WIDTH, SCREEN_HEIGHT, ctrl->zoom, ctrl->center,
+										ang + 90 + d_ang, &center, &segment);
+							}
+						}
+						}break;
+					case ANIMATION_DAMAGE:
+						segment.x = 0 + anime->stage*32; segment.y = 0;
+						segment.w = 32; segment.h = 32;
+						center.x = 16; center.y = 16;
+						damage->renderZoomed(soldier->pos.coeff(0), soldier->pos.coeff(1), soldier->rad,
+							SCREEN_WIDTH, SCREEN_HEIGHT, ctrl->zoom, ctrl->center,
+							0, &center, &segment);
+						break;
+					}
+				}
 			}
 			// writing text
 			if(ctrl->shift()) {
@@ -298,7 +397,74 @@ private:
 			if(ev->type == CHANGE_TEXTBOX_EVENT) {
 				textbox = dynamic_cast<ChangeTextboxEvent*>(ev)->text;
 			}
+			else if(ev->type == UNIT_ROSTER_MODIFIED_EVENT) {
+				debug("Unit roster was modified. Generating new animations...");
+				animations.clear();
+				debug("Cleared old animations.");
+				for(auto player : Gem()->model->players) {
+					debug("counted a player");
+					for(auto unit : player->units) {
+						for(auto row : unit->soldiers) {
+							for(auto soldier : row) {
+								animations.push_back(new AttackAnimation(soldier));
+								animations.push_back(new DamageAnimation(soldier));
+							}
+						}
+					}
+				}
+			}
 			else if(ev->type == TICK_EVENT) {
+				for(auto anime : animations) {
+					switch(anime->type) {
+					case ANIMATION_ATTACK:
+						if(!anime->running && !anime->onCooldown && anime->soldier->meleeCooldownTicks > 0) {
+							anime->running = true;
+							anime->onCooldown = true;
+							anime->ticksToNextStage = 1;
+						}
+						else if(anime->running) {
+							if(anime->ticksToNextStage == 0) {
+								if(anime->stage == 6) {
+									anime->stage = 0;
+									anime->ticksToNextStage = 0;
+									anime->running = false;
+								}
+								else {
+									anime->stage = (anime->stage + 1) % 7;
+									anime->ticksToNextStage = 1;
+								}
+							}
+							else
+								anime->ticksToNextStage--;
+						}
+						else if(anime->onCooldown && anime->soldier->meleeCooldownTicks == 0)
+							anime->onCooldown = false;
+						break;
+					case ANIMATION_DAMAGE:{
+						DamageAnimation* danime = dynamic_cast<DamageAnimation*>(anime);
+						if(!anime->running && anime->soldier->hp < danime->lastHP) {
+							anime->running = true;
+							danime->lastHP = anime->soldier->hp;
+							anime->ticksToNextStage = 5;
+						}
+						else if(anime->running) {
+							if(anime->ticksToNextStage == 0) {
+								if(anime->stage == 6) {
+									anime->stage = 0;
+									anime->ticksToNextStage = 0;
+									anime->running = false;
+								}
+								else {
+									anime->stage = (anime->stage + 1) %7;
+									anime->ticksToNextStage = 1;
+								}
+							}
+							else
+								anime->ticksToNextStage--;
+						}
+						}break;
+					}
+				}
 				Update();
 			}
 		}

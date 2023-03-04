@@ -63,6 +63,40 @@ void DrawCircle(double x, double y, double rad, SDL_Renderer* renderer, Color* c
 	}
 }
 
+void DrawOuterCircle(double x, double y, double radOut, double radIn, SDL_Renderer* renderer, Color* color, int SCREEN_WIDTH, int SCREEN_HEIGHT, double zoom, Eigen::Vector2d center) {
+	Eigen::Vector2d diag; diag << SCREEN_WIDTH / 2., SCREEN_HEIGHT / 2.;
+	double rradOut = zoom * radOut;
+	double rradIn = zoom * radIn;
+	double xx = zoom*x - center.coeff(0) + diag.coeff(0);
+	double yy = zoom*y - center.coeff(1) + diag.coeff(1);
+	yy = SCREEN_HEIGHT - yy;
+	SDL_SetRenderDrawColor(renderer, color->r, color->g, color->b, color->al);
+	int i_max = std::ceil(rradOut);
+	int j_max = std::ceil(rradOut);
+	int i = 0;
+	int j = 0;
+	int i_square = i * i;
+	int j_square = j * j;
+	double r_squareOut = rradOut * rradOut;
+	double r_squareIn = rradIn * rradIn;
+	while(i <= i_max) {
+		while(j <= j_max) {
+			if(r_squareIn < i_square + j_square && i_square + j_square < r_squareOut) {
+				SDL_RenderDrawPoint(renderer, xx+i, yy+j);
+				SDL_RenderDrawPoint(renderer, xx+j, yy-i);
+				SDL_RenderDrawPoint(renderer, xx-i, yy-j);
+				SDL_RenderDrawPoint(renderer, xx-j, yy+i);
+			}
+			j_square += j + j + 1;
+			j++;
+		}
+		i_square += i + i + 1;
+		i++;
+		j = 0;	
+		j_square = 0;
+	}
+}
+
 void DrawCircle(Circle* circ, SDL_Renderer* renderer, Color* color, int SCREEN_WIDTH, int SCREEN_HEIGHT, double zoom, Eigen::Vector2d center) {
 	Eigen::Vector2d diag; diag << SCREEN_WIDTH / 2., SCREEN_HEIGHT / 2.;
 	Circle ccirc(circ->pos*zoom - center + diag, zoom * circ->rad);

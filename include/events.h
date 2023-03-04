@@ -24,6 +24,7 @@ enum EVENT_IDS {
 	UNIT_SELECT_EVENT,
 	UNIT_ADD_EVENT,
 	UNIT_DELETE_EVENT,
+	UNIT_ROSTER_MODIFIED_EVENT,
 	PLAYER_SELECT_EVENT,
 	PLAYER_ADD_EVENT,
 	PLAYER_DELETE_EVENT,
@@ -202,6 +203,14 @@ class UnitDeleteEvent : public Event {
 		UnitDeleteEvent() : Event() {
 			name = "UnitDeleteEvent";
 			type = UNIT_DELETE_EVENT;
+		}
+};
+
+class UnitRosterModifiedEvent : public Event {
+	public:
+		UnitRosterModifiedEvent() : Event() {
+			name = "UnitRosterModifiedEvent";
+			type = UNIT_ROSTER_MODIFIED_EVENT;
 		}
 };
 
