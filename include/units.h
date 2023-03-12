@@ -59,6 +59,7 @@ class Unit {
 		std::vector<Order*> orders;
 		Eigen::Vector2d vel;
 		bool enemyContact;
+		int targetUpdateCounter = 60;
 		std::vector<Unit*> targetedBy;
 		
 		void init() {
@@ -264,7 +265,8 @@ void UpdatePos(Unit* unit) {
 			}
 		}
 	}
-	pos /= nSoldiers;
+	if(nSoldiers > 0)
+		pos /= nSoldiers;
 	unit->pos = pos;
 }
 
@@ -305,7 +307,7 @@ bool CurrentOrderCompleted(Unit* unit) {
 		Order* currentOrder = unit->orders.at(unit->currentOrder);
 		switch(currentOrder->type) {
 		case ORDER_ATTACK:
-			return (dynamic_cast<AttackOrder*>(currentOrder)->unit->nLiveSoldiers) <= 0; break;
+			return (dynamic_cast<AttackOrder*>(currentOrder)->target->nLiveSoldiers) <= 0; break;
 		case ORDER_MOVE: {
 			debug("Checking order completion...");
 			MoveOrder* mo = dynamic_cast<MoveOrder*>(currentOrder);
@@ -329,11 +331,14 @@ bool CurrentOrderCompleted(Unit* unit) {
 void UnitNextOrder(Unit* unit) {
 	Order* o = unit->orders.at(unit->currentOrder);
 	if(o->type == ORDER_ATTACK) {
-		std::erase(dynamic_cast<AttackOrder*>(o)->unit->targetedBy, unit);
+		std::erase(dynamic_cast<AttackOrder*>(o)->target->targetedBy, unit);
+		unit->enemyContact = false;
 	}
 	unit->currentOrder++;
 	unit->nSoldiersArrived = 0;
-	unit->enemyContact = false;
+	Order* no = unit->orders.at(unit->currentOrder);
+	if(!no->target || no->target != o->target)
+		unit->enemyContact = false;
 	std::cout << "Onwards to the next order!\n";
 }
 
@@ -344,7 +349,8 @@ void DeleteObsoleteOrder(Unit* unit) {
 		std::vector<std::vector<Soldier*>> soldiers = unit->soldiers;
 		for(auto row : soldiers) {
 			for(auto soldier: row) {
-				soldier->currentOrder--;
+				if(soldier->alive)
+					soldier->currentOrder--;
 				if(soldier->currentOrder == 0 && soldier->placed && soldier->alive) {
 					unit->nSoldiersOnFirstOrder++;
 				}
@@ -359,11 +365,11 @@ void SoldierNextOrder(Soldier* soldier, Eigen::Vector2d posInUnit) {
 	soldier->currentOrder++;
 	soldier->arrived = false;
 	Order* o = soldier->unit->orders.at(soldier->currentOrder);
-	if(o->type == ORDER_MOVE || true) {
-		//MoveOrder* mo = dynamic_cast<MoveOrder*>(o);
-		soldier->posTarget = o->pos + o->rot * posInUnit;
-		soldier->rotTarget = o->rot;
-		soldier->angleTarget = o->angleTarget;
+	Order* po = soldier->unit->orders.at(soldier->currentOrder - 1);
+	soldier->posTarget = o->pos + o->rot * posInUnit;
+	soldier->rotTarget = o->rot;
+	soldier->angleTarget = o->angleTarget;
+	if(!o->target || (o->target != po->target)) {
 		soldier->charging = true;
 		soldier->chargeGapTicks = 30;
 	}

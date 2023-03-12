@@ -416,6 +416,7 @@ class KeyboardAndMouseController : public ZoomableGUIController {
 				}
 			}
 			else if(ev->type == TICK_EVENT) {
+				debug("TickEvent: ctrl - begin");
 				double oldZoom = zoom;
 				zoom = zoom * std::pow(maxZoom, em->dt/1*(zoomSpeedIn - zoomSpeedOut));
 				if(zoom < minZoom) zoom = minZoom;
@@ -434,6 +435,7 @@ class KeyboardAndMouseController : public ZoomableGUIController {
 				if(y > ymax) y = ymax;
 				newCenter << x, y;
 				center = newCenter;
+				debug("TickEvent: ctrl - end");
 			}
 		}
 

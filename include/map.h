@@ -3,6 +3,7 @@
 
 //#include <base.h>
 #include <soldiers.h>
+#include <units.h>
 #include <extra_math.h>
 #include <debug.h>
 

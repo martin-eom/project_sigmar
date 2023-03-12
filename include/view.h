@@ -176,7 +176,7 @@ private:
 						Rrectangle rec = UnitRectangle(model->selectedUnit, i, ctrl->orders);
 						if(o->type == ORDER_ATTACK) {
 							AttackOrder* ao = dynamic_cast<AttackOrder*>(o);
-							rec = UnitRectangle(ao->unit, ao->unit->currentOrder);
+							rec = UnitRectangle(ao->target, ao->target->currentOrder);
 							recColor = colorOrange;
 						}
 						DrawRectangle(&rec, renderer, recColor, SCREEN_WIDTH, SCREEN_HEIGHT, ctrl->zoom, ctrl->center);
@@ -211,6 +211,7 @@ private:
 						if(model->selectedUnit) {
 							if(model->selectedUnit == unit) {
 								DrawUnitArrow(unit->posTarget, unit->rotTarget, renderer, colorGreen, SCREEN_WIDTH, SCREEN_HEIGHT, ctrl->zoom, ctrl->center);
+								debug(std::to_string(unit->orders.size()));
 								for(int i = 0; i < unit->orders.size(); i++) {
 									Order* o = unit->orders.at(i);
 									if(o->type == ORDER_MOVE) {
@@ -219,7 +220,7 @@ private:
 									}
 									else if(o->type == ORDER_ATTACK) {
 										AttackOrder* ao = dynamic_cast<AttackOrder*>(o);
-										Rrectangle rec = UnitRectangle(ao->unit, ao->unit->currentOrder);
+										Rrectangle rec = UnitRectangle(ao->target, ao->target->currentOrder);
 										DrawRectangle(&rec, renderer, colorOrange, SCREEN_WIDTH, SCREEN_HEIGHT, ctrl->zoom, ctrl->center);
 									}
 									if(i > 0) {
@@ -227,7 +228,9 @@ private:
 										Point p1(o->pos); Point p2(prevo->pos);
 										DrawLine(&p1, &p2, renderer, colorGreen, SCREEN_WIDTH, SCREEN_HEIGHT, ctrl->zoom, ctrl->center);
 									}
+									debug("this loop might be infinite");
 								}
+								debug("or not");
 							}
 						}
 						
@@ -246,12 +249,15 @@ private:
 										}
 									}
 								}
+								debug("but maybe this one is");
 							}
+							debug("nope");
 						}
 					}
 				}
 				//nplayer++;
 			}
+			debug("Drew selected unit stuff.");
 			SDL_Rect segment;
 			SDL_Point center;
 			for(auto anime : animations) {
@@ -414,6 +420,7 @@ private:
 				}
 			}
 			else if(ev->type == TICK_EVENT) {
+				debug("TickEvent: view - begin");
 				for(auto anime : animations) {
 					switch(anime->type) {
 					case ANIMATION_ATTACK:
@@ -466,6 +473,7 @@ private:
 					}
 				}
 				Update();
+				debug("TickEvent: view - end");
 			}
 		}
 };

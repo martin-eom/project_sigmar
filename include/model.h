@@ -72,12 +72,17 @@ void OrderPathfinding(Unit* unit, Map* map) {
 							Rot << 1, 0, 0, 1;
 						}
 						if(mo->type == ORDER_ATTACK && k == positions.size() - 1) {
-							newOrders.push_back(new MoveOrder(positions.at(k-1), Rot, MOVE_FORMUP, true, true));
+							int movetype = MOVE_FORMUP;
+							if(unit->enemyContact)
+								movetype = MOVE_PASSINGTHROUGH;
+							newOrders.push_back(new MoveOrder(positions.at(k-1), Rot, movetype, true, true, mo->target));
 							//newOrders.push_back(new MoveOrder(positions.at(k-1), Rot, MOVE_PASSINGTHROUGH, true, true));
 							mo->rot = Rot;
 						}
+						else if(mo->type == ORDER_ATTACK)
+							newOrders.push_back(new MoveOrder(positions.at(k-1), Rot, MOVE_PASSINGTHROUGH, true, false, mo->target));
 						else
-							newOrders.push_back(new MoveOrder(positions.at(k-1), Rot, MOVE_PASSINGTHROUGH, true));
+							newOrders.push_back(new MoveOrder(positions.at(k-1), Rot, MOVE_PASSINGTHROUGH, true, false));
 					}
 
 				}
@@ -89,12 +94,15 @@ void OrderPathfinding(Unit* unit, Map* map) {
 				double sin = diff.coeff(1)/d;
 				Rot << cos, -sin, sin, cos;
 				mo->rot = Rot;
-				newOrders.push_back(new MoveOrder(w2.pos, Rot, MOVE_FORMUP, true));
+				int movetype = MOVE_FORMUP;
+				if(unit->enemyContact)
+					movetype = MOVE_PASSINGTHROUGH;
+				newOrders.push_back(new MoveOrder(w2.pos, Rot, movetype, true, true, mo->target));
 			}
 		}
 		newOrders.push_back(mo);
 		if(mo->type == ORDER_ATTACK)
-			newOrders.push_back(new MoveOrder(mo->pos, mo->rot, MOVE_FORMUP, true));
+			newOrders.push_back(new MoveOrder(mo->pos, mo->rot, MOVE_FORMUP, true, true));
 	}
 	while(unit->orders.size() > unit->currentOrder + 1) unit->orders.pop_back();
 	unit->orders.insert(unit->orders.end(), newOrders.begin(), newOrders.end());
@@ -127,7 +135,7 @@ class Model : public Listener{
 			dt = &(em->dt);
 			selectedPlayer = NULL;
 			selectedUnit = NULL;
-		};
+		}
 		void SetPlayer() {
 			selectedPlayer = player1;
 		}
@@ -158,12 +166,15 @@ class Model : public Listener{
 						while(unit->orders.size() > unit->currentOrder) unit->orders.pop_back();
 						debug("Finished order deletion");
 						// setting a new current order to the current unit position as starting point for the pathfinding calculation
-						unit->orders.push_back(new MoveOrder(unit->pos, unit->rot, MOVE_PASSINGTHROUGH, true, true));
+						if(!oev->orders.empty() && oev->orders.at(0)->type == ORDER_ATTACK)
+							unit->orders.push_back(new MoveOrder(unit->pos, unit->rot, MOVE_PASSINGTHROUGH, true, true, oev->orders.at(0)->target));
+						else
+							unit->orders.push_back(new MoveOrder(unit->pos, unit->rot, MOVE_PASSINGTHROUGH, true, true));
 					}
 					// appending the new orders
 					for(auto order : oev->orders) {
 						if(order->type == ORDER_ATTACK) {
-							Unit* target = dynamic_cast<AttackOrder*>(order)->unit;
+							Unit* target = dynamic_cast<AttackOrder*>(order)->target;
 							if(target->orders.at(target->currentOrder)->type == ORDER_ATTACK)
 								order->pos = target->pos;
 							else
@@ -188,6 +199,8 @@ class Model : public Listener{
 					unit->nSoldiersArrived = 0;
 					// doing pathfinding on all orders
 					OrderPathfinding(unit, map);
+					// debug
+					// end debug
 					// reforming so that the new position targets are set
 					if(unit->placed) {
 						ReformUnit(unit);
@@ -201,7 +214,7 @@ class Model : public Listener{
 				if(unit) {
 					for(auto order : oev->orders) {
 						if(order->type == ORDER_ATTACK) {
-							Unit* target = dynamic_cast<AttackOrder*>(order)->unit;
+							Unit* target = dynamic_cast<AttackOrder*>(order)->target;
 							if(target->orders.at(target->currentOrder)->type == ORDER_ATTACK)
 								order->pos = target->pos;
 							else
@@ -357,6 +370,7 @@ class Model : public Listener{
 				}
 			}
 			else if (ev->type == TICK_EVENT) {
+				debug("TickEvent: map - begin");
 				//mapping soldiers to grid
 				for(auto player : players) {
 					for(auto unit : player->units) {
@@ -386,6 +400,14 @@ class Model : public Listener{
 						}
 						//advancing order
 						if(unit->placed) {
+							if(unit->enemyContact && unit->orders.at(unit->currentOrder)->type == ORDER_ATTACK) {
+								unit->targetUpdateCounter--;
+								if(!unit->targetUpdateCounter) {
+									unit->posTarget = unit->orders.at(unit->currentOrder)->target->pos;
+									MoveTarget(unit);
+									unit->targetUpdateCounter = 60;
+								}
+							}
 							if(unit->orders.size() > (unit->currentOrder +1) && CurrentOrderCompleted(unit)) {
 								bool transitionOrder = unit->orders.at(unit->currentOrder)->_transition;
 								UnitNextOrder(unit);
@@ -394,7 +416,7 @@ class Model : public Listener{
 									ReformUnit(unit);
 									MoveTarget(unit);
 								}
-								if(!transitionOrder) {
+								if(!unit->enemyContact && !transitionOrder) {
 									debug(std::to_string(unit->targetedBy.size()));
 									std::vector<std::vector<Order*>> newOrders;
 									std::vector<Unit*> targetedByTemp;
@@ -406,7 +428,7 @@ class Model : public Listener{
 											o = attacker->orders.at(i);
 											if(!o->_auto) {
 												if(o->type == ORDER_ATTACK) {
-													o = new AttackOrder(dynamic_cast<AttackOrder*>(o)->unit);
+													o = new AttackOrder(dynamic_cast<AttackOrder*>(o)->target);
 												}
 												newOrders.back().push_back(o);
 											}
@@ -426,7 +448,23 @@ class Model : public Listener{
 							for(int i = 0; i < unit->nrows; i++) {
 								for(int j = 0; j < unit->width; j++) {
 									Soldier* soldier = soldiers->at(i).at(j);
-									if(soldier) {
+									if(soldier && soldier->alive) {
+										//possibly advancing soldier order during combat
+										int co = soldier->currentOrder;
+										if(!soldier->charging && unit->orders.at(co)->type != ORDER_ATTACK && unit->orders.size() > co + 1 && unit->enemyContact) {
+											Order* no = unit->orders.at(co + 1);
+											if(unit->orders.at(co)->target && no->target) {
+												Circle c1(soldier->pos, soldier->rad);
+												Eigen::Vector2d nextPos = no->pos + no->rot * unit->posInUnit.at(i).at(j);
+												Circle c2(nextPos, soldier->rad);
+												if(!soldier->arrived && FreePath(&c1, &c2, map)) {
+													//SoldierNextOrder(soldier, posInUnit->at(i).at(j));
+													soldier->arrived = true;
+													if(soldier->currentOrder == unit->currentOrder)
+														unit->nSoldiersArrived++;
+												}
+											}
+										}
 										if(soldier->placed && soldier->alive) {
 											TimeStep(soldier, *dt);
 										}
@@ -481,10 +519,12 @@ class Model : public Listener{
 										//handling "charging" status
 										//	while charging soldiers will push into the enemy position
 										//  if they have no target in front of them for 1 second they will stop charging and seek out enemies close to them
-										if(unit->orders.at(soldier->currentOrder)->type == ORDER_ATTACK) {
+										//if(unit->orders.at(soldier->currentOrder)->type == ORDER_ATTACK) {
+										Order* o = unit->orders.at(soldier->currentOrder);
+										if(o->target) {
 											if(soldier->charging) {
 												if(unit->enemyContact) {
-													if(!targets.empty() && (!soldier->meleeAOE && soldier->unit->maxSoldiers == 1))	//lone monsters stop charging after impact
+													if(!targets.empty() && (!soldier->meleeAOE && soldier->unit->maxSoldiers == 1) && o->type == ORDER_ATTACK)	//lone monsters stop charging after impact
 														soldier->chargeGapTicks = 30;
 													else {
 														if(soldier->chargeGapTicks > 0)
@@ -494,7 +534,7 @@ class Model : public Listener{
 													}
 												}
 												else {
-													if(!targets.empty() || (unit->pos - unit->posTarget).norm() < 20) {
+													if((!targets.empty() && targets.at(0).soldier->unit == o->target) || ((unit->pos - unit->posTarget).norm() < 20 && o->type == ORDER_ATTACK)) {
 														unit->enemyContact = true;
 													}
 												}
@@ -502,13 +542,13 @@ class Model : public Listener{
 											else {
 												debug("SEEK AND DESTROY!");
 												//target finding
-												AttackOrder* ao = dynamic_cast<AttackOrder*>(unit->orders.at(soldier->currentOrder));
-												if((!soldier->meleeTarget || !soldier->meleeTarget->alive) && !ao->unit->liveSoldiers.empty()) {
+												//AttackOrder* ao = dynamic_cast<AttackOrder*>(o);
+												if((!soldier->meleeTarget || !soldier->meleeTarget->alive) && !o->target->liveSoldiers.empty()) {
 													Soldier* target = NULL;
 													if(soldier->meleeAOE && soldier->unit->maxSoldiers == 1) {
 														double maxDist = 0;
 														for(int i = 0; i < 8; i++) {
-															Soldier* current = ao->unit->liveSoldiers.at(rand()%ao->unit->liveSoldiers.size());
+															Soldier* current = o->target->liveSoldiers.at(rand()%o->target->liveSoldiers.size());
 															double dist = (current->pos - soldier->pos).norm();
 															if(dist > maxDist) {
 																target = current;
@@ -519,7 +559,7 @@ class Model : public Listener{
 													else {
 														double minDist = std::numeric_limits<double>::infinity();
 														for(int i = 0; i < 10; i++) {
-															Soldier* current = ao->unit->liveSoldiers.at(rand()%ao->unit->liveSoldiers.size());
+															Soldier* current = o->target->liveSoldiers.at(rand()%o->target->liveSoldiers.size());
 															double dist = (current->pos - soldier->pos).norm();
 															if(dist < minDist) {
 																target = current;
@@ -531,6 +571,22 @@ class Model : public Listener{
 												}
 											}
 										}
+										if(soldier->unit->orders.at(soldier->currentOrder)->target
+										&& soldier->meleeTarget && !soldier->charging) {//soldier->unit->enemyContact) {
+											if(soldier->cantSeeTargetTimer > 0) {
+												soldier->cantSeeTargetTimer--;
+											}
+											else {
+												Circle c1(soldier->pos, soldier->rad);
+												Circle c2(soldier->meleeTarget->pos, soldier->meleeTarget->rad);
+												if(!FreePath(&c1, &c2, map)) {
+													soldier->meleeTarget = NULL;
+												}
+												soldier->cantSeeTargetTimer = 60;
+
+											}
+										}
+										// resolving attacks
 										if(!targets.empty() && soldier->meleeCooldownTicks == 0) {
 											soldier->meleeCooldownTicks = 31;
 											for(auto targetContainer : targets) {
@@ -552,7 +608,7 @@ class Model : public Listener{
 						}
 					}
 				}
-				//combat resolving
+				//resolving damage
 				while(!damages.empty()) {
 					DamageTick d = damages.front();
 					d.soldier->hp -= d.dmg;
@@ -565,7 +621,7 @@ class Model : public Listener{
 				//damages = std::queue<DamageTick>();
 				//cleanup
 				map->Cleangrid();	// do it later and use it for target detection? yes
-				//debug("end model TickEvent");
+				debug("TickEvent: map - end");
 			}
 		}
 };

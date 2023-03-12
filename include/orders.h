@@ -27,15 +27,18 @@ class Order{
 		int type;
 		bool _auto;
 		bool _transition;
+		Unit* target;
+
 		Order() {
 			type = ORDER_ORDER;
 			pos << 0, 0;
 			rot << 1, 0, 0, 1;
 			angleTarget = Angle(rot.coeff(0,1), rot.coeff(0,0));
 		}
-		Order(bool _auto, bool _transition = false) : Order() {
+		Order(bool _auto, bool _transition = false, Unit* target = NULL) : Order() {
 			this->_auto = _auto;
 			this->_transition = _transition;
+			this->target = target;
 		}
 };
 
@@ -43,7 +46,9 @@ class MoveOrder : public Order {
 	public:
 		int moveType;
 
-		MoveOrder(Eigen::Vector2d pos, Eigen::Matrix2d rot, int moveType, bool _auto = false, bool _transition = false) : Order(_auto, _transition) {
+		MoveOrder(Eigen::Vector2d pos, Eigen::Matrix2d rot, int moveType, 
+			bool _auto = false, bool _transition = false, Unit* target = NULL)
+			: Order(_auto, _transition, target) {
 			type = ORDER_MOVE;
 			this->moveType = moveType;
 			this->pos = pos;
@@ -54,13 +59,13 @@ class MoveOrder : public Order {
 
 class AttackOrder : public Order {
 public:
-	Unit* unit;
+	//Unit* unit;
 	bool enemyContact;
 	void SetPos();
 
-	AttackOrder(Unit* unit, bool _auto = false, bool _transition = false) : Order(_auto, _transition) {
+	AttackOrder(Unit* unit, bool _auto = false, bool _transition = false) : Order(_auto, _transition, unit) {
 		type = ORDER_ATTACK;
-		this->unit = unit;
+		this->target = unit;
 		enemyContact = false;
 	}
 };

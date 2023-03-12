@@ -120,8 +120,12 @@ void DampenedHarmonicOscillator(Soldier* soldier, double dt) {	//deprecated / on
 }
 
 Eigen::Vector2d PosTarget(Soldier* soldier) {
-	if(!soldier->charging && soldier->meleeTarget)
-		return soldier->meleeTarget->pos;
+	if(soldier->meleeTarget) {
+		if(!soldier->charging)
+			return soldier->meleeTarget->pos;
+		if(soldier->unit->enemyContact && soldier->unit->orders.at(soldier->currentOrder)->target)
+			return soldier->meleeTarget->pos;
+	}
 	return soldier->posTarget;
 }
 
@@ -267,7 +271,7 @@ void TimeStep(Soldier* soldier, double dt) {
 		}
 	}
 	else if(o->type == ORDER_ATTACK && !soldier->arrived) {
-		if(dynamic_cast<AttackOrder*>(o)->unit->nLiveSoldiers <= 0) {
+		if(dynamic_cast<AttackOrder*>(o)->target->nLiveSoldiers <= 0) {
 			soldier->arrived = true;
 		}
 	}

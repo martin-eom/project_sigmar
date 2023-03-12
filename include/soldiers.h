@@ -106,6 +106,7 @@ class Soldier {
 		Soldier* meleeSwingTarget;	// target they are striking at the moment
 		bool charging;
 		int chargeGapTicks;
+		int cantSeeTargetTimer = 0;
 		Eigen::Matrix2d meleeCone;
 
 		void init(Unit* unit) {
@@ -204,10 +205,10 @@ class InfantryMan : public Soldier {
 			maxHP = 2;
 			meleeRange = 7.;
 			meleeAngle = 1./3.;
-			meleeCooldownTicks = 61;
+			meleeCooldownTicks = 71;
 
 			meleeAttack = 25;
-			meleeDefense = 25;
+			meleeDefense = 20;
 			infantry = true;
 
 			init(unit);
@@ -268,8 +269,8 @@ class Monster : public Soldier {
 			meleeAngle = 1./2.;
 			meleeCooldownTicks = 71;
 
-			meleeAttack = 50;
-			meleeDefense = 35;
+			meleeAttack = 55;
+			meleeDefense = 40;
 			large = true;
 			antiInfantry = true;
 			meleeAOE = true;
