@@ -93,31 +93,60 @@ class KeyboardAndMouseController : public ZoomableGUIController {
 					x = mousePos.coeff(0);
 					y = mousePos.coeff(1);
 					switch(_state) {
-					case CTRL_GIVING_ORDERS:
-						if(firstPointSet) {
-							p1 << x, y;
-							double dx = p1.coeff(0) - p0.coeff(0);
-							double dy = p1.coeff(1) - p0.coeff(1);
-							double dp = sqrt(dx*dx + dy*dy);
-							if(dp !=0 ) {
-								double cos = dx / dp;
-								double sin = dy / dp;
-								rot << cos, -sin, sin, cos;
-								MoveOrder* mo = new MoveOrder(p0, rot, MOVE_FORMUP);
-								if(passingThrough) {mo->moveType = MOVE_PASSINGTHROUGH;}
-								if(!queueingOrders) {orders.clear();}
-								orders.push_back(mo);
-								std::cout << orders.size() << " orders queued\n";
+					case CTRL_GIVING_ORDERS: {
+						Order* o = NULL;
+						if(e.button.button == SDL_BUTTON_RIGHT) {
+							if(firstPointSet) {
+								p1 << x, y;
+								double dx = p1.coeff(0) - p0.coeff(0);
+								double dy = p1.coeff(1) - p0.coeff(1);
+								double dp = sqrt(dx*dx + dy*dy);
+								if(dp !=0 ) {
+									double cos = dx / dp;
+									double sin = dy / dp;
+									rot << cos, -sin, sin, cos;
+									MoveOrder* mo = new MoveOrder(p0, rot, MOVE_FORMUP);
+									o = new MoveOrder(p0, rot, MOVE_FORMUP);
+									if(passingThrough) {mo->moveType = MOVE_PASSINGTHROUGH; dynamic_cast<MoveOrder*>(o)->moveType = MOVE_PASSINGTHROUGH;}
+								}
+								else {
+									std::cout << "First and second point are identical, can't get angel.\n";
+								}
 							}
 							else {
-								std::cout << "First and second point are identical, can't get angel.\n";
+								p0 << x, y;
+							}
+							firstPointSet = !firstPointSet;
+						}
+						else if(e.button.button == SDL_BUTTON_LEFT) {
+							Eigen::Vector2d realPos; realPos << x, y;
+							Player* player;
+							if(model->selectedPlayer->player1)
+								player = model->players.at(1);
+							else
+								player = model->players.at(0);
+							double dist;
+							double minDist = std::numeric_limits<double>::infinity();
+							Unit* target = NULL;
+							for(auto unit : player->units) {
+								if(unit->placed && unit->nLiveSoldiers > 0) {
+									dist = (realPos - unit->pos).norm();
+									if(dist < minDist) {
+										target = unit;
+										minDist = dist;
+									}
+								}
+							}
+							if(target) {
+								o = new AttackOrder(target);
 							}
 						}
-						else {
-							p0 << x, y;
+						if(!queueingOrders) {orders.clear();}
+						if(o) {
+							orders.push_back(o);
 						}
-						firstPointSet = !firstPointSet;
-						break;
+						std::cout << orders.size() << " orders queued\n";
+						}break;
 					case CTRL_SELECTING_UNIT:
 						double dist;
 						double minDist = 1000000;	//infinity
@@ -346,6 +375,8 @@ class KeyboardAndMouseController : public ZoomableGUIController {
 						switch(_state) {
 						case CTRL_IDLE:
 							_state = CTRL_SELECTING_UNIT;
+							if(model->selectedUnit == NULL)
+								model->SetUnit();
 							break;
 						}
 					}
@@ -361,7 +392,6 @@ class KeyboardAndMouseController : public ZoomableGUIController {
 					Eigen::Vector2d diag; diag << view->SCREEN_WIDTH / 2., view->SCREEN_HEIGHT / 2.;
 					Eigen::Vector2d pos; pos << e.button.x, view->SCREEN_HEIGHT - e.button.y;
 					mousePos = (pos + center - diag) / zoom;
-
 					int x, y;
 					x = mousePos.coeff(0);
 					y = mousePos.coeff(1);
@@ -386,6 +416,7 @@ class KeyboardAndMouseController : public ZoomableGUIController {
 				}
 			}
 			else if(ev->type == TICK_EVENT) {
+				debug("TickEvent: ctrl - begin");
 				double oldZoom = zoom;
 				zoom = zoom * std::pow(maxZoom, em->dt/1*(zoomSpeedIn - zoomSpeedOut));
 				if(zoom < minZoom) zoom = minZoom;
@@ -404,6 +435,7 @@ class KeyboardAndMouseController : public ZoomableGUIController {
 				if(y > ymax) y = ymax;
 				newCenter << x, y;
 				center = newCenter;
+				debug("TickEvent: ctrl - end");
 			}
 		}
 
@@ -849,6 +881,7 @@ private:
 
 		}
 		else if(ev->type == TICK_EVENT) {
+			debug("ctrl : TickEvent");
 			double oldZoom = zoom;
 			zoom = zoom * std::pow(maxZoom, em->dt/1*(zoomSpeedIn - zoomSpeedOut));
 			if(zoom < minZoom) zoom = minZoom;
@@ -867,6 +900,7 @@ private:
 			if(y > ymax) y = ymax;
 			newCenter << x, y;
 			center = newCenter;
+			debug("ctrl : end TickEvent");
 		}
 	}
 };

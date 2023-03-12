@@ -29,27 +29,31 @@ void ReformUnit(Unit* unit) {
 		}
 	};
 
-	//Eigen::Matrix2d rotDiff = rot.transpose() * unit->rot;
-	std::vector<std::vector<Soldier*>>* soldiers = unit->soldiers();
+	std::vector<std::vector<Soldier*>>* soldiers = &(unit->soldiers);
 	std::deque<RebasedSoldier*> temp1;
 	std::deque<RebasedSoldier*> temp2;
 	// Sorting soldiers by new "y coordinate" (front-back in formation)
-	for(int i = 0; i < unit->nrows(); i++) {
-		for(int j = 0; j < unit->width(); j++) {
+	for(int i = 0; i < unit->nrows; i++) {
+		for(int j = 0; j < unit->width; j++) {
 			Soldier* soldier = soldiers->at(i).at(j);
-			if (soldier) {
+			if(soldier) {
 				Eigen::Matrix2d rot;
-				Order* o = unit->orders.at(soldier->currentOrder);
+				Order* o;
+				if(soldier->alive)
+					o = unit->orders.at(soldier->currentOrder);
+				else
+					o = unit->orders.at(unit->currentOrder);
 				if(o->type == ORDER_MOVE) {
 					MoveOrder* mo = dynamic_cast<MoveOrder*>(o);
 					rot = mo->rot;
 				}
-				else {rot = unit->rot;}
+				else {rot = o->rot;}
 				Eigen::Matrix2d rotDiff = rot.transpose() * unit->rot;
 				RebasedSoldier* r = new RebasedSoldier(soldier, rotDiff, rot.transpose() * (soldier->pos - unit->pos));
 				auto current = temp1.begin();
 				while(current != temp1.end()) {
-					if (r->soldier->currentOrder < (*current)->soldier->currentOrder) {
+					if(!(*current)->soldier->alive) break;
+					if (r->soldier->currentOrder < (*current)->soldier->currentOrder || !r->soldier->alive) {
 						current = std::next(current);
 					}
 					else if (r->soldier->currentOrder == (*current)->soldier->currentOrder && 
@@ -66,12 +70,13 @@ void ReformUnit(Unit* unit) {
 	while(!temp1.empty()) {
 		std::deque<RebasedSoldier*> tempRow;
 		// Filling tempRow
-		while((!temp1.empty()) && tempRow.size() < unit->width()) {
+		while((!temp1.empty()) && tempRow.size() < unit->width) {
 			RebasedSoldier* node = temp1.at(0); temp1.pop_front();
 			auto current = tempRow.begin();
 			int n = 0;
 			while(current != tempRow.end()) {
-				if(node->rebasedPos[1] < (*current)->rebasedPos[1]) {
+				if(!(*current)->soldier->alive) break;
+				if(node->rebasedPos[1] < (*current)->rebasedPos[1] || !node->soldier->alive) {
 					n++;
 					current = std::next(current);
 				}
@@ -86,8 +91,8 @@ void ReformUnit(Unit* unit) {
 		}
 	}
 	// Pasting the new order into unit
-	for(int i = 0; i < unit->nrows(); i++) {
-		for(int j = 0; j < unit->width(); j++) {
+	for(int i = 0; i < unit->nrows; i++) {
+		for(int j = 0; j < unit->width; j++) {
 			if(!temp2.empty()) {
 				RebasedSoldier* r = temp2.at(0); temp2.pop_front();
 				(*soldiers).at(i).at(j) = r->soldier;
@@ -96,6 +101,7 @@ void ReformUnit(Unit* unit) {
 		}
 	}
 	PosInUnitByID(unit);
+	debug("Reforming unit succeeded");
 }
 
 
@@ -113,9 +119,18 @@ void DampenedHarmonicOscillator(Soldier* soldier, double dt) {	//deprecated / on
 	soldier->force = newForce;
 }
 
-
+Eigen::Vector2d PosTarget(Soldier* soldier) {
+	if(soldier->meleeTarget) {
+		if(!soldier->charging)
+			return soldier->meleeTarget->pos;
+		if(soldier->unit->enemyContact && soldier->unit->orders.at(soldier->currentOrder)->target)
+			return soldier->meleeTarget->pos;
+	}
+	return soldier->posTarget;
+}
 
 void TimeStep(Soldier* soldier, double dt) {
+	Eigen::Vector2d posTarget = PosTarget(soldier);;
 	Eigen::Vector2d newPos, newVel;
 	Eigen::Matrix2d newRot;
 	double newAngle;
@@ -131,12 +146,27 @@ void TimeStep(Soldier* soldier, double dt) {
 	double angleDiff;
 	Eigen::Matrix2d toRot;
 	double maxTurn;
-	Eigen::Vector2d dist = soldier->posTarget - soldier->pos;
+	Eigen::Vector2d dist = posTarget - soldier->pos;
 	double dx = dist.norm();
-	bool closeToTarget = dx < soldier->maxSpeed()/4;
+	bool closeToTarget = dx < soldier->maxSpeed/4;
+	bool almostOnTarget = dx < 50 
+		&& soldier->unit->orders.at(soldier->currentOrder)->type == ORDER_MOVE 
+		&& dynamic_cast<MoveOrder*>(soldier->unit->orders.at(soldier->currentOrder))->moveType == MOVE_FORMUP;
+	bool inMelee = soldier->meleeTarget && soldier->meleeTarget->alive;
 	bool movingAway = dist.dot(soldier->vel) < 0.;
 	if(closeToTarget) {
-		rotT = soldier->rotTarget;
+		if(inMelee) {
+			Eigen::Vector2d dm = soldier->meleeTarget->pos - soldier->pos;
+			double mdist = dm.norm();
+			rotT << dm.coeff(0)/mdist, -dm.coeff(1)/mdist, dm.coeff(1)/mdist, dm.coeff(0)/mdist;
+		}
+		else
+			rotT = soldier->rotTarget;
+	}
+	else if(almostOnTarget && inMelee) {
+			Eigen::Vector2d dm = soldier->meleeTarget->pos - soldier->pos;
+			double mdist = dm.norm();
+			rotT << dm.coeff(0)/mdist, -dm.coeff(1)/mdist, dm.coeff(1)/mdist, dm.coeff(0)/mdist;
 	}
 	else {
 		double sinT, cosT;
@@ -147,7 +177,7 @@ void TimeStep(Soldier* soldier, double dt) {
 	rotDiff = rotT * (soldier->rot.transpose());
 	angleDiff = Angle(rotDiff.coeff(0,1), rotDiff.coeff(0,0));
 	if(!(soldier->rot == rotT)) {
-		maxTurn = soldier->turn() * dt * (0.1 + 0.9 * std::max((soldier->maxSpeed() - speed), 0.)/soldier->maxSpeed());
+		maxTurn = soldier->turn * dt * (0.1 + 0.9 * std::max((soldier->maxSpeed - speed), 0.)/soldier->maxSpeed);
 		if(abs(angleDiff) < maxTurn) {
 			newRot = rotT;
 			if(closeToTarget) {
@@ -174,8 +204,8 @@ void TimeStep(Soldier* soldier, double dt) {
 	}
 	//new force
 	Eigen::Vector2d newForce;
-	if(closeToTarget || abs(angleDiff) < 0.25) {
-		newForce = (soldier->posTarget - newPos)*1;
+	if(closeToTarget || abs(angleDiff) < 0.25 || (inMelee && almostOnTarget)) {
+		newForce = (posTarget - newPos)*1;
 		double oscilStrength = newForce.norm();
 		if(oscilStrength > soldier->Force || movingAway) {	// moving away and not in the process of knockdown
 			newForce *= soldier->Force / oscilStrength;
@@ -186,15 +216,18 @@ void TimeStep(Soldier* soldier, double dt) {
 	}
 	double damp;
 	if(closeToTarget) {
-		damp = soldier->onTargetDamp();
+		damp = soldier->onTargetDamp;
+	}
+	else if(inMelee && almostOnTarget && abs(angleDiff) >= 0.25) {
+		damp = soldier->onTargetDamp;
 	}
 	else if(movingAway) {
-		damp = soldier->onTargetDamp()*1.1;
+		damp = soldier->onTargetDamp*1.1;
 	}
 	else {
-		damp = soldier->squareDamp();
-		double linDamp = soldier->linearDamp();
-		double squDamp = soldier->squareDamp() * soldier->vel.norm();
+		damp = soldier->squareDamp;
+		double linDamp = soldier->linearDamp;
+		double squDamp = soldier->squareDamp * soldier->vel.norm();
 		damp = std::max(linDamp, squDamp);
 	}
 	Eigen::Vector2d dampForce = soldier->vel*damp;
@@ -219,10 +252,10 @@ void TimeStep(Soldier* soldier, double dt) {
 	//check if order complete
 	bool newestOrder = (soldier->currentOrder == soldier->unit->currentOrder);
 	Order* o = soldier->unit->orders.at(soldier->currentOrder);
-	if(o->type = ORDER_MOVE) {
+	if(o->type == ORDER_MOVE) {
 		MoveOrder* mo = dynamic_cast<MoveOrder*>(o);
 		if(!soldier->arrived) {
-			if(newestOrder) {
+			if(newestOrder) {// && (mo->moveType != MOVE_PASSINGTHROUGH)) {
 				if(closeToTarget) {
 					soldier->arrived = true;
 					soldier->unit->nSoldiersArrived++;
@@ -237,10 +270,15 @@ void TimeStep(Soldier* soldier, double dt) {
 			}
 		}
 	}
+	else if(o->type == ORDER_ATTACK && !soldier->arrived) {
+		if(dynamic_cast<AttackOrder*>(o)->target->nLiveSoldiers <= 0) {
+			soldier->arrived = true;
+		}
+	}
 }
 
 void KnockKnock(Soldier* sold1, Soldier* sold2) {
-	double minDist = sold1->rad() + sold2->rad();
+	double minDist = sold1->rad + sold2->rad;
 	if((sold1->unit->player == sold2->unit->player) && (sold1->unit != sold2->unit)) {
 		minDist *= 0.7;
 	}
@@ -251,18 +289,20 @@ void KnockKnock(Soldier* sold1, Soldier* sold2) {
 		double dxdv = dx.dot(dv);
 		bool movingCloser = dxdv < 0.;
 		if(movingCloser) {
-			double totalMass = sold1->mass() + sold2->mass();
+			double totalMass = sold1->mass + sold2->mass;
 			Eigen::Vector2d prod = 2. * dxdv * dx / (totalMass * pow(d,2));
-			sold1->knockVel += sold2->mass() * prod;
-			sold2->knockVel -= sold1->mass() * prod;
+			sold1->knockVel += sold2->mass * prod;
+			sold2->knockVel -= sold1->mass * prod;
+			Eigen::Vector2d target1 = PosTarget(sold1);
+			Eigen::Vector2d target2 = PosTarget(sold2);
 			if(sold1->unit->player == sold2->unit->player && sold1->unit == sold2->unit) {
 				if(sold1->currentOrder < sold2->currentOrder) {
-					if((sold1->pos - sold2->posTarget).norm() < (sold2->pos - sold2->posTarget).norm()) {
+					if((sold1->pos - target2).norm() < (sold2->pos - target2).norm()) {
 						sold1->arrived = true;
 					}
 				}
 				else if(sold1->currentOrder > sold2->currentOrder) {
-					if((sold1->pos - sold1->posTarget).norm() > (sold2->pos - sold1->posTarget).norm()) {
+					if((sold1->pos - target1).norm() > (sold2->pos - target1).norm()) {
 						sold2->arrived = true;
 					}
 				}
@@ -272,10 +312,10 @@ void KnockKnock(Soldier* sold1, Soldier* sold2) {
 }
 
 void CollisionScrying(Map* map, Unit* unit) {
-	for(int i = 0; i < unit->nrows(); i++) {
-		for(int j = 0; j < unit->width(); j++) {
-			Soldier* soldier = (*unit).soldiers()->at(i).at(j);
-			if(soldier->placed) {
+	for(int i = 0; i < unit->nrows; i++) {
+		for(int j = 0; j < unit->width; j++) {
+			Soldier* soldier = (*unit).soldiers.at(i).at(j);
+			if(soldier->placed && soldier->alive) {
 				int m = (int) (soldier->pos.coeff(1) / map->tilesize);
 				if(m < 0) m=0;
 				else if(m > map->nrows - 1) m = map->nrows - 1;
@@ -285,6 +325,35 @@ void CollisionScrying(Map* map, Unit* unit) {
 				map->Assign(soldier, m, n);
 			}
 		}
+	}
+}
+
+void EvaluateRange(Soldier* sold1, Soldier* sold2) {
+	Eigen::Vector2d dx = sold2->pos - sold1->pos;
+	double dist = dx.norm();
+	double drad = sold1->rad + sold2->rad;
+	//if(dist < drad || true)
+		KnockKnock(sold1, sold2);
+	if(sold1->unit->player != sold2->unit->player) {
+		double meleeDist = dist - drad;
+		if(meleeDist < 5*sold1->meleeRange) {
+			if(meleeDist < sold1->meleeRange) 
+				sold1->enemiesInMeleeRange.push(SoldierNeighbourContainer(sold2, dx, dist, true));			
+			else if(sold1->unit->orders.at(sold1->currentOrder)->type != ORDER_ATTACK)
+					sold1->enemiesInMeleeRange.push(SoldierNeighbourContainer(sold2, dx, dist, false));
+		}
+		if(meleeDist < 4*sold2->meleeRange) {
+			if(meleeDist < sold2->meleeRange) 
+				sold2->enemiesInMeleeRange.push(SoldierNeighbourContainer(sold1, dx, dist, true));			
+			else if(sold2->unit->orders.at(sold2->currentOrder)->type != ORDER_ATTACK)
+				sold2->enemiesInMeleeRange.push(SoldierNeighbourContainer(sold1, dx, dist, false));
+		}
+		/*if(dist - drad < sold1->meleeRange) {
+			sold1->enemiesInMeleeRange.push(SoldierNeighbourContainer(sold2, dx, dist, true));
+		}
+		if(dist - drad < sold2->meleeRange) {
+			sold2->enemiesInMeleeRange.push(SoldierNeighbourContainer(sold1, dx, dist, true));
+		}*/
 	}
 }
 
@@ -300,9 +369,7 @@ void CollisionResolution(Map* map) {
 				auto soldNode2 = std::next(soldNode1);
 				while(soldNode2 != tile1->soldiers.end()) {
 					sold2 = (*soldNode2);
-					if((sold2->pos - sold1->pos).norm() < (sold1->rad() + sold2->rad()) || true) {
-						KnockKnock(sold1, sold2);
-					}
+					EvaluateRange(sold1, sold2);
 					soldNode2 = std::next(soldNode2);
 				}
 				auto neighbour = tile1->neighbours.begin();
@@ -311,9 +378,7 @@ void CollisionResolution(Map* map) {
 					soldNode2 = tile2->soldiers.begin();
 					while(soldNode2 != tile2->soldiers.end()) {
 						sold2 = (*soldNode2);
-						if((sold2->pos - sold1->pos).norm() < (sold1->rad() + sold2->rad()) ||true) {
-							KnockKnock(sold1, sold2);
-						}
+						EvaluateRange(sold1, sold2);
 						soldNode2 = std::next(soldNode2);
 					}
 					neighbour = std::next(neighbour);

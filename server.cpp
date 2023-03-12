@@ -41,16 +41,20 @@ void OpenWindow(Map* map) {
 	dynamic_cast<GameEventManager*>(em)->map = map;
 	model = new Model(em, map);
 	dynamic_cast<GameEventManager*>(em)->model = model;
-	Player* player1 = new Player();
+	Player* player1 = new Player(true);
 	model->players.push_back(player1);
+	model->player1 = player1;
 	player1->units.push_back(new Infantry(player1));
 	player1->units.push_back(new Cavalry(player1));
 	player1->units.push_back(new MonsterUnit(player1));
-	Player* player2 = new Player();
+	player1->units.push_back(new LoneRider(player1));
+	Player* player2 = new Player(false);
 	model->players.push_back(player2);
+	model->player2 = player2;
 	player2->units.push_back(new Infantry(player2));
 	player2->units.push_back(new Cavalry(player2));
 	player2->units.push_back(new MonsterUnit(player2));
+	player2->units.push_back(new LoneRider(player2));
 	model->SetPlayer();
 	model->SetUnit();
 	ctrl = new KeyboardAndMouseController(em, SCREEN_WIDTH, SCREEN_HEIGHT, map);
@@ -78,6 +82,8 @@ void OpenWindow(Map* map) {
 
 	view = new View(em, map, window, renderer);
 	dynamic_cast<GameEventManager*>(em)->view = view;
+	UnitRosterModifiedEvent e;
+	em->Post(&e);
 }
 
 void ResetTextbox(std::string text, bool input) {
@@ -136,6 +142,7 @@ int main(int argc, char* argv[1]) {
 		t = (t+1)%SCREEN_WIDTH;
 		CURRENT_TICK = SDL_GetTicks();
 		if (CURRENT_TICK >= T_OF_NEXT_TICK) {
+			//debug("Tick");
 			TickEvent ev;
 			em->Post(&ev);
 			T_OF_NEXT_TICK = CURRENT_TICK + em->dt * 1000;

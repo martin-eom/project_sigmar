@@ -22,10 +22,21 @@ The soldiers can turn and move forwards (or sideways and backwards at low speeds
 A simple form of pathfinding is implemented for units. Given a well designed map they will choose the shortest path between any 2 points while not running directly into map objects.
 The shortest paths are computed during map creation using the [Floyd-Warshall algorithm](https://en.wikipedia.org/wiki/Floyd%E2%80%93Warshall_algorithm).
 There is a map editor to create and modify maps, which can be loaded into the main game.
+
+A melee combat system inspired by that of the Total War games (Melee Attack/Defense stats, unit traits) is implemented. Units can be ordered to hold a point, which will only make them attack enemies if they get within melee range of their formation, or they can be ordered to attack a unit in which case they will charge the enemy position for a while and then seek out the remaining soldiers of that unit.
+
+The soldiers are rendered with very basic pixelart and animation.
+
 ## (Immediate) to-do list
-* zoomable and moveable map
-* combat
-* A server-client architecture is planned, but the implementation will be reserved for much later in the development process, since it is not necessary for testing of game mechanics.
+* individual pathfinding for soldiers that lose line of sight with their next target position
+* ranged combat
+
+## (Future) to-do list
+* figure out the games objective(s)
+* basic ai to play against
+* more and more detailed sprites and animations
+* server-client architecture
+
 ## Requirements
 * C++20
 * Eigen3 library
@@ -38,6 +49,6 @@ The rest of the code should be platform independent. When compiling on Linux rem
 All header files are in the *include* folder, so make sure to include this folder when compiling.
 Additionally you might have to alter the include statements for SDL2 (*SDL.h*) and Eigen3 (*Dense*) to something like *SDL2/SDL.h* and *Eigen/Dense* in all files depending on your setup of the libraries.
 ### Windows
-For installation on Windows an installer will be included in all releases starting with cdev0.2. The map editor, game and *maps* folder have to be within the same installation folder, because the map editor will save to *maps* and both programs will load from *maps*. It is not recommended to install into *Program Files*, despite this being the default suggested installation directory, because then the map editor would require administrator rights to be able to write into the *maps* folder.
+For installation on Windows an installer will be included in all releases starting with cdev0.2. The map editor, game and *maps* folder have to be within the same installation folder, because the map editor will save to *maps* and both programs will load from *maps*. It is not recommended to install into *Program Files*, because then the map editor would require administrator rights to be able to write into the *maps* folder.
 ## Controls
 For both the map editor and game the controls being shown on screen can be toggled by pressing h.

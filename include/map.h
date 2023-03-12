@@ -3,6 +3,7 @@
 
 //#include <base.h>
 #include <soldiers.h>
+#include <units.h>
 #include <extra_math.h>
 #include <debug.h>
 
@@ -58,6 +59,8 @@ public:
 class gridpiece{
 	public:
 		std::vector<Soldier*> soldiers;
+		std::vector<Soldier*> p1Soldiers;
+		std::vector<Soldier*> p2Soldiers;
 		std::vector<MapObject*> mapObjects;
 		std::vector<gridpiece*> neighbours;
 		Rrectangle* rec;
@@ -136,12 +139,18 @@ class Map {
 			for(int i = 0; i < nrows; i++) {
 				for(int j = 0; j < ncols; j++) {
 					tiles.at(i).at(j)->soldiers.clear();
+					tiles.at(i).at(j)->p1Soldiers.clear();
+					tiles.at(i).at(j)->p2Soldiers.clear();
 				}
 			}
 		}
 		
 		void Assign(Soldier* soldier, int i, int j) {
 			tiles.at(i).at(j)->soldiers.push_back(soldier);
+			if(soldier->unit->player->player1)
+				tiles.at(i).at(j)->p1Soldiers.push_back(soldier);
+			else
+				tiles.at(i).at(j)->p2Soldiers.push_back(soldier);
 		}
 
 		void AddMapObject(MapObject* obj) {
@@ -230,7 +239,7 @@ void SoldierCircleCollision(Soldier* soldier, Circle* circle) {
 	Eigen::Vector2d knockVel;
 	Eigen::Vector2d dist = soldier->pos - circle->pos;
 	double d = dist.norm();
-	if(d <= (soldier->rad() + circle->rad)) {		
+	if(d <= (soldier->rad + circle->rad)) {		
 		double sin = dist.coeff(1) / d;
 		double cos = dist.coeff(0) / d;
 		Eigen::Matrix2d rot;
@@ -241,7 +250,7 @@ void SoldierCircleCollision(Soldier* soldier, Circle* circle) {
 			rotVel(1) = 0;
 			rotVel = rot * rotVel;
 			knockVel = rotVel;
-			posCorrection = dist/d*(soldier->rad() + circle->rad - d);
+			posCorrection = dist/d*(soldier->rad + circle->rad - d);
 			soldier->knockVel += knockVel;
 			soldier->pos += posCorrection;
 		}
@@ -256,14 +265,14 @@ void SoldierRectangleCollision(Soldier* soldier, Rrectangle* rec) {
 	Eigen::Vector2d soldierPosCorrection;
 	soldierPosCorrection << 0., 0.;
 	bool _long, _wide;
-	_long = (-rec->hw <= rotPos.coeff(0) && rotPos.coeff(0) <= rec->hw && -rec->hl - soldier->rad() <= rotPos.coeff(1) && rotPos.coeff(1) <= rec->hl + soldier->rad());
-	_wide = (-rec->hw - soldier->rad() <= rotPos.coeff(0) && rotPos.coeff(0) <= rec->hw + soldier->rad() && -rec->hl <= rotPos.coeff(1) && rotPos.coeff(1) <= rec->hl);
+	_long = (-rec->hw <= rotPos.coeff(0) && rotPos.coeff(0) <= rec->hw && -rec->hl - soldier->rad <= rotPos.coeff(1) && rotPos.coeff(1) <= rec->hl + soldier->rad);
+	_wide = (-rec->hw - soldier->rad <= rotPos.coeff(0) && rotPos.coeff(0) <= rec->hw + soldier->rad && -rec->hl <= rotPos.coeff(1) && rotPos.coeff(1) <= rec->hl);
 	double dl;
 	double dw;
-	if(rotPos.coeff(1) < 0) {dl = -(rec->hl + soldier->rad()) - rotPos.coeff(1);}
-	else {dl = rec->hl + soldier->rad() - rotPos.coeff(1);}
-	if(rotPos.coeff(0) < 0) {dw = -(rec->hw + soldier->rad()) - rotPos.coeff(0);}
-	else {dw = rec->hw + soldier->rad() - rotPos.coeff(0);}
+	if(rotPos.coeff(1) < 0) {dl = -(rec->hl + soldier->rad) - rotPos.coeff(1);}
+	else {dl = rec->hl + soldier->rad - rotPos.coeff(1);}
+	if(rotPos.coeff(0) < 0) {dw = -(rec->hw + soldier->rad) - rotPos.coeff(0);}
+	else {dw = rec->hw + soldier->rad - rotPos.coeff(0);}
 	int edge;
 	if(_long) {
 		if(_wide) {
@@ -350,7 +359,7 @@ void SoldierRectangleCollision(Soldier* soldier, Rrectangle* rec) {
 			Corner* corner = rec->corners.at(i);
 			Eigen::Vector2d dist = soldier->pos - corner->pos;
 			double d = dist.norm();
-			if(d <= soldier->rad()) {
+			if(d <= soldier->rad) {
 				double sin = dist.coeff(1) / d;
 				double cos = dist.coeff(0) / d;
 				Eigen::Matrix2d rot;
@@ -361,7 +370,7 @@ void SoldierRectangleCollision(Soldier* soldier, Rrectangle* rec) {
 					rotVel(1) = 0;
 					rotVel = rot * rotVel;
 					knockVel = rotVel;
-					soldierPosCorrection(0) += soldier->rad() - d;
+					soldierPosCorrection(0) += soldier->rad - d;
 					soldierPosCorrection = rot * soldierPosCorrection;
 				}
 			}

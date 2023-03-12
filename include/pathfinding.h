@@ -4,7 +4,7 @@
 #include <map.h>
 #include <Dense>
 
-bool FreePath(MapWaypoint* w1, MapWaypoint* w2, Map* map) {
+bool FreePath(Circle* w1, Circle* w2, Map* map) {
 	Eigen::Vector2d p1 = w1->pos;
 	Eigen::Vector2d p2 = w2->pos;
 	Point u(p1);
