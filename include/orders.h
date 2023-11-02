@@ -2,6 +2,7 @@
 #define ORDERS
 
 #include <base.h>
+#include <extra_math.h>
 
 #include <Dense>
 

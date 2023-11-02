@@ -16,6 +16,10 @@ double Angle(double sin, double cos) {
 	}
 }
 
+double Tans(double sin, double cos) {
+	return sin / cos;
+}
+
 class Point {
 public:
 	Eigen::Vector2d pos;

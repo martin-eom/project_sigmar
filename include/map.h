@@ -6,6 +6,7 @@
 #include <units.h>
 #include <extra_math.h>
 #include <debug.h>
+#include <projectiles.h>
 
 #include <iostream>
 #include <vector>
@@ -62,6 +63,7 @@ class gridpiece{
 		std::vector<Soldier*> p1Soldiers;
 		std::vector<Soldier*> p2Soldiers;
 		std::vector<MapObject*> mapObjects;
+		std::vector<Projectile*> projectiles;
 		std::vector<gridpiece*> neighbours;
 		Rrectangle* rec;
 };
@@ -141,6 +143,7 @@ class Map {
 					tiles.at(i).at(j)->soldiers.clear();
 					tiles.at(i).at(j)->p1Soldiers.clear();
 					tiles.at(i).at(j)->p2Soldiers.clear();
+					tiles.at(i).at(j)->projectiles.clear();
 				}
 			}
 		}
@@ -151,6 +154,10 @@ class Map {
 				tiles.at(i).at(j)->p1Soldiers.push_back(soldier);
 			else
 				tiles.at(i).at(j)->p2Soldiers.push_back(soldier);
+		}
+
+		void ProjectileAssign(Projectile* projectile, int i, int j) {
+			tiles.at(i).at(j)->projectiles.push_back(projectile);		
 		}
 
 		void AddMapObject(MapObject* obj) {
