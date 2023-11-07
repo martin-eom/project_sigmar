@@ -22,7 +22,8 @@ enum SOLDIER_IDS {
 	SOLDIER_INFANTRYMAN,
 	SOLDIER_RIDER,
 	SOLDIER_MONSTER,
-	SOLDIER_SHOOTA
+	SOLDIER_SHOOTA,
+	SOLDIER_SLOW_SHOOTA
 };
 
 
@@ -86,11 +87,13 @@ class Soldier {
 		bool antiLarge = false;
 		bool meleeAOE = false;
 		int rangedDefense = 0;
+		double rangedAOE = 0.;
 
 		bool ranged = false;
 		double rangedRange = 0.;
 		double rangedMinRange = 0.;
 		double rangedRad = 0.;
+		bool rangedHeavy = false;
 		Timer DrawTimer = Timer(0);
 		Timer ReloadTimer = Timer(0);
 		Soldier* rangedTarget = NULL;
@@ -323,6 +326,7 @@ class Monster : public Soldier {
 
 			meleeAttack = 55;
 			meleeDefense = 40;
+			rangedDefense = 40;
 			large = true;
 			antiInfantry = true;
 			meleeAOE = true;
@@ -351,8 +355,8 @@ class Shoota : public Soldier {
 			MeleeTimer.set_max(70);
 			//meleeCooldownTicks = 61;
 
-			meleeAttack = 20;
-			meleeDefense = 15;
+			meleeAttack = 15;
+			meleeDefense = -10;
 			armor = 0;
 			armorPiercing = 0;
 			infantry = true;
@@ -373,6 +377,7 @@ class Shoota : public Soldier {
 			maxSpeedForFiring = 10.;
 			projectileType = PROJECTILE_ARROW;
 			rangedMinRange = 60;
+			rangedAOE = 10;
 
 			init(unit);
 		};
@@ -380,6 +385,57 @@ class Shoota : public Soldier {
 		int damage(Soldier* target) {return 1;}
 
 };
+
+class SlowShoota : public Soldier {
+	public:		
+		SlowShoota(Unit* unit) : Soldier() {
+			rad = 5.;
+			mass = 1.;
+			defaultMaxSpeed = 15.;
+			maxSpeed = defaultMaxSpeed;
+			accel = 3.;
+			turn = M_PI/60.;
+			onTargetDamp = 3.;	//dampening when close to posTarget
+			type = SOLDIER_SLOW_SHOOTA;
+
+			maxHP = 2;
+			meleeRange = 7.;
+			meleeAngle = 1./3.;
+			MeleeTimer.set_max(70);
+			//meleeCooldownTicks = 61;
+
+			meleeAttack = 15;
+			meleeDefense = -10;
+			armor = 0;
+			armorPiercing = 0;
+			infantry = true;
+			large = false;
+			antiInfantry = false;
+			antiLarge = false;
+
+			ranged = true;
+			rangedRange = 700.;
+			rangedMinRange = 7.;
+			rangedRad = 0.1;//M_PI / 6;
+			rangedHeavy = true;
+			DrawTimer = Timer(10);
+			ReloadTimer = Timer(600);
+			// drawCDTicks = 0;
+			//int reloadCDTicks = 0;
+			rangedDamage = 0;
+			rangedSpeed = 120.;
+			maxSpeedForFiring = 10.;
+			projectileType = PROJECTILE_GRENADE;
+			rangedMinRange = 60;
+			rangedAOE = 40.; // determines when not shooting close to allies
+
+			init(unit);
+		};
+		
+		int damage(Soldier* target) {return 1;}
+
+};
+
 
 
 #endif

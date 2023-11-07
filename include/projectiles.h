@@ -7,7 +7,9 @@
 
 enum PROJECTILE_TYPES {
 	PROJECTILE_GENERIC,
-	PROJECTILE_ARROW
+	PROJECTILE_DUMMY_ARROW,
+	PROJECTILE_ARROW,
+	PROJECTILE_GRENADE
 };
 
 class Soldier;
@@ -24,6 +26,7 @@ public:
 	bool dead;
 	std::vector<Soldier*> targets;
 	virtual int damage(Soldier* target) {return 100;}
+	double aoerad = 0.;
 
 	void advance() {
 		pos += vel*dt;
@@ -53,6 +56,25 @@ public:
 	}
 };
 
+class DummyArrow : public Projectile {
+public:
+	int damage(Soldier* soldier) {return 0;}
+
+	DummyArrow(Eigen::Vector2d start, Eigen::Vector2d vel, int lifetime, double dt) : Projectile(start, vel, lifetime, dt) {
+		type = PROJECTILE_DUMMY_ARROW;
+	}
+};
+
+class Grenade : public Projectile {
+public:
+	int damage(Soldier* soldier) {return 5;}
+
+	Grenade(Eigen::Vector2d start, Eigen::Vector2d vel, int lifetime, double dt) : Projectile(start, vel, lifetime, dt) {
+		type = PROJECTILE_GRENADE;
+		aoerad = 15.;
+	}
+};
+
 class Arrow : public Projectile {
 public:
 	int damage(Soldier* soldier) {return 2;}
@@ -68,6 +90,12 @@ ProjectileSpawnEvent SpawnProjectile(int type, Eigen::Vector2d pos, Eigen::Vecto
 	switch(type) {
 	case PROJECTILE_ARROW:
 		p = new Arrow(pos, vel, lifetime, dt);
+		break;
+	case PROJECTILE_DUMMY_ARROW:
+		p = new DummyArrow(pos, vel, lifetime, dt);
+		break;
+	case PROJECTILE_GRENADE:
+		p = new Grenade(pos, vel, lifetime, dt);
 		break;
 	default:
 		p = new Arrow(pos, vel, lifetime, dt);

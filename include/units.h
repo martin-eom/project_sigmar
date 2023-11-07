@@ -30,7 +30,8 @@ enum UNIT_TYPE {
 	UNIT_CAVALRY,
 	UNIT_MONSTER,
 	UNIT_LONE_RIDER,
-	UNIT_SHOOTAS
+	UNIT_SHOOTAS,
+	UNIT_SLOW_SHOOTA
 };
 
 
@@ -191,6 +192,25 @@ class Shootas : public Unit {
 		};
 };
 
+class SlowShootaUnit : public Unit {
+	public:
+		SlowShootaUnit(Player* player) : Unit(true, player) {
+			maxSoldiers = 1;
+			spacing = 0.;
+			width = 1;
+			nrows = 1;
+			soldierType = SOLDIER_SLOW_SHOOTA;
+			type = UNIT_SLOW_SHOOTA;
+
+			ranged = true;
+			range = 700;
+			rangedAngle = 1.;//1./3.;
+
+			init();
+		};
+};
+
+
 void Populate(Unit* unit) {
 	std::vector<std::vector<Soldier*>>* soldiers = &(unit->soldiers);
 	for(int i = 0; i < unit->nrows; i++) {
@@ -208,6 +228,8 @@ void Populate(Unit* unit) {
 					(*soldiers).at(i).at(j) = new Monster(unit); break;
 				case SOLDIER_SHOOTA:
 					(*soldiers).at(i).at(j) = new Shoota(unit); break;
+				case SOLDIER_SLOW_SHOOTA:
+					(*soldiers).at(i).at(j) = new SlowShoota(unit); break;
 				default:
 					std::cout << "[ERROR:] Population of Unit: Soldier type does not exist!\n";
 			}
@@ -340,6 +362,8 @@ bool CurrentOrderCompleted(Unit* unit) {
 		switch(currentOrder->type) {
 		case ORDER_ATTACK:
 			return (dynamic_cast<AttackOrder*>(currentOrder)->target->nLiveSoldiers) <= 0; break;
+		case ORDER_TARGET:
+			return (dynamic_cast<TargetOrder*>(currentOrder)->target->nLiveSoldiers) <= 0; break;
 		case ORDER_MOVE: {
 			debug("Checking order completion...");
 			MoveOrder* mo = dynamic_cast<MoveOrder*>(currentOrder);

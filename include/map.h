@@ -65,6 +65,7 @@ class gridpiece{
 		std::vector<MapObject*> mapObjects;
 		std::vector<Projectile*> projectiles;
 		std::vector<gridpiece*> neighbours;
+		std::vector<gridpiece*> redundantNeighbours;
 		Rrectangle* rec;
 };
 
@@ -108,6 +109,20 @@ class Map {
 					}
 				}
 				tiles.at(i).at(ncols-1)->neighbours.push_back(tiles.at(i+1).at(ncols-1));
+			}
+			for(int i = 1; i < nrows; i++) {
+				for(int j = 1; j < ncols; j++) {
+					if(i+1 < nrows && j-1 > 0)
+						tiles.at(i).at(j)->redundantNeighbours.push_back(tiles.at(i+1).at(j-1));
+					if(j-1 > 0)
+						tiles.at(i).at(j)->redundantNeighbours.push_back(tiles.at(i).at(j-1));
+					if(i-1 > 0 && j-1 > 0)
+						tiles.at(i).at(j)->redundantNeighbours.push_back(tiles.at(i-1).at(j-1));
+					if(i-1 > 0)
+						tiles.at(i).at(j)->redundantNeighbours.push_back(tiles.at(i-1).at(j));
+					if(i-1 > 0 && j+1 < ncols)
+						tiles.at(i).at(j)->redundantNeighbours.push_back(tiles.at(i-1).at(j+1));
+				}
 			}
 			//creating map borders, but not adding them to objects yet
 			double hw = 0.5*width;

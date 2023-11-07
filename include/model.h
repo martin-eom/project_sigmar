@@ -108,6 +108,9 @@ void OrderPathfinding(Unit* unit, Map* map) {
 		newOrders.push_back(mo);
 		if(mo->type == ORDER_ATTACK)
 			newOrders.push_back(new MoveOrder(mo->pos, mo->rot, MOVE_FORMUP, true, true));
+		else if(mo->type == ORDER_TARGET) {
+			newOrders.push_back(new MoveOrder(mo->pos, mo->rot, MOVE_FORMUP, true, true));
+		}
 	}
 	while(unit->orders.size() > unit->currentOrder + 1) unit->orders.pop_back();
 	unit->orders.insert(unit->orders.end(), newOrders.begin(), newOrders.end());
@@ -552,37 +555,43 @@ class Model : public Listener{
 						if(unit->placed && unit->ranged) {
 							if(unit->rangedTargetUpdateTimer.decrement()) {
 								unit->rangedTarget = NULL;	// may be bad flag
-								std::vector<UnitDistance> inRange;
-								Eigen::Matrix2d rangedCone;
-								rangedCone << std::cos(0.5*M_PI*unit->rangedAngle), -std::sin(0.5*M_PI*unit->rangedAngle), 
-									std::sin(0.5*M_PI*unit->rangedAngle), std::cos(0.5*M_PI*unit->rangedAngle);
-								//assign value to rangedCone
-								for(auto player2 : players) {
-									if(player2 != player) {
-										std::cout << "Selected a different player.\n";
-										// go through all units and list those that are in the cone
-										for(auto unit2 : player2->units) {
-											//if unit in cone: inRange.push_back(unit)
-											if(unit2->placed) {
-												Circle circ(unit2->pos, 0);
-												if(ConeCircleCollision(unit->pos, unit->rot, rangedCone, unit->range, &circ)
-													&& (unit->pos - unit2->pos).norm() < unit->range) {
-													inRange.push_back(UnitDistance(unit, unit2));
-													// currently ignores range stat
-												}
-											}
-											//make some kind of priority score
-										}
-									}
-								}
-								std::sort(inRange.begin(), inRange.end(), compareUnitDistance);
-								if(!inRange.empty()) {
-									unit->rangedTarget = inRange.at(0).unit;
-									std::cout << "Targets found, horray!\n";
+								Order* current = unit->orders.at(unit->currentOrder);
+								if(current->type == ORDER_TARGET && current->target->nLiveSoldiers > 0 && (current->target->pos - unit->pos).norm() < unit->range) {
+									unit->rangedTarget = current->target;
 								}
 								else {
-									unit->rangedTarget = NULL;
-									std::cout << "No ranged targets found.\n";
+									std::vector<UnitDistance> inRange;
+									Eigen::Matrix2d rangedCone;
+									rangedCone << std::cos(0.5*M_PI*unit->rangedAngle), -std::sin(0.5*M_PI*unit->rangedAngle), 
+										std::sin(0.5*M_PI*unit->rangedAngle), std::cos(0.5*M_PI*unit->rangedAngle);
+									//assign value to rangedCone
+									for(auto player2 : players) {
+										if(player2 != player) {
+											std::cout << "Selected a different player.\n";
+											// go through all units and list those that are in the cone
+											for(auto unit2 : player2->units) {
+												//if unit in cone: inRange.push_back(unit)
+												if(unit2->placed) {
+													Circle circ(unit2->pos, 0);
+													if(ConeCircleCollision(unit->pos, unit->rot, rangedCone, unit->range, &circ)
+														&& (unit->pos - unit2->pos).norm() < unit->range) {
+														inRange.push_back(UnitDistance(unit, unit2));
+														// currently ignores range stat
+													}
+												}
+												//make some kind of priority score
+											}
+										}
+									}
+									std::sort(inRange.begin(), inRange.end(), compareUnitDistance);
+									if(!inRange.empty()) {
+										unit->rangedTarget = inRange.at(0).unit;
+										std::cout << "Targets found, horray!\n";
+									}
+									else {
+										unit->rangedTarget = NULL;
+										std::cout << "No ranged targets found.\n";
+									}
 								}
 								unit->rangedTargetUpdateTimer.reset();
 							}
@@ -755,7 +764,12 @@ class Model : public Listener{
 											&& soldier->currentOrder == unit->currentOrder
 											&& soldier->vel.norm() < soldier->maxSpeedForFiring
 											&& (!soldier->meleeTarget || (soldier->rangedTarget->pos - soldier->pos).norm() > soldier->rangedMinRange)) {
-											if(soldier->ReloadTimer.done()) {
+											bool canFire = true;
+											if(soldier->rangedHeavy || true) {
+												Eigen::Vector2d dist = soldier->rangedTarget->pos - soldier->pos;
+												canFire = (soldier->rot.transpose() * dist).x() / dist.norm() > 0.7;
+											}
+											if(soldier->ReloadTimer.done() && canFire) {
 												double t = projectile_flight_time(soldier->rangedTarget->pos - soldier->pos,
 													soldier->rangedTarget->vel, soldier->rangedSpeed);
 												//std::cout << t << "\n";
@@ -765,10 +779,20 @@ class Model : public Listener{
 													Eigen::Vector2d vel;
 													vel << 1., 0.;
 													vel = dis.rot * vel * soldier->rangedSpeed;
+													if(soldier->rangedTarget->meleeTarget) {
+														Soldier* mtarget = soldier->rangedTarget->meleeTarget;
+														Eigen::Vector2d targetPos = soldier->pos + vel * t;
+														Eigen::Vector2d allyPos = mtarget->pos + mtarget->vel * t;
+														double rmin = soldier->tans * (soldier->pos - targetPos).norm() + soldier->rangedAOE;
+														if((targetPos - allyPos).norm() - mtarget->rad < rmin)
+															canFire = false;
+													}
 													// create projectile spawn event
-													ProjectileSpawnEvent pev = SpawnProjectile(soldier->projectileType, soldier->pos, vel, static_cast<int>(t/em->dt), em->dt);
-													em->Post(&pev);
-													soldier->ReloadTimer.reset();
+													if(canFire) {
+														ProjectileSpawnEvent pev = SpawnProjectile(soldier->projectileType, soldier->pos, vel, static_cast<int>(t/em->dt), em->dt);
+														em->Post(&pev);
+														soldier->ReloadTimer.reset();
+													}
 												}
 												else
 													soldier->rangedTarget = NULL;

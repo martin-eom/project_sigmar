@@ -227,6 +227,11 @@ private:
 										Rrectangle rec = UnitRectangle(ao->target, ao->target->currentOrder);
 										DrawRectangle(&rec, renderer, colorOrange, SCREEN_WIDTH, SCREEN_HEIGHT, ctrl->zoom, ctrl->center);
 									}
+									else if(o->type == ORDER_TARGET) {
+										TargetOrder* to = dynamic_cast<TargetOrder*>(o);
+										Rrectangle rec = UnitRectangle(to->target, to->target->currentOrder);
+										DrawRectangle(&rec, renderer, colorOrange, SCREEN_WIDTH, SCREEN_HEIGHT, ctrl->zoom, ctrl->center);
+									}
 									if(i > 0) {
 										Order* prevo = unit->orders.at(i-1);
 										Point p1(o->pos); Point p2(prevo->pos);

@@ -138,7 +138,22 @@ class KeyboardAndMouseController : public ZoomableGUIController {
 								}
 							}
 							if(target) {
-								o = new AttackOrder(target);
+								if(_shift) {
+									Eigen::Vector2d pos;
+									Eigen::Matrix2d rot;
+									if(orders.size() > 0) {
+										pos = orders.at(orders.size()-1)->pos;
+										rot = orders.at(orders.size()-1)->rot;
+									}
+									else {
+										pos = model->selectedUnit->pos;
+										rot = model->selectedUnit->rot;
+									}
+									o = new TargetOrder(pos, rot, target);
+								}
+								else {
+									o = new AttackOrder(target);
+								}
 							}
 						}
 						if(!queueingOrders) {orders.clear();}

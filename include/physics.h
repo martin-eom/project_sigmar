@@ -291,6 +291,24 @@ void TimeStep(Soldier* soldier, double dt) {
 			}
 		}
 	}
+	if(o->type == ORDER_TARGET) {
+		TargetOrder* mo = dynamic_cast<TargetOrder*>(o);
+		if(!soldier->arrived && soldier->indivPath.empty()) {
+			if(newestOrder) {// && (mo->moveType != MOVE_PASSINGTHROUGH)) {
+				if(closeToTarget) {
+					soldier->arrived = true;
+					soldier->unit->nSoldiersArrived++;
+				}
+			}
+			else {
+				Rrectangle rec = SoldierRectangle(soldier);
+				Point p(soldier->pos);
+				if(PointRectangleCollision(&p, &rec)) {
+					soldier->arrived = true;
+				}
+			}
+		}
+	}
 	else if(o->type == ORDER_ATTACK && !soldier->arrived && soldier->indivPath.empty()) {
 		if(dynamic_cast<AttackOrder*>(o)->target->nLiveSoldiers <= 0) {
 			soldier->arrived = true;
@@ -390,8 +408,25 @@ void ProjectileCollisionHandling(Map* map) {
 				//soldiers
 				if(!projectile->dead && projectile->get_progress() > 0.99) {
 					for(auto soldier : tile->soldiers) {
-						if((projectile->get_pos() - soldier->pos).norm() < soldier->rad) {
+						if((projectile->get_pos() - soldier->pos).norm() < (soldier->rad + projectile->aoerad)) {
 							projectile->targets.push_back(soldier);
+						}
+					}
+					if(projectile->aoerad > 0.) {
+						std::cout << "-----looking at neighbours " << tile->neighbours.size() << "-----\n";
+						for(auto ntile : tile->neighbours) {
+							for(auto soldier : ntile->soldiers) {
+								if((projectile->get_pos() - soldier->pos).norm() < soldier->rad + projectile->aoerad) {
+									projectile->targets.push_back(soldier);
+								}
+							}						
+						}
+						for(auto ntile : tile->redundantNeighbours) {
+							for(auto soldier : ntile->soldiers) {
+								if((projectile->get_pos() - soldier->pos).norm() < soldier->rad + projectile->aoerad) {
+									projectile->targets.push_back(soldier);
+								}
+							}						
 						}
 					}
 					projectile->dead = true;
