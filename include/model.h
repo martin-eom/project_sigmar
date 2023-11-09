@@ -9,6 +9,7 @@
 #include <player.h>
 #include <vector>
 #include <pathfinding.h>
+#include <projectiles.h>
 
 #include <cstdlib>
 
@@ -26,7 +27,9 @@ void OrderPathfinding(Unit* unit, Map* map) {
 			MapWaypoint w2 = MapWaypoint(pmo->pos, rad);
 			Eigen::Matrix2d Rot;
 			if(!FreePath(&w1, &w2, map)) {
+				std::vector<Eigen::Vector2d> positions = findPath(&w1, &w2, map);
 				// finding waypoints with line of sight to start and goal
+				/*
 				std::vector<int> visibleStart = std::vector<int>();
 				std::vector<int> visibleEnd = std::vector<int>();
 				for(int j = 0; j < map->waypoints.size(); j++) {
@@ -47,10 +50,10 @@ void OrderPathfinding(Unit* unit, Map* map) {
 							end = i2;
 						}
 					}
-				}
-				if(mindist != std::numeric_limits<float>::infinity()) {
-					// translating waypoints to orders
-					std::vector<Eigen::Vector2d> positions = std::vector<Eigen::Vector2d>();
+				}*/
+				//if(mindist != std::numeric_limits<float>::infinity()) {
+					// determining waypoint positions
+					/*std::vector<Eigen::Vector2d> positions = std::vector<Eigen::Vector2d>();
 					positions.push_back(map->waypoints.at(start)->pos);
 					int next = map->wp_path_next.at(start).at(end);
 					while(next != end) {
@@ -59,33 +62,35 @@ void OrderPathfinding(Unit* unit, Map* map) {
 					}
 					positions.push_back(map->waypoints.at(end)->pos);
 					positions.push_back(mo->pos);
-					for(int k = 1; k < positions.size(); k++) {
-						//Eigen::Matrix2d Rot;
-						Eigen::Vector2d diff = positions.at(k) - positions.at(k-1);
-						double d = diff.norm();
-						double cos = diff.coeff(0)/d;
-						double sin = diff.coeff(1)/d;
-						if(d > 0) {
-							Rot << cos, -sin, sin, cos;
-						}
-						else {
-							Rot << 1, 0, 0, 1;
-						}
-						if(mo->type == ORDER_ATTACK && k == positions.size() - 1) {
-							int movetype = MOVE_FORMUP;
-							if(unit->enemyContact)
-								movetype = MOVE_PASSINGTHROUGH;
-							newOrders.push_back(new MoveOrder(positions.at(k-1), Rot, movetype, true, true, mo->target));
-							//newOrders.push_back(new MoveOrder(positions.at(k-1), Rot, MOVE_PASSINGTHROUGH, true, true));
-							mo->rot = Rot;
-						}
-						else if(mo->type == ORDER_ATTACK)
-							newOrders.push_back(new MoveOrder(positions.at(k-1), Rot, MOVE_PASSINGTHROUGH, true, false, mo->target));
-						else
-							newOrders.push_back(new MoveOrder(positions.at(k-1), Rot, MOVE_PASSINGTHROUGH, true, false));
+					*/
+					// translating waypoints to orders
+				for(int k = 1; k < positions.size(); k++) {
+					//Eigen::Matrix2d Rot;
+					Eigen::Vector2d diff = positions.at(k) - positions.at(k-1);
+					double d = diff.norm();
+					double cos = diff.coeff(0)/d;
+					double sin = diff.coeff(1)/d;
+					if(d > 0) {
+						Rot << cos, -sin, sin, cos;
 					}
-
+					else {
+						Rot << 1, 0, 0, 1;
+					}
+					if(mo->type == ORDER_ATTACK && k == positions.size() - 1) {
+						int movetype = MOVE_FORMUP;
+						if(unit->enemyContact)
+							movetype = MOVE_PASSINGTHROUGH;
+						newOrders.push_back(new MoveOrder(positions.at(k-1), Rot, movetype, true, true, mo->target));
+						//newOrders.push_back(new MoveOrder(positions.at(k-1), Rot, MOVE_PASSINGTHROUGH, true, true));
+						mo->rot = Rot;
+					}
+					else if(mo->type == ORDER_ATTACK)
+						newOrders.push_back(new MoveOrder(positions.at(k-1), Rot, MOVE_PASSINGTHROUGH, true, false, mo->target));
+					else
+						newOrders.push_back(new MoveOrder(positions.at(k-1), Rot, MOVE_PASSINGTHROUGH, true, false));
 				}
+
+				//}
 			}
 			else if(mo->type == ORDER_ATTACK) {
 				Eigen::Vector2d diff = w1.pos - w2.pos;
@@ -103,6 +108,9 @@ void OrderPathfinding(Unit* unit, Map* map) {
 		newOrders.push_back(mo);
 		if(mo->type == ORDER_ATTACK)
 			newOrders.push_back(new MoveOrder(mo->pos, mo->rot, MOVE_FORMUP, true, true));
+		else if(mo->type == ORDER_TARGET) {
+			newOrders.push_back(new MoveOrder(mo->pos, mo->rot, MOVE_FORMUP, true, true));
+		}
 	}
 	while(unit->orders.size() > unit->currentOrder + 1) unit->orders.pop_back();
 	unit->orders.insert(unit->orders.end(), newOrders.begin(), newOrders.end());
@@ -129,6 +137,7 @@ class Model : public Listener{
 		Player* selectedPlayer;
 		Unit* selectedUnit;
 		std::queue<DamageTick> damages;
+		std::vector<Projectile*> projectiles;
 	
 		Model(EventManager* em, Map* map) : Listener(em) {
 			this->map = map;
@@ -369,6 +378,10 @@ class Model : public Listener{
 					std::erase(soldier->unit->liveSoldiers, soldier);
 				}
 			}
+			else if (ev->type == PROJECTILE_SPAWN_EVENT) {
+				//std::cout << "dakka!\n";
+				projectiles.push_back(dynamic_cast<ProjectileSpawnEvent*>(ev)->p);
+			}
 			else if (ev->type == TICK_EVENT) {
 				debug("TickEvent: map - begin");
 				//mapping soldiers to grid
@@ -384,6 +397,8 @@ class Model : public Listener{
 				CollisionResolution(map);
 				//resolving collisions with map objects
 				MapObjectCollisionHandling(map);
+				ProjectileCollisionScrying(map, projectiles);
+				ProjectileCollisionHandling(map);
 
 				for(auto player : players) {
 					for(auto unit : player->units) {
@@ -398,16 +413,24 @@ class Model : public Listener{
 								}
 							}
 						}
-						//advancing order
+					}
+				}// new loop required for consistency
+				for(auto player : players) {
+					for(auto unit : player->units) {
 						if(unit->placed) {
+							//moving unit target if combat has already started every so often to keep up with moving units
 							if(unit->enemyContact && unit->orders.at(unit->currentOrder)->type == ORDER_ATTACK) {
-								unit->targetUpdateCounter--;
-								if(!unit->targetUpdateCounter) {
+								unit->targetUpdateTimer.decrement();
+								//unit->targetUpdateCounter--;
+								if(unit->targetUpdateTimer.done()) {
+								//if(!unit->targetUpdateCounter) {
 									unit->posTarget = unit->orders.at(unit->currentOrder)->target->pos;
 									MoveTarget(unit);
-									unit->targetUpdateCounter = 60;
+									unit->targetUpdateTimer.reset();
+									//unit->targetUpdateCounter = 60;
 								}
 							}
+							//advancing order
 							if(unit->orders.size() > (unit->currentOrder +1) && CurrentOrderCompleted(unit)) {
 								bool transitionOrder = unit->orders.at(unit->currentOrder)->_transition;
 								UnitNextOrder(unit);
@@ -416,6 +439,7 @@ class Model : public Listener{
 									ReformUnit(unit);
 									MoveTarget(unit);
 								}
+								//telling other units that this one is moving on if they are targeting it
 								if(!unit->enemyContact && !transitionOrder) {
 									debug(std::to_string(unit->targetedBy.size()));
 									std::vector<std::vector<Order*>> newOrders;
@@ -449,6 +473,9 @@ class Model : public Listener{
 								for(int j = 0; j < unit->width; j++) {
 									Soldier* soldier = soldiers->at(i).at(j);
 									if(soldier && soldier->alive) {
+										soldier->debugFlag1 = false;
+										soldier->debugFlag2 = false;
+										soldier->debugFlag3 = false;
 										//possibly advancing soldier order during combat
 										int co = soldier->currentOrder;
 										if(!soldier->charging && unit->orders.at(co)->type != ORDER_ATTACK && unit->orders.size() > co + 1 && unit->enemyContact) {
@@ -465,17 +492,109 @@ class Model : public Listener{
 												}
 											}
 										}
+										//check if need to do indiv pathfinding, but only do this every second or so!
+										soldier->indivPathTimer.decrement();
+										//soldier->indivPathCooldown--;
+										if(soldier->indivPathTimer.done()) {
+										//if(soldier->indivPathCooldown < 1) {
+											Circle c1(soldier->pos, soldier->rad);
+											Circle c2(NoIPFPosTarget(soldier), soldier->rad);
+											if(soldier->indivPath.empty()) {
+												if(!FreePath(&c1, &c2, map)) {
+													//do indiv pathfinding
+													soldier->indivPath = findPath(&c2, &c1, map);
+												}
+											}
+											else {
+												if(FreePath(&c1, &c2, map)) {
+													soldier->indivPath.clear();
+												}
+												else {
+													Circle c3(soldier->indivPath.at(0), soldier->rad);
+													if(FreePath(&c1, &c3, map)) {
+														if(soldier->indivPath.size() > 1) {
+															Circle c4(soldier->indivPath.at(1), soldier->rad);
+															if(FreePath(&c1, &c4, map))
+																std::erase(soldier->indivPath, soldier->indivPath.at(0));
+														}
+														else {
+															if((c3.pos - c1.pos).norm() < soldier->rad)
+																std::erase(soldier->indivPath, soldier->indivPath.at(0));
+														}
+													}
+													else {
+														//redo indiv pathfinding
+														soldier->indivPath = findPath(&c2, &c1, map);
+													}
+												}
+											}
+											soldier->indivPathTimer.reset();
+											//soldier->indivPathCooldown = soldier->indivPathCDMax;
+										}
+										//physics step
 										if(soldier->placed && soldier->alive) {
 											TimeStep(soldier, *dt);
 										}
-										if(soldier->alive && soldier->arrived && soldier->currentOrder < unit->currentOrder) {
-											SoldierNextOrder(soldier, posInUnit->at(i).at(j));
+										//advancing soldier order
+										if(soldier->alive && soldier->arrived) {
+											if(soldier->currentOrder < unit->currentOrder) {
+												SoldierNextOrder(soldier, posInUnit->at(i).at(j));
+											}
 										}
 									}
 								}
 							}
 							UpdatePos(unit);
 							UpdateVel(unit);
+						}
+					}
+				}
+				//ranged target finding
+				for(auto player : players) {
+					for(auto unit : player->units) {
+						if(unit->placed && unit->ranged) {
+							if(unit->rangedTargetUpdateTimer.decrement()) {
+								unit->rangedTarget = NULL;	// may be bad flag
+								Order* current = unit->orders.at(unit->currentOrder);
+								if(current->type == ORDER_TARGET && current->target->nLiveSoldiers > 0 && (current->target->pos - unit->pos).norm() < unit->range) {
+									unit->rangedTarget = current->target;
+								}
+								else {
+									std::vector<UnitDistance> inRange;
+									Eigen::Matrix2d rangedCone;
+									rangedCone << std::cos(0.5*M_PI*unit->rangedAngle), -std::sin(0.5*M_PI*unit->rangedAngle), 
+										std::sin(0.5*M_PI*unit->rangedAngle), std::cos(0.5*M_PI*unit->rangedAngle);
+									//assign value to rangedCone
+									for(auto player2 : players) {
+										if(player2 != player) {
+											std::cout << "Selected a different player.\n";
+											// go through all units and list those that are in the cone
+											for(auto unit2 : player2->units) {
+												//if unit in cone: inRange.push_back(unit)
+												if(unit2->placed) {
+													Circle circ(unit2->pos, 0);
+													if(ConeCircleCollision(unit->pos, unit->rot, rangedCone, unit->range, &circ)
+														&& (unit->pos - unit2->pos).norm() < unit->range) {
+														inRange.push_back(UnitDistance(unit, unit2));
+														// currently ignores range stat
+													}
+												}
+												//make some kind of priority score
+											}
+										}
+									}
+									std::sort(inRange.begin(), inRange.end(), compareUnitDistance);
+									if(!inRange.empty()) {
+										unit->rangedTarget = inRange.at(0).unit;
+										std::cout << "Targets found, horray!\n";
+									}
+									else {
+										unit->rangedTarget = NULL;
+										std::cout << "No ranged targets found.\n";
+									}
+								}
+								unit->rangedTargetUpdateTimer.reset();
+							}
 						}
 					}
 				}
@@ -524,11 +643,15 @@ class Model : public Listener{
 										if(o->target) {
 											if(soldier->charging) {
 												if(unit->enemyContact) {
-													if(!targets.empty() && (!soldier->meleeAOE && soldier->unit->maxSoldiers == 1) && o->type == ORDER_ATTACK)	//lone monsters stop charging after impact
-														soldier->chargeGapTicks = 30;
+													if(!targets.empty() && (!soldier->meleeAOE && soldier->unit->maxSoldiers == 1) && o->type == ORDER_ATTACK)	{//lone monsters stop charging after impact
+														soldier->chargeTimer.reset();
+														//soldier->chargeGapTicks = 30;
+													}
 													else {
-														if(soldier->chargeGapTicks > 0)
-															soldier->chargeGapTicks--;
+														if(!soldier->chargeTimer.done())
+														//if(soldier->chargeGapTicks > 0)
+															soldier->chargeTimer.decrement();
+															//soldier->chargeGapTicks--;
 														else
 															soldier->charging = false;
 													}
@@ -573,8 +696,10 @@ class Model : public Listener{
 										}
 										if(soldier->unit->orders.at(soldier->currentOrder)->target
 										&& soldier->meleeTarget && !soldier->charging) {//soldier->unit->enemyContact) {
-											if(soldier->cantSeeTargetTimer > 0) {
-												soldier->cantSeeTargetTimer--;
+											if(!soldier->noTargetTimer.done()) {
+											//if(soldier->cantSeeTargetTimer > 0) {
+												soldier->noTargetTimer.decrement();
+												//soldier->cantSeeTargetTimer--;
 											}
 											else {
 												Circle c1(soldier->pos, soldier->rad);
@@ -582,13 +707,16 @@ class Model : public Listener{
 												if(!FreePath(&c1, &c2, map)) {
 													soldier->meleeTarget = NULL;
 												}
-												soldier->cantSeeTargetTimer = 60;
+												soldier->noTargetTimer.reset();
+												//soldier->cantSeeTargetTimer = 60;
 
 											}
 										}
 										// resolving attacks
-										if(!targets.empty() && soldier->meleeCooldownTicks == 0) {
-											soldier->meleeCooldownTicks = 31;
+										if(!targets.empty() && soldier->MeleeTimer.done()) {
+										//if(!targets.empty() && soldier->meleeCooldownTicks == 0) {
+											soldier->MeleeTimer.reset();
+											//soldier->meleeCooldownTicks = 31;
 											for(auto targetContainer : targets) {
 												Soldier* target = targetContainer.soldier;
 												double hitChance = 0.35 + 0.01*(soldier->meleeAttack - target->meleeDefense) + 0.15*(soldier->antiInfantry && target->infantry) + 0.15*(soldier->antiLarge && target->large);
@@ -600,12 +728,105 @@ class Model : public Listener{
 												}
 											}
 										}
-										if(soldier->meleeCooldownTicks > 0)
-											soldier->meleeCooldownTicks--;
+										soldier->MeleeTimer.decrement();
+										//if(soldier->meleeCooldownTicks > 0)
+										//	soldier->meleeCooldownTicks--;
 									}
 								}
 							}
 						}
+					}
+				}
+				// do shooting after melee so that people with melee target cant shoot
+				// reset ranged target after every shot (so they dont have to find new target multiple times before shooting)
+				for(auto player : players) {
+					for(auto unit : player->units) {
+						if(unit->ranged) { //&& unit->rangedTarget) {
+							for(auto row : unit->soldiers) {
+								for(auto soldier : row) {
+									if(unit->rangedTarget && soldier->alive) {
+										bool swinging = !soldier->MeleeTimer.done();
+										if(soldier->currentOrder < unit->currentOrder) {
+											soldier->rangedTarget = NULL;
+											//soldier->debugFlag3 = true;
+										}
+										else if(!soldier->rangedTarget) {
+											if(unit->rangedTarget->nLiveSoldiers > 0) {
+												Soldier* target = unit->rangedTarget->liveSoldiers.at(rand()%unit->rangedTarget->liveSoldiers.size());
+												if(target->currentOrder == unit->rangedTarget->currentOrder) {
+													soldier->rangedTarget = target;
+												}
+											}
+										}
+										if(soldier->rangedTarget && !soldier->rangedTarget->alive) {
+											soldier->rangedTarget = NULL;
+										}
+										if(soldier->rangedTarget
+											&& soldier->currentOrder == unit->currentOrder
+											&& soldier->vel.norm() < soldier->maxSpeedForFiring
+											&& (!soldier->meleeTarget || (soldier->rangedTarget->pos - soldier->pos).norm() > soldier->rangedMinRange)) {
+											bool canFire = true;
+											if(soldier->rangedHeavy || true) {
+												Eigen::Vector2d dist = soldier->rangedTarget->pos - soldier->pos;
+												canFire = (soldier->rot.transpose() * dist).x() / dist.norm() > 0.7;
+											}
+											if(soldier->ReloadTimer.done() && canFire) {
+												double t = projectile_flight_time(soldier->rangedTarget->pos - soldier->pos,
+													soldier->rangedTarget->vel, soldier->rangedSpeed);
+												//std::cout << t << "\n";
+												if(t > 0) {
+													Displacement dis = ShotAngle(soldier->rangedTarget->pos - soldier->pos,
+														soldier->rangedTarget->vel, soldier->rangedSpeed, t, soldier->tans);
+													Eigen::Vector2d vel;
+													vel << 1., 0.;
+													vel = dis.rot * vel * soldier->rangedSpeed;
+													if(soldier->rangedTarget->meleeTarget) {
+														Soldier* mtarget = soldier->rangedTarget->meleeTarget;
+														Eigen::Vector2d targetPos = soldier->pos + vel * t;
+														Eigen::Vector2d allyPos = mtarget->pos + mtarget->vel * t;
+														double rmin = soldier->tans * (soldier->pos - targetPos).norm() + soldier->rangedAOE;
+														if((targetPos - allyPos).norm() - mtarget->rad < rmin)
+															canFire = false;
+													}
+													if(swinging) {
+														canFire = false;
+													}
+													// create projectile spawn event
+													if(canFire) {
+														ProjectileSpawnEvent pev = SpawnProjectile(soldier->projectileType, soldier->pos, vel, static_cast<int>(t/em->dt), em->dt);
+														em->Post(&pev);
+														soldier->ReloadTimer.reset();
+													}
+												}
+												else
+													soldier->rangedTarget = NULL;
+											}
+											else if(!swinging){
+												soldier->ReloadTimer.decrement();
+											}
+										}
+										else {
+											if(soldier->vel.norm() < soldier->maxSpeedForFiring && !swinging) {
+											//&& (!soldier->meleeTarget || (soldier->rangedTarget->pos - soldier->pos).norm() > soldier->rangedMinRange)) {
+												soldier->ReloadTimer.decrement();
+											}
+										}
+									}
+									else
+										soldier->rangedTarget = NULL;
+								}
+							}
+						}
+					}
+				}
+				//Projectile hit scanning
+				for(auto projectile : projectiles) {
+					if(projectile->dead) {
+						for(auto soldier : projectile->targets) {
+							if(soldier->rangedDefense + 20 < rand()%100)
+								damages.push(DamageTick(soldier, projectile->damage(soldier)));
+						}
+						projectile->targets.clear();
 					}
 				}
 				//resolving damage
@@ -619,6 +840,18 @@ class Model : public Listener{
 					damages.pop();
 				}
 				//damages = std::queue<DamageTick>();
+				// projectile movement and obsolescence
+				for(auto projectile : projectiles) {
+					if(projectile->dead) {
+						Projectile* tempProj = projectile;
+						std::erase(projectiles, projectile);
+						//delete tempProj;	///////// VERY IMPORTANT
+						std::cout << "POW!\n";
+					}
+					else {
+						projectile->advance();
+					}
+				}
 				//cleanup
 				map->Cleangrid();	// do it later and use it for target detection? yes
 				debug("TickEvent: map - end");

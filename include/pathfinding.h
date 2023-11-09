@@ -80,4 +80,61 @@ void FloydWarshallWithPathReconstruction(Map* map) {
 	debug("Finished the Floyd Warshall algorithm!");
 }
 
+std::vector<Eigen::Vector2d> findExplicitPath(int start, int end, Map* map) {
+	std::vector<Eigen::Vector2d> positions;
+	positions.push_back(map->waypoints.at(start)->pos);
+	int next = map->wp_path_next.at(start).at(end);
+	while(next != end) {
+		positions.push_back(map->waypoints.at(next)->pos);
+		next = map->wp_path_next.at(next).at(end);
+	}
+	positions.push_back(map->waypoints.at(end)->pos);
+	return positions;
+}
+
+std::vector<Eigen::Vector2d> findPath(Circle* w1, Circle* w2, Map* map) {
+	// finding waypoints with line of sight to start and goal
+	std::vector<int> visibleStart = std::vector<int>();
+	std::vector<int> visibleEnd = std::vector<int>();
+	for(int j = 0; j < map->waypoints.size(); j++) {
+		if(FreePath(w2, map->waypoints.at(j), map)) {visibleStart.push_back(j);}
+		if(FreePath(w1, map->waypoints.at(j), map)) {visibleEnd.push_back(j);}
+	}
+	// finding shortest-total-path combination
+	int start, end;
+	bool foundPath = false;
+	float mindist = std::numeric_limits<float>::infinity();
+	for(auto i1 : visibleStart) {
+		for(auto i2 : visibleEnd) {
+			float dist = (w2->pos - map->waypoints.at(i1)->pos).norm()
+						+ (w1->pos - map->waypoints.at(i2)->pos).norm()
+						+ map->wp_path_dist.at(i1).at(i2);
+			if(dist < mindist) {
+				mindist = dist;
+				start = i1;
+				end = i2;
+				foundPath = true;
+			}
+		}
+	}
+	//determining positions
+	/*std::vector<Eigen::Vector2d> positions;
+	if(mindist != std::numeric_limits<float>::infinity()) {
+		positions.push_back(map->waypoints.at(start)->pos);
+		int next = map->wp_path_next.at(start).at(end);
+		while(next != end) {
+			positions.push_back(map->waypoints.at(next)->pos);
+			next = map->wp_path_next.at(next).at(end);
+		}
+		positions.push_back(map->waypoints.at(end)->pos);
+		positions.push_back(w1->pos);	
+	}*/
+	std::vector<Eigen::Vector2d> positions;
+	if(foundPath) {
+		positions = findExplicitPath(start, end, map);
+		positions.push_back(w1->pos);
+	}
+	return positions;
+}
+
 #endif

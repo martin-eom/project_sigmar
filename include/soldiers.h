@@ -2,7 +2,9 @@
 #define SOLDIERS
 
 #include <extra_math.h>
+#include <timer.h>
 #include <debug.h>
+#include <projectiles.h>
 
 #ifndef _USE_MATH_DEFINES
 #define _USE_MATH_DEFINES
@@ -12,13 +14,16 @@
 #include <Dense>
 #include <ostream>
 #include <queue>
+#include <cstdlib>
 
 enum SOLDIER_IDS {
 	SOLDIER_SOLDIER,
 	SOLDIER_SUBCLASSTEMPLATE,
 	SOLDIER_INFANTRYMAN,
 	SOLDIER_RIDER,
-	SOLDIER_MONSTER
+	SOLDIER_MONSTER,
+	SOLDIER_SHOOTA,
+	SOLDIER_SLOW_SHOOTA
 };
 
 
@@ -70,7 +75,8 @@ class Soldier {
 		double meleeRange = 0.;
 		double meleeAngle = 1./3.;
 		virtual int damage(Soldier* target) {return 1;}
-		int meleeCooldownTicks = 61;
+		Timer MeleeTimer = Timer(60);
+		//int meleeCooldownTicks = 61;
 		int meleeAttack = 0;
 		int meleeDefense = 0;
 		int armor = 0;
@@ -80,6 +86,23 @@ class Soldier {
 		bool antiInfantry = false;
 		bool antiLarge = false;
 		bool meleeAOE = false;
+		int rangedDefense = 0;
+		double rangedAOE = 0.;
+
+		bool ranged = false;
+		double rangedRange = 0.;
+		double rangedMinRange = 0.;
+		double rangedRad = 0.;
+		bool rangedHeavy = false;
+		Timer DrawTimer = Timer(0);
+		Timer ReloadTimer = Timer(0);
+		Soldier* rangedTarget = NULL;
+		// drawCDTicks = 0;
+		//int reloadCDTicks = 0;
+		int rangedDamage = 0;
+		double rangedSpeed = 0.;
+		double maxSpeedForFiring = 0.;
+		int projectileType = 0;
 		
 		//general members
 		double Force, damp, defaultDamp;
@@ -105,9 +128,22 @@ class Soldier {
 		Soldier* meleeTarget;	// target they will turn to eventually
 		Soldier* meleeSwingTarget;	// target they are striking at the moment
 		bool charging;
-		int chargeGapTicks;
-		int cantSeeTargetTimer = 0;
+		Timer chargeTimer = Timer(30);
+		//int chargeGapTicks;
+		Timer noTargetTimer = Timer(60);
+		//int cantSeeTargetTimer = 0;
 		Eigen::Matrix2d meleeCone;
+		std::vector<Eigen::Vector2d> indivPath;	// individual pathfinding when los to original next target is lost
+		Timer indivPathTimer = Timer(60);
+		//int indivPathCooldown = 60;
+		//int indivPathCDMax = 60;
+		//int drawTimer;
+		//int reloadTimer;
+		double tans;
+
+		bool debugFlag1;
+		bool debugFlag2;
+		bool debugFlag3;
 
 		void init(Unit* unit) {
 			Force = mass*accel;
@@ -122,7 +158,20 @@ class Soldier {
 			meleeTarget = NULL;
 			meleeSwingTarget = NULL;
 			charging = true;
-			chargeGapTicks = 30;
+			chargeTimer.reset();
+			//chargeGapTicks = 30;
+			noTargetTimer.unset();
+			indivPathTimer.set_max(int((2 + rand()/RAND_MAX)*30));
+			//indivPathCDMax = int((2 + rand()/RAND_MAX)*30);
+			//drawTimer = 0;
+			//reloadTimer = 0;
+			int reloadShift = rand()%30 - 15;
+			ReloadTimer.set_max(std::max(ReloadTimer.get_max() + reloadShift, 1));
+			tans = sin(rangedRad) / cos(rangedRad);
+
+			debugFlag1 = false;
+			debugFlag2 = false;
+			debugFlag3 = false;
 
 			this->unit = unit;		
 		}
@@ -172,7 +221,8 @@ class SoldierSubClassTemplate : public Soldier {
 			maxHP = 2;
 			meleeRange = 0.;
 			meleeAngle = 1./3.;
-			meleeCooldownTicks = 61;
+			MeleeTimer.set_max(60);
+			//meleeCooldownTicks = 61;
 
 			meleeAttack = 0;
 			meleeDefense = 0;
@@ -205,11 +255,13 @@ class InfantryMan : public Soldier {
 			maxHP = 2;
 			meleeRange = 7.;
 			meleeAngle = 1./3.;
-			meleeCooldownTicks = 71;
+			MeleeTimer.set_max(70);
+			//meleeCooldownTicks = 71;
 
 			meleeAttack = 25;
 			meleeDefense = 20;
 			infantry = true;
+			rangedDefense = 0;
 
 			init(unit);
 		};
@@ -232,11 +284,13 @@ class Rider : public Soldier {
 			maxHP = 5;
 			meleeRange = 7.;
 			meleeAngle = 1.;
-			meleeCooldownTicks = 31;
+			MeleeTimer.set_max(30);
+			//meleeCooldownTicks = 31;
 
 			meleeAttack = 35;
 			meleeDefense = 25;
 			large = true;
+			rangedDefense = 40;
 
 			init(unit);
 		};
@@ -267,10 +321,12 @@ class Monster : public Soldier {
 			maxHP = 50;
 			meleeRange = 15.;
 			meleeAngle = 1./2.;
-			meleeCooldownTicks = 71;
+			MeleeTimer.set_max(70);
+			//meleeCooldownTicks = 71;
 
 			meleeAttack = 55;
 			meleeDefense = 40;
+			rangedDefense = 40;
 			large = true;
 			antiInfantry = true;
 			meleeAOE = true;
@@ -280,5 +336,106 @@ class Monster : public Soldier {
 
 		int damage(Soldier* target) {debug("RARR!"); return 4;}
 };
+
+class Shoota : public Soldier {
+	public:		
+		Shoota(Unit* unit) : Soldier() {
+			rad = 5.;
+			mass = 1.;
+			defaultMaxSpeed = 15.;
+			maxSpeed = defaultMaxSpeed;
+			accel = 3.;
+			turn = M_PI/1.5;
+			onTargetDamp = 3.;	//dampening when close to posTarget
+			type = SOLDIER_SHOOTA;
+
+			maxHP = 2;
+			meleeRange = 7.;
+			meleeAngle = 1./3.;
+			MeleeTimer.set_max(70);
+			//meleeCooldownTicks = 61;
+
+			meleeAttack = 15;
+			meleeDefense = -10;
+			armor = 0;
+			armorPiercing = 0;
+			infantry = true;
+			large = false;
+			antiInfantry = false;
+			antiLarge = false;
+
+			ranged = true;
+			rangedRange = 400.;
+			rangedMinRange = 7.;
+			rangedRad = 0.1;//M_PI / 6;
+			DrawTimer = Timer(10);
+			ReloadTimer = Timer(300);
+			// drawCDTicks = 0;
+			//int reloadCDTicks = 0;
+			rangedDamage = 2;
+			rangedSpeed = 120.;
+			maxSpeedForFiring = 10.;
+			projectileType = PROJECTILE_ARROW;
+			rangedMinRange = 60;
+			rangedAOE = 10;
+
+			init(unit);
+		};
+		
+		int damage(Soldier* target) {return 1;}
+
+};
+
+class SlowShoota : public Soldier {
+	public:		
+		SlowShoota(Unit* unit) : Soldier() {
+			rad = 5.;
+			mass = 1.;
+			defaultMaxSpeed = 15.;
+			maxSpeed = defaultMaxSpeed;
+			accel = 3.;
+			turn = M_PI/60.;
+			onTargetDamp = 3.;	//dampening when close to posTarget
+			type = SOLDIER_SLOW_SHOOTA;
+
+			maxHP = 2;
+			meleeRange = 7.;
+			meleeAngle = 1./3.;
+			MeleeTimer.set_max(70);
+			//meleeCooldownTicks = 61;
+
+			meleeAttack = 15;
+			meleeDefense = -10;
+			armor = 0;
+			armorPiercing = 0;
+			infantry = true;
+			large = false;
+			antiInfantry = false;
+			antiLarge = false;
+
+			ranged = true;
+			rangedRange = 700.;
+			rangedMinRange = 7.;
+			rangedRad = 0.1;//M_PI / 6;
+			rangedHeavy = true;
+			DrawTimer = Timer(10);
+			ReloadTimer = Timer(600);
+			// drawCDTicks = 0;
+			//int reloadCDTicks = 0;
+			rangedDamage = 0;
+			rangedSpeed = 120.;
+			maxSpeedForFiring = 10.;
+			projectileType = PROJECTILE_GRENADE;
+			rangedMinRange = 60;
+			rangedAOE = 40.; // determines when not shooting close to allies
+
+			init(unit);
+		};
+		
+		int damage(Soldier* target) {return 1;}
+
+};
+
+
 
 #endif

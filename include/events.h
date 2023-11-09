@@ -30,8 +30,10 @@ enum EVENT_IDS {
 	PLAYER_DELETE_EVENT,
 	CTRL_STATE_EVENT,
 	INPUT_RECEIVED_EVENT,
-	CHANGE_TEXTBOX_EVENT
+	CHANGE_TEXTBOX_EVENT,
+	PROJECTILE_SPAWN_EVENT
 };
+
 
 class Event {
 	public:
@@ -268,6 +270,20 @@ public:
 		name = "ChangeTextboxEvent";
 		type = CHANGE_TEXTBOX_EVENT;
 		this->text = text;
+	}
+};
+
+
+class Projectile;
+
+class ProjectileSpawnEvent : public Event {
+public:
+	Projectile* p;
+
+	ProjectileSpawnEvent(Projectile* p) {
+		name = "ProjectileSpawnEvent";
+		type = PROJECTILE_SPAWN_EVENT;
+		this->p = p;
 	}
 };
 

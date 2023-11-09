@@ -203,9 +203,13 @@ private:
 				for(auto unit : player->units) {
 					std::vector<std::vector<Soldier*>>* soldiers = &(unit->soldiers);
 					if(unit->placed) {
-						if(ddebug::_showDebugGraphics) {
+						if(ddebug::_showDebugGraphics || true) {
 							Circle circ = Circle(unit->pos, 30);
 							//DrawCircle(&circ, renderer, colorGrey, SCREEN_WIDTH, SCREEN_HEIGHT, ctrl->zoom, ctrl->center);
+							if(unit->rangedTarget && unit == gem->model->selectedUnit) {
+								Rrectangle rec = OnSpotUnitRectangle(unit->rangedTarget);//, unit->rangedTarget->currentOrder);
+								DrawRectangle(&rec, renderer, colorPurple, SCREEN_WIDTH, SCREEN_HEIGHT, ctrl->zoom, ctrl->center);
+							}
 						}
 						
 						if(model->selectedUnit) {
@@ -221,6 +225,11 @@ private:
 									else if(o->type == ORDER_ATTACK) {
 										AttackOrder* ao = dynamic_cast<AttackOrder*>(o);
 										Rrectangle rec = UnitRectangle(ao->target, ao->target->currentOrder);
+										DrawRectangle(&rec, renderer, colorOrange, SCREEN_WIDTH, SCREEN_HEIGHT, ctrl->zoom, ctrl->center);
+									}
+									else if(o->type == ORDER_TARGET) {
+										TargetOrder* to = dynamic_cast<TargetOrder*>(o);
+										Rrectangle rec = UnitRectangle(to->target, to->target->currentOrder);
 										DrawRectangle(&rec, renderer, colorOrange, SCREEN_WIDTH, SCREEN_HEIGHT, ctrl->zoom, ctrl->center);
 									}
 									if(i > 0) {
@@ -268,6 +277,15 @@ private:
 					case ANIMATION_ATTACK: {
 						bool player1 = (soldier->unit->player == Gem()->model->players.at(0));
 						if(soldier->alive) {
+							// (debug) drawing indiv path
+							if(!soldier->indivPath.empty()) {
+								Point p0(soldier->pos);
+								for(int i = 0; i < soldier->indivPath.size(); i++) {
+									Point p1 (soldier->indivPath.at(i));
+									DrawLine(&p0, &p1, renderer, colorGrey, SCREEN_WIDTH, SCREEN_HEIGHT, ctrl->zoom, ctrl->center);
+									p0 = Point(p1.pos);
+								}
+							}
 							//base circle
 							SDL_SetTextureAlphaMod(token->texture, 255*std::min(double(soldier->hp) / soldier->maxHP, 1.));
 							if(player1) {
@@ -320,6 +338,7 @@ private:
 							}
 						}
 						}break;
+
 					case ANIMATION_DAMAGE:
 						segment.x = 0 + anime->stage*32; segment.y = 0;
 						segment.w = 32; segment.h = 32;
@@ -329,7 +348,25 @@ private:
 							0, &center, &segment);
 						break;
 					}
+
+					//if(soldier->debugFlag1) {
+					if(soldier->debugFlag1) {
+						DrawCircle(soldier->pos.coeff(0), soldier->pos.coeff(1), soldier->rad, renderer, colorOrange, SCREEN_WIDTH, SCREEN_HEIGHT, ctrl->zoom, ctrl->center);
+					}
+					if(soldier->debugFlag2) {
+						DrawCircle(soldier->pos.coeff(0), soldier->pos.coeff(1), soldier->rad, renderer, colorWhite, SCREEN_WIDTH, SCREEN_HEIGHT, ctrl->zoom, ctrl->center);
+					}
+					if(soldier->debugFlag3) {
+						DrawCircle(soldier->pos.coeff(0), soldier->pos.coeff(1), soldier->rad, renderer, darkGreen, SCREEN_WIDTH, SCREEN_HEIGHT, ctrl->zoom, ctrl->center);
+					}
+
 				}
+			}
+			//drawing projectiles
+			for(auto projectile : model->projectiles) {
+				Point p1(projectile->get_pos());
+				Point p2(projectile->get_pos() - projectile->get_vel() / projectile->get_vel().norm() * 15);
+				DrawLine(&p1, &p2, renderer, colorOrange, SCREEN_WIDTH, SCREEN_HEIGHT, ctrl->zoom, ctrl->center);
 			}
 			// writing text
 			if(ctrl->shift()) {
@@ -424,7 +461,8 @@ private:
 				for(auto anime : animations) {
 					switch(anime->type) {
 					case ANIMATION_ATTACK:
-						if(!anime->running && !anime->onCooldown && anime->soldier->meleeCooldownTicks > 0) {
+						if(!anime->running && !anime->onCooldown && !anime->soldier->MeleeTimer.done()) {
+						//if(!anime->running && !anime->onCooldown && anime->soldier->meleeCooldownTicks > 0) {
 							anime->running = true;
 							anime->onCooldown = true;
 							anime->ticksToNextStage = 1;
@@ -444,7 +482,8 @@ private:
 							else
 								anime->ticksToNextStage--;
 						}
-						else if(anime->onCooldown && anime->soldier->meleeCooldownTicks == 0)
+						else if(anime->onCooldown && anime->soldier->MeleeTimer.done())
+						//else if(anime->onCooldown && anime->soldier->meleeCooldownTicks == 0)
 							anime->onCooldown = false;
 						break;
 					case ANIMATION_DAMAGE:{

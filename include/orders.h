@@ -2,13 +2,15 @@
 #define ORDERS
 
 #include <base.h>
+#include <extra_math.h>
 
 #include <Dense>
 
 enum ORDER_TYPES{
 	ORDER_ORDER,
 	ORDER_MOVE,
-	ORDER_ATTACK
+	ORDER_ATTACK,
+	ORDER_TARGET
 };
 
 enum MOVEMENT_TYPE{
@@ -67,6 +69,19 @@ public:
 		type = ORDER_ATTACK;
 		this->target = unit;
 		enemyContact = false;
+	}
+};
+
+class TargetOrder : public Order {
+public:
+	Unit* target;
+
+	TargetOrder(Eigen::Vector2d pos, Eigen::Matrix2d rot, Unit* target, bool _auto = false, bool _transition = false) : Order(_auto, _transition, target) {
+		type = ORDER_TARGET;
+		this->target = target; // redundant
+		this->pos = pos;
+		this->rot = rot;
+		this->angleTarget = Angle(rot.coeff(0,1), rot.coeff(0,0));
 	}
 };
 

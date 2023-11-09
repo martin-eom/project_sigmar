@@ -4,10 +4,12 @@
 #include <soldiers.h>
 #include <orders.h>
 #include <player.h>
+#include <timer.h>
 #include <extra_math.h>
 
 #include <iostream>
 #include <vector>
+#include <cstdlib>
 
 class Unit;
 //class Player;
@@ -27,8 +29,11 @@ enum UNIT_TYPE {
 	UNIT_INFANTRY,
 	UNIT_CAVALRY,
 	UNIT_MONSTER,
-	UNIT_LONE_RIDER
+	UNIT_LONE_RIDER,
+	UNIT_SHOOTAS,
+	UNIT_SLOW_SHOOTA
 };
+
 
 class Unit {
 	public:
@@ -59,7 +64,13 @@ class Unit {
 		std::vector<Order*> orders;
 		Eigen::Vector2d vel;
 		bool enemyContact;
-		int targetUpdateCounter = 60;
+		Timer targetUpdateTimer = Timer(60);
+		bool ranged = false;
+		double range = 0.;
+		double rangedAngle = 0.;
+		Timer rangedTargetUpdateTimer = Timer(int(80 + (rand()/RAND_MAX)*20));
+		Unit* rangedTarget = NULL;
+		//int targetUpdateCounter = 60;
 		std::vector<Unit*> targetedBy;
 		
 		void init() {
@@ -157,11 +168,48 @@ class LoneRider : public Unit {
 			width = 1;
 			nrows = 1;
 			soldierType = SOLDIER_RIDER;
-			type = UNIT_TEMPLATE;
+			type = UNIT_LONE_RIDER;
 
 			init();
 		};
 };
+
+class Shootas : public Unit {
+	public:
+		Shootas(Player* player) : Unit(true, player) {
+			maxSoldiers = 64;
+			spacing = 12.;
+			width = 8;
+			nrows = 8;
+			soldierType = SOLDIER_SHOOTA;
+			type = UNIT_SHOOTAS;
+
+			ranged = true;
+			range = 400;
+			rangedAngle = 1.;//1./3.;
+
+			init();
+		};
+};
+
+class SlowShootaUnit : public Unit {
+	public:
+		SlowShootaUnit(Player* player) : Unit(true, player) {
+			maxSoldiers = 1;
+			spacing = 0.;
+			width = 1;
+			nrows = 1;
+			soldierType = SOLDIER_SLOW_SHOOTA;
+			type = UNIT_SLOW_SHOOTA;
+
+			ranged = true;
+			range = 700;
+			rangedAngle = 1.;//1./3.;
+
+			init();
+		};
+};
+
 
 void Populate(Unit* unit) {
 	std::vector<std::vector<Soldier*>>* soldiers = &(unit->soldiers);
@@ -178,11 +226,17 @@ void Populate(Unit* unit) {
 					(*soldiers).at(i).at(j) = new Rider(unit); break;
 				case SOLDIER_MONSTER:
 					(*soldiers).at(i).at(j) = new Monster(unit); break;
+				case SOLDIER_SHOOTA:
+					(*soldiers).at(i).at(j) = new Shoota(unit); break;
+				case SOLDIER_SLOW_SHOOTA:
+					(*soldiers).at(i).at(j) = new SlowShoota(unit); break;
 				default:
 					std::cout << "[ERROR:] Population of Unit: Soldier type does not exist!\n";
 			}
 			unit->liveSoldiers.push_back(unit->soldiers.at(i).at(j));
 			unit->nLiveSoldiers++;
+			if(unit->soldiers.at(i).at(j)->ranged)
+				unit->soldiers.at(i).at(j)->ReloadTimer.unset();
 		}
 	}
 };
@@ -308,6 +362,8 @@ bool CurrentOrderCompleted(Unit* unit) {
 		switch(currentOrder->type) {
 		case ORDER_ATTACK:
 			return (dynamic_cast<AttackOrder*>(currentOrder)->target->nLiveSoldiers) <= 0; break;
+		case ORDER_TARGET:
+			return (dynamic_cast<TargetOrder*>(currentOrder)->target->nLiveSoldiers) <= 0; break;
 		case ORDER_MOVE: {
 			debug("Checking order completion...");
 			MoveOrder* mo = dynamic_cast<MoveOrder*>(currentOrder);
@@ -371,7 +427,8 @@ void SoldierNextOrder(Soldier* soldier, Eigen::Vector2d posInUnit) {
 	soldier->angleTarget = o->angleTarget;
 	if(!o->target || (o->target != po->target)) {
 		soldier->charging = true;
-		soldier->chargeGapTicks = 30;
+		soldier->chargeTimer.reset();
+		//soldier->chargeGapTicks = 30;
 	}
 }
 
@@ -404,6 +461,12 @@ Rrectangle UnitRectangle(Unit* unit, int orderID) {
 	return Rrectangle(halfWidth, halfDepth, pos, rot);
 }
 
+Rrectangle OnSpotUnitRectangle(Unit* unit) {
+	double halfWidth = (unit->width - 1) * unit->spacing * 0.5;
+	double halfDepth = (unit->nrows - 1) * unit->spacing * 0.5;
+	return Rrectangle(halfWidth, halfDepth, unit->pos, unit->rot);
+};
+
 Rrectangle UnitRectangle(Unit* unit, int orderID, std::vector<Order*> orders) {
 	double halfWidth = (unit->width - 1) * unit->spacing * 0.5;
 	double halfDepth = (unit->nrows - 1) * unit->spacing * 0.5;
@@ -420,6 +483,20 @@ Rrectangle UnitRectangle(Unit* unit, int orderID, std::vector<Order*> orders) {
 		rot = o->rot;
 	}
 	return Rrectangle(halfWidth, halfDepth, pos, rot);
+}
+
+struct UnitDistance {
+	Unit* unit;
+	double dist;
+
+	UnitDistance(Unit* me, Unit* them) {
+		unit = them;
+		dist = (me->pos - them->pos).norm();
+	}
+};
+
+bool compareUnitDistance(const UnitDistance &a, const UnitDistance &b) {
+	return a.dist < b.dist;
 }
 
 #endif

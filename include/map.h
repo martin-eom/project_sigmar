@@ -6,6 +6,7 @@
 #include <units.h>
 #include <extra_math.h>
 #include <debug.h>
+#include <projectiles.h>
 
 #include <iostream>
 #include <vector>
@@ -62,7 +63,9 @@ class gridpiece{
 		std::vector<Soldier*> p1Soldiers;
 		std::vector<Soldier*> p2Soldiers;
 		std::vector<MapObject*> mapObjects;
+		std::vector<Projectile*> projectiles;
 		std::vector<gridpiece*> neighbours;
+		std::vector<gridpiece*> redundantNeighbours;
 		Rrectangle* rec;
 };
 
@@ -107,6 +110,20 @@ class Map {
 				}
 				tiles.at(i).at(ncols-1)->neighbours.push_back(tiles.at(i+1).at(ncols-1));
 			}
+			for(int i = 1; i < nrows; i++) {
+				for(int j = 1; j < ncols; j++) {
+					if(i+1 < nrows && j-1 > 0)
+						tiles.at(i).at(j)->redundantNeighbours.push_back(tiles.at(i+1).at(j-1));
+					if(j-1 > 0)
+						tiles.at(i).at(j)->redundantNeighbours.push_back(tiles.at(i).at(j-1));
+					if(i-1 > 0 && j-1 > 0)
+						tiles.at(i).at(j)->redundantNeighbours.push_back(tiles.at(i-1).at(j-1));
+					if(i-1 > 0)
+						tiles.at(i).at(j)->redundantNeighbours.push_back(tiles.at(i-1).at(j));
+					if(i-1 > 0 && j+1 < ncols)
+						tiles.at(i).at(j)->redundantNeighbours.push_back(tiles.at(i-1).at(j+1));
+				}
+			}
 			//creating map borders, but not adding them to objects yet
 			double hw = 0.5*width;
 			double hl = 0.5*height;
@@ -141,6 +158,7 @@ class Map {
 					tiles.at(i).at(j)->soldiers.clear();
 					tiles.at(i).at(j)->p1Soldiers.clear();
 					tiles.at(i).at(j)->p2Soldiers.clear();
+					tiles.at(i).at(j)->projectiles.clear();
 				}
 			}
 		}
@@ -151,6 +169,10 @@ class Map {
 				tiles.at(i).at(j)->p1Soldiers.push_back(soldier);
 			else
 				tiles.at(i).at(j)->p2Soldiers.push_back(soldier);
+		}
+
+		void ProjectileAssign(Projectile* projectile, int i, int j) {
+			tiles.at(i).at(j)->projectiles.push_back(projectile);		
 		}
 
 		void AddMapObject(MapObject* obj) {

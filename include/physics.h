@@ -119,7 +119,7 @@ void DampenedHarmonicOscillator(Soldier* soldier, double dt) {	//deprecated / on
 	soldier->force = newForce;
 }
 
-Eigen::Vector2d PosTarget(Soldier* soldier) {
+Eigen::Vector2d NoIPFPosTarget(Soldier* soldier) {	// NoIPF = No Individual Pathfinding
 	if(soldier->meleeTarget) {
 		if(!soldier->charging)
 			return soldier->meleeTarget->pos;
@@ -127,6 +127,22 @@ Eigen::Vector2d PosTarget(Soldier* soldier) {
 			return soldier->meleeTarget->pos;
 	}
 	return soldier->posTarget;
+}
+
+Eigen::Vector2d PosTarget(Soldier* soldier) {
+	if(soldier->indivPath.empty()) {
+		return NoIPFPosTarget(soldier);
+		/*if(soldier->meleeTarget) {
+			if(!soldier->charging)
+				return soldier->meleeTarget->pos;
+			if(soldier->unit->enemyContact && soldier->unit->orders.at(soldier->currentOrder)->target)
+				return soldier->meleeTarget->pos;
+		}
+		return soldier->posTarget;	*/
+	}
+	else {
+		return soldier->indivPath.at(0);
+	}
 }
 
 void TimeStep(Soldier* soldier, double dt) {
@@ -159,6 +175,11 @@ void TimeStep(Soldier* soldier, double dt) {
 			Eigen::Vector2d dm = soldier->meleeTarget->pos - soldier->pos;
 			double mdist = dm.norm();
 			rotT << dm.coeff(0)/mdist, -dm.coeff(1)/mdist, dm.coeff(1)/mdist, dm.coeff(0)/mdist;
+		}
+		else if(soldier->rangedTarget) { // not correct, what are the correct conditions?
+			Eigen::Vector2d dm = soldier->rangedTarget->pos - soldier->pos;
+			double mdist = dm.norm();
+			rotT << dm.coeff(0)/mdist, -dm.coeff(1)/mdist, dm.coeff(1)/mdist, dm.coeff(0)/mdist;			
 		}
 		else
 			rotT = soldier->rotTarget;
@@ -254,7 +275,7 @@ void TimeStep(Soldier* soldier, double dt) {
 	Order* o = soldier->unit->orders.at(soldier->currentOrder);
 	if(o->type == ORDER_MOVE) {
 		MoveOrder* mo = dynamic_cast<MoveOrder*>(o);
-		if(!soldier->arrived) {
+		if(!soldier->arrived && soldier->indivPath.empty()) {
 			if(newestOrder) {// && (mo->moveType != MOVE_PASSINGTHROUGH)) {
 				if(closeToTarget) {
 					soldier->arrived = true;
@@ -270,7 +291,25 @@ void TimeStep(Soldier* soldier, double dt) {
 			}
 		}
 	}
-	else if(o->type == ORDER_ATTACK && !soldier->arrived) {
+	if(o->type == ORDER_TARGET) {
+		TargetOrder* mo = dynamic_cast<TargetOrder*>(o);
+		if(!soldier->arrived && soldier->indivPath.empty()) {
+			if(newestOrder) {// && (mo->moveType != MOVE_PASSINGTHROUGH)) {
+				if(closeToTarget) {
+					soldier->arrived = true;
+					soldier->unit->nSoldiersArrived++;
+				}
+			}
+			else {
+				Rrectangle rec = SoldierRectangle(soldier);
+				Point p(soldier->pos);
+				if(PointRectangleCollision(&p, &rec)) {
+					soldier->arrived = true;
+				}
+			}
+		}
+	}
+	else if(o->type == ORDER_ATTACK && !soldier->arrived && soldier->indivPath.empty()) {
 		if(dynamic_cast<AttackOrder*>(o)->target->nLiveSoldiers <= 0) {
 			soldier->arrived = true;
 		}
@@ -323,6 +362,75 @@ void CollisionScrying(Map* map, Unit* unit) {
 				if(n < 0) n = 0;
 				else if(n > map->ncols - 1) n = map->ncols - 1;
 				map->Assign(soldier, m, n);
+			}
+		}
+	}
+}
+
+void ProjectileCollisionScrying(Map* map, std::vector<Projectile*> projectiles) {
+	for(auto projectile : projectiles) {
+		int m = (int) (projectile->get_pos().coeff(1) / map->tilesize);
+		if(m < 0) m=0;
+		else if(m > map->nrows - 1) m = map->nrows - 1;
+		int n = (int) (projectile->get_pos().coeff(0) / map->tilesize);
+		if(n < 0) n = 0;
+		else if(n > map->ncols - 1) n = map->ncols - 1;
+		map->ProjectileAssign(projectile, m, n);
+	}
+}
+
+void ProjectileCollisionHandling(Map* map) {
+	for(int i = 0; i < map->nrows; i++) {
+		for(int j = 0; j < map->ncols; j++) {
+			gridpiece* tile = map->tiles.at(i).at(j);
+			for(auto projectile : tile->projectiles) {
+				Point p(projectile->get_pos());
+				//map_objects
+				for(auto obj : tile->mapObjects) {
+					if(!projectile->dead) {
+						switch(obj->type()) {
+						case MAP_RECTANGLE:
+						case MAP_BORDER:
+							if(PointRectangleCollision(&p, dynamic_cast<Rrectangle*>(obj))) {
+								projectile->dead = true;
+							}
+							break;
+						case MAP_CIRCLE:
+							Circle* circ = dynamic_cast<Circle*>(obj);
+							Eigen::Vector2d dist;
+							if((projectile->get_pos() - circ->pos).norm() < circ->rad) {
+								projectile->dead = true;
+							}
+							break;
+						}
+					}
+				}
+				//soldiers
+				if(!projectile->dead && projectile->get_progress() > 0.99) {
+					for(auto soldier : tile->soldiers) {
+						if((projectile->get_pos() - soldier->pos).norm() < (soldier->rad + projectile->aoerad)) {
+							projectile->targets.push_back(soldier);
+						}
+					}
+					if(projectile->aoerad > 0.) {
+						std::cout << "-----looking at neighbours " << tile->neighbours.size() << "-----\n";
+						for(auto ntile : tile->neighbours) {
+							for(auto soldier : ntile->soldiers) {
+								if((projectile->get_pos() - soldier->pos).norm() < soldier->rad + projectile->aoerad) {
+									projectile->targets.push_back(soldier);
+								}
+							}						
+						}
+						for(auto ntile : tile->redundantNeighbours) {
+							for(auto soldier : ntile->soldiers) {
+								if((projectile->get_pos() - soldier->pos).norm() < soldier->rad + projectile->aoerad) {
+									projectile->targets.push_back(soldier);
+								}
+							}						
+						}
+					}
+					projectile->dead = true;
+				}
 			}
 		}
 	}
@@ -410,6 +518,59 @@ void MapObjectCollisionHandling(Map* map) {
 			}
 		}
 	}
+}
+
+double projectile_flight_time(Eigen::Vector2d r_target_rel, Eigen::Vector2d v_target, double vel_projectile) {
+	// returns minimum possible time for colllision of projectile and target (center)
+	//   if projectile too slow to reach target return -1
+	//   r_target_rel = r_target - r_shooter
+	double vel_target = v_target.norm();
+	double dv = vel_target*vel_target - vel_projectile*vel_projectile;
+	double ph = v_target.dot(r_target_rel) / dv;
+	double q = pow(r_target_rel.norm(), 2) / dv;
+	double rad = ph*ph - q; //radicant
+	if(rad < 0) {
+		return -1;
+	}
+	else {
+		double srad = sqrt(rad);
+		if(srad > -ph)
+			return -ph + srad;
+		return -ph - srad;
+	}
+}
+
+struct Displacement{
+	Eigen::Matrix2d rot;
+	double t;
+
+	Displacement(Eigen::Matrix2d rot, double t) {
+		this->rot = rot;
+		this->t = t;
+	}
+};
+
+Displacement ShotAngle(Eigen::Vector2d r_target_rel, Eigen::Vector2d v_target, double vel_projectile, double t, double tans) {
+	// tans is the tangens of the maximum angle error
+	Eigen::Vector2d r_target_new = r_target_rel + t*v_target;
+	
+	double re = r_target_new.norm() * tans;
+	Eigen::Vector2d miss;
+	miss << 1., 1.;
+	while(miss.norm() > 1) {
+		double randx = 2*(static_cast<float>(rand()) / static_cast<float>(RAND_MAX)) - 0.5;
+		double randy = 2*(static_cast<float>(rand()) / static_cast<float>(RAND_MAX)) - 0.5;
+		miss << randx, randy;
+	}
+	r_target_new += re * miss;
+
+	Eigen::Matrix2d rot;
+	double cos = r_target_new(0) / (t*vel_projectile);
+	double sin = r_target_new(1) / (t*vel_projectile);
+	rot << cos, -sin, sin, cos;
+
+	return Displacement(rot, r_target_new.norm() / vel_projectile);
+	// does this work without new?
 }
 
 #endif
