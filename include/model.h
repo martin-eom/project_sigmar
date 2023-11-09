@@ -745,6 +745,7 @@ class Model : public Listener{
 							for(auto row : unit->soldiers) {
 								for(auto soldier : row) {
 									if(unit->rangedTarget && soldier->alive) {
+										bool swinging = !soldier->MeleeTimer.done();
 										if(soldier->currentOrder < unit->currentOrder) {
 											soldier->rangedTarget = NULL;
 											//soldier->debugFlag3 = true;
@@ -787,6 +788,9 @@ class Model : public Listener{
 														if((targetPos - allyPos).norm() - mtarget->rad < rmin)
 															canFire = false;
 													}
+													if(swinging) {
+														canFire = false;
+													}
 													// create projectile spawn event
 													if(canFire) {
 														ProjectileSpawnEvent pev = SpawnProjectile(soldier->projectileType, soldier->pos, vel, static_cast<int>(t/em->dt), em->dt);
@@ -797,12 +801,12 @@ class Model : public Listener{
 												else
 													soldier->rangedTarget = NULL;
 											}
-											else {
+											else if(!swinging){
 												soldier->ReloadTimer.decrement();
 											}
 										}
 										else {
-											if(soldier->vel.norm() < soldier->maxSpeedForFiring) {
+											if(soldier->vel.norm() < soldier->maxSpeedForFiring && !swinging) {
 											//&& (!soldier->meleeTarget || (soldier->rangedTarget->pos - soldier->pos).norm() > soldier->rangedMinRange)) {
 												soldier->ReloadTimer.decrement();
 											}
