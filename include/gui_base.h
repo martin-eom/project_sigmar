@@ -48,8 +48,10 @@ public:
 		zoom = std::min(SCREEN_WIDTH / double(map->width), SCREEN_HEIGHT / double(map->height));
 		center << zoom * double(map->width) / 2., zoom * double(map->height) / 2.;
 
-		maxZoom = 4.;
+		//maxZoom = 4.;
+		maxZoom = 16.;
 		minZoom = 0.1;
+		//zoomSpeed = 1;
 		zoomSpeed = 1;
 		zoomMoveSpeed = 1.;
 

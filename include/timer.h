@@ -17,6 +17,11 @@ public:
 		current = 0;
 	}
 
+	void set(int value) {
+		if(value < max) current = value;
+		else current = max;
+	}
+
 	void set_max(int max) {
 		this->max = max;
 		reset();

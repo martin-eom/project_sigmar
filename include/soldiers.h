@@ -1,5 +1,5 @@
-#ifndef SOLDIERS
-#define SOLDIERS
+#ifndef OLDSOLDIERS
+#define OLDSOLDIERS
 
 #include <extra_math.h>
 #include <timer.h>

@@ -1,7 +1,8 @@
-#ifndef ANIMATION
-#define ANIMATION
+#ifndef OLDANIMATION
+#define OLDANIMATION
 
-#include <soldiers.h>
+//#include <soldiers.h>
+#include <soldiers2.h>
 
 enum AnimationTypes {
 	ANIMATION_GENERIC,
@@ -9,7 +10,7 @@ enum AnimationTypes {
 	ANIMATION_DAMAGE
 };
 
-class SoldierAnimation {
+class OldSoldierAnimation {
 public:
 	virtual void ConversionEnabler() {}
 
@@ -20,7 +21,7 @@ public:
 	bool onCooldown;
 	int type;
 
-	SoldierAnimation(Soldier* soldier) {
+	OldSoldierAnimation(Soldier* soldier) {
 		this->soldier = soldier;
 		stage = 0;
 		ticksToNextStage = 0;
@@ -30,18 +31,18 @@ public:
 	}
 };
 
-class AttackAnimation : public SoldierAnimation {
+class OldAttackAnimation : public OldSoldierAnimation {
 public:
-	AttackAnimation(Soldier* soldier) : SoldierAnimation(soldier) {
+	OldAttackAnimation(Soldier* soldier) : OldSoldierAnimation(soldier) {
 		type = ANIMATION_ATTACK;
 	}
 };
 
-class DamageAnimation : public SoldierAnimation {
+class DamageAnimation : public OldSoldierAnimation {
 public:
 	int lastHP;
 
-	DamageAnimation(Soldier* soldier) : SoldierAnimation(soldier) {
+	DamageAnimation(Soldier* soldier) : OldSoldierAnimation(soldier) {
 		lastHP = soldier->hp;
 		type = ANIMATION_DAMAGE;
 	}

@@ -1,5 +1,5 @@
-#ifndef FILEIO
-#define FILEIO
+#ifndef OLDFILEIO
+#define OLDFILEIO
 
 #include <map.h>
 

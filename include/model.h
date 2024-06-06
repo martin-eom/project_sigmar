@@ -2,16 +2,19 @@
 #define MODEL
 
 #include <base.h>
-#include <soldiers.h>
+#include <soldiers2.h>
 #include <units.h>
 #include <map.h>
 #include <physics.h>
 #include <player.h>
 #include <vector>
 #include <pathfinding.h>
-#include <projectiles.h>
+#include <projectiles2.h>
+#include <information.h>
+//#include <fileio2.h>
 
 #include <cstdlib>
+#include <map>
 
 void OrderPathfinding(Unit* unit, Map* map) {
 	std::vector<Order*> newOrders = std::vector<Order*>();
@@ -22,7 +25,7 @@ void OrderPathfinding(Unit* unit, Map* map) {
 			Order* mo = unit->orders.at(i);
 			Order* pmo = unit->orders.at(i-1);
 			// checking if line of sight between orders
-			double rad = unit->width*(unit->spacing - 1);
+			double rad = unit->ncols*(unit->yspacing - 1);
 			MapWaypoint w1 = MapWaypoint(mo->pos, rad);
 			MapWaypoint w2 = MapWaypoint(pmo->pos, rad);
 			Eigen::Matrix2d Rot;
@@ -129,6 +132,11 @@ struct DamageTick {
 
 class Model : public Listener{
 	public:
+		std::map<std::string, SoldierInformation> SoldierTypes;
+		std::map<std::string, UnitInformation> UnitTypes;
+		//std::vector<SoldierInformation> SoldierTypes;
+		//std::vector<UnitInformation> UnitTypes;
+
 		std::vector<Player*> players;
 		Player* player1;
 		Player* player2;
@@ -138,6 +146,10 @@ class Model : public Listener{
 		Unit* selectedUnit;
 		std::queue<DamageTick> damages;
 		std::vector<Projectile*> projectiles;
+
+		void loadSoldierTypes(std::string filename);
+		void loadUnitTypes(std::string filename);
+		void loadArmyLists(std::string filename);
 	
 		Model(EventManager* em, Map* map) : Listener(em) {
 			this->map = map;
@@ -281,7 +293,7 @@ class Model : public Listener{
 				}
 			}
 			else if(ev->type == UNIT_ADD_EVENT) {
-				if(selectedPlayer) {
+				/*if(selectedPlayer) {
 					UnitAddEvent* uev = dynamic_cast<UnitAddEvent*>(ev);
 					Unit* unit = NULL;
 					switch(uev->unitType) {
@@ -297,15 +309,15 @@ class Model : public Listener{
 					if(unit) selectedPlayer->units.push_back(unit);
 					UnitRosterModifiedEvent e;
 					em->Post(&e);
-				}
+				}*/
 			}
 			else if(ev->type == UNIT_DELETE_EVENT) {
-				if(selectedPlayer && selectedUnit) {
+				/*if(selectedPlayer && selectedUnit) {
 					selectedPlayer->units.erase(std::find(selectedPlayer->units.begin(), selectedPlayer->units.end(), selectedUnit));
 					SetUnit();
 					UnitRosterModifiedEvent e;
 					em->Post(&e);
-				}
+				}*/
 			}
 			else if(ev->type == PLAYER_SELECT_EVENT) {
 				PlayerSelectEvent* pev = dynamic_cast<PlayerSelectEvent*>(ev);
@@ -379,7 +391,6 @@ class Model : public Listener{
 				}
 			}
 			else if (ev->type == PROJECTILE_SPAWN_EVENT) {
-				//std::cout << "dakka!\n";
 				projectiles.push_back(dynamic_cast<ProjectileSpawnEvent*>(ev)->p);
 			}
 			else if (ev->type == TICK_EVENT) {
@@ -470,7 +481,7 @@ class Model : public Listener{
 							std::vector<std::vector<Soldier*>>* soldiers = &(unit->soldiers);
 							std::vector<std::vector<Eigen::Vector2d>>* posInUnit = &(unit->posInUnit);
 							for(int i = 0; i < unit->nrows; i++) {
-								for(int j = 0; j < unit->width; j++) {
+								for(int j = 0; j < unit->ncols; j++) {
 									Soldier* soldier = soldiers->at(i).at(j);
 									if(soldier && soldier->alive) {
 										soldier->debugFlag1 = false;
@@ -586,11 +597,11 @@ class Model : public Listener{
 									std::sort(inRange.begin(), inRange.end(), compareUnitDistance);
 									if(!inRange.empty()) {
 										unit->rangedTarget = inRange.at(0).unit;
-										std::cout << "Targets found, horray!\n";
+										debug("Targets found, horray!");
 									}
 									else {
 										unit->rangedTarget = NULL;
-										std::cout << "No ranged targets found.\n";
+										debug("No ranged targets found.");
 									}
 								}
 								unit->rangedTargetUpdateTimer.reset();
@@ -722,9 +733,10 @@ class Model : public Listener{
 												double hitChance = 0.35 + 0.01*(soldier->meleeAttack - target->meleeDefense) + 0.15*(soldier->antiInfantry && target->infantry) + 0.15*(soldier->antiLarge && target->large);
 												hitChance = std::min(std::max(0.08, hitChance), 0.9);
 												if(std::rand()/double(RAND_MAX) < hitChance) {
-													int dmg = soldier->damage(target);
-													dmg = dmg + std::max(int(1 + 0.3*(soldier->antiInfantry && target->infantry)), 1) + std::max(int(0.3*(soldier->antiLarge && target->large)), 1);
-													damages.push(DamageTick(target, soldier->damage(target)));
+													int dmg = soldier->meleeDamage;
+													// melee damage function
+													dmg = dmg * (1 + 0.3*(soldier->antiInfantry && target->infantry) + 0.3*(soldier->antiLarge && target->large));
+													damages.push(DamageTick(target, dmg));
 												}
 											}
 										}
@@ -761,6 +773,11 @@ class Model : public Listener{
 										if(soldier->rangedTarget && !soldier->rangedTarget->alive) {
 											soldier->rangedTarget = NULL;
 										}
+										/*std::cout << static_cast<bool>(soldier->rangedTarget) 
+											<< (soldier->currentOrder == unit->currentOrder) 
+											<< (soldier->vel.norm() < soldier->maxSpeedForFiring) 
+											<< static_cast<bool>(soldier->meleeTarget)
+											<< "\n";*/
 										if(soldier->rangedTarget
 											&& soldier->currentOrder == unit->currentOrder
 											&& soldier->vel.norm() < soldier->maxSpeedForFiring
@@ -793,7 +810,7 @@ class Model : public Listener{
 													}
 													// create projectile spawn event
 													if(canFire) {
-														ProjectileSpawnEvent pev = SpawnProjectile(soldier->projectileType, soldier->pos, vel, static_cast<int>(t/em->dt), em->dt);
+														ProjectileSpawnEvent pev = SpawnProjectile(soldier->tag, soldier->pos, vel, static_cast<int>(t/em->dt), em->dt, soldier->rangedDamage, soldier->rangedArmorPiercing, soldier->rangedAOE);
 														em->Post(&pev);
 														soldier->ReloadTimer.reset();
 													}
@@ -814,6 +831,8 @@ class Model : public Listener{
 									}
 									else
 										soldier->rangedTarget = NULL;
+										if(!soldier->ReloadTimer.done() && soldier->speed < soldier->maxSpeedForFiring)
+											soldier->ReloadTimer.decrement();
 								}
 							}
 						}
@@ -821,10 +840,10 @@ class Model : public Listener{
 				}
 				//Projectile hit scanning
 				for(auto projectile : projectiles) {
-					if(projectile->dead) {
+					if(projectile->dead && !projectile->longDead) {
 						for(auto soldier : projectile->targets) {
 							if(soldier->rangedDefense + 20 < rand()%100)
-								damages.push(DamageTick(soldier, projectile->damage(soldier)));
+								damages.push(DamageTick(soldier, projectile->damage));
 						}
 						projectile->targets.clear();
 					}
@@ -842,11 +861,13 @@ class Model : public Listener{
 				//damages = std::queue<DamageTick>();
 				// projectile movement and obsolescence
 				for(auto projectile : projectiles) {
-					if(projectile->dead) {
+					if(projectile->longDead) {
 						Projectile* tempProj = projectile;
 						std::erase(projectiles, projectile);
 						//delete tempProj;	///////// VERY IMPORTANT
-						std::cout << "POW!\n";
+					}
+					else if(projectile->dead) {
+						projectile->longDead = true;
 					}
 					else {
 						projectile->advance();
@@ -858,5 +879,6 @@ class Model : public Listener{
 			}
 		}
 };
+
 
 #endif

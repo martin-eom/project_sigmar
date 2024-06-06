@@ -22,7 +22,11 @@ double Tans(double sin, double cos) {
 
 class Point {
 public:
+	virtual void ConversionEnabler() {}
+
 	Eigen::Vector2d pos;
+
+	Point() {};
 
 	Point(Eigen::Vector2d pos) {
 		this->pos = pos;

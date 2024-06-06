@@ -1,0 +1,82 @@
+[
+	{
+		"tag": "Infantry",
+		"formation": {
+			"maxSoldiers": 90,
+			"rows": 9,
+			"columns": 10,
+			"xspacing": 12.0,
+			"yspacing": 12.0
+		},
+		"class": "Infantryman",
+		"ranged_stats": {
+			"ranged": false,
+			"range": 400.0,
+			"angle": 1.0
+		}
+	},
+	{
+		"tag": "Cavalry",
+		"formation": {
+			"maxSoldiers": 16,
+			"rows": 4,
+			"columns": 4,
+			"xspacing": 18.0,
+			"yspacing": 18.0
+		},
+		"class": "Rider",
+		"ranged_stats": {
+			"ranged": false,
+			"range": 400.0,
+			"angle": 1.0
+		}
+	},
+	{
+		"tag": "Monster",
+		"formation": {
+			"maxSoldiers": 1,
+			"rows": 1,
+			"columns": 1,
+			"xspacing": 0.0,
+			"yspacing": 0.0
+		},
+		"class": "Monster",
+		"ranged_stats": {
+			"ranged": false,
+			"range": 400.0,
+			"angle": 1.0
+		}
+	},
+	{
+		"tag": "Crossbows",
+		"formation": {
+			"maxSoldiers": 64,
+			"rows": 8,
+			"columns": 8,
+			"xspacing": 12.0,
+			"yspacing": 12.0
+		},
+		"class": "Crossbowman",
+		"ranged_stats": {
+			"ranged": true,
+			"range": 400.0,
+			"angle": 1.0
+		}
+	},
+	{
+		"tag": "Ballista",
+		"formation": {
+			"maxSoldiers": 1,
+			"rows": 1,
+			"columns": 1,
+			"xspacing": 0.0,
+			"yspacing": 0.0
+		},
+		"class": "Ballista",
+		"ranged_stats": {
+			"ranged": true,
+			"range": 800.0,
+			"angle": 0.5
+		}
+	}
+]]

@@ -2,11 +2,11 @@
 #define MAP
 
 //#include <base.h>
-#include <soldiers.h>
+#include <soldiers2.h>
 #include <units.h>
 #include <extra_math.h>
 #include <debug.h>
-#include <projectiles.h>
+#include <projectiles2.h>
 
 #include <iostream>
 #include <vector>
