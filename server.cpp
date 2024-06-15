@@ -9,6 +9,7 @@
 #include <SDL.h>
 #include <stdio.h>
 #include <SDL_ttf.h>
+//#include <omp.h>
 
 
 // Declaring variables
@@ -40,21 +41,18 @@ void OpenWindow(Map* map) {
 	em = new GameEventManager(30);
 	dynamic_cast<GameEventManager*>(em)->map = map;
 	model = new Model(em, map);
+	model->loadSoldierTypes("config/templates/classes.json");
+	model->loadUnitTypes("config/templates/units.json");
+	model->loadDamageInfo();
 	dynamic_cast<GameEventManager*>(em)->model = model;
+	// #### set up players with units from armylist.json
 	Player* player1 = new Player(true);
 	model->players.push_back(player1);
 	model->player1 = player1;
-	player1->units.push_back(new Infantry(player1));
-	player1->units.push_back(new Cavalry(player1));
-	player1->units.push_back(new MonsterUnit(player1));
-	player1->units.push_back(new LoneRider(player1));
 	Player* player2 = new Player(false);
 	model->players.push_back(player2);
 	model->player2 = player2;
-	player2->units.push_back(new Infantry(player2));
-	player2->units.push_back(new Cavalry(player2));
-	player2->units.push_back(new MonsterUnit(player2));
-	player2->units.push_back(new LoneRider(player2));
+	model->loadArmyLists("config/templates/armylist.json");
 	model->SetPlayer();
 	model->SetUnit();
 	ctrl = new KeyboardAndMouseController(em, SCREEN_WIDTH, SCREEN_HEIGHT, map);
@@ -118,6 +116,20 @@ int main(int argc, char* argv[1]) {
 	OpenWindow(map);
 
 	// Extra Debug section
+	Eigen::Vector2d start_pos;
+	start_pos << 20, 90;
+	Eigen::Vector2d vel;
+	vel << 77*2/3, 77*2/3;
+	//Projectile* proj = new Projectile(start_pos, vel, 225, *model->dt);
+	//model->projectiles.push_back(proj);
+
+	start_pos << 200, 200;
+	Eigen::Matrix2d rot;
+	rot << 1, 0, 0, 1;
+	//Event ume = UnitRosterModifiedEvent();
+	//em->Post(&ume);
+	//UnitPlaceRequest placeTurret(turret, start_pos, rot);
+	//em->Post(&placeTurret);
 
 	// Main loop
 	bool quit = false;

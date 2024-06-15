@@ -1,0 +1,414 @@
+[
+	{
+		"tag": "Infantryman",
+		"general_stats": {
+			"radius": 5.0,
+			"mass": 1.0,
+			"max_speed": 15.0,
+			"acceleration": 3.0,
+			"turn_speed": 0.66,
+			"on_target_dampening": 3.0,
+			"max_hp": 2,
+			"armor": 0
+		},
+		"melee_stats": {
+			"melee": true,
+			"range": 7.0,
+			"angle": 0.33,
+			"cooldown": 70,
+			"aoe": false,
+			"attack": 25,
+			"defense": 20,
+			"armor_piercing": 0,
+			"damage": 1
+		},
+		"ranged_stats": {
+			"ranged": false,
+			"range": 400.0,
+			"min_range": 7.0,
+			"radius": 0.1,
+			"heavy": false,
+			"draw_timer": 10,
+			"reload_timer": 300,
+			"max_speed_for_firing": 10.0,
+			"defense": 0,
+			"projectile_speed": 120.0,
+			"armor_piercing": 0,
+			"ally_protection_aoe": 10.0,
+			"aoe": 0.0,
+			"damage": 2
+		},
+		"keywords": {
+			"infantry": true,
+			"large": false,
+			"anti_infantry": false,
+			"anti_large": false
+		},
+		"textures": {
+			"legs": {
+				"texture": "soldier_legs.bmp",
+				"size_x": 32,
+				"size_y": 32,
+				"step": 3.0
+			},
+			"arms": {
+				"texture": "soldier_shield_melee.bmp",
+				"num_frames": 5,
+				"size_x": 32,
+				"size_y": 64,
+				"frame_size_x": 32,
+				"frame_size_y": 32,
+				"ticks_per_frame": 2
+			},
+			"ranged": {
+				"texture": "soldier_crossbow.bmp",
+				"num_frames": 4,
+				"size_x": 32,
+				"size_y": 32
+			},
+			"projectile": {
+				"texture": "arrow.bmp",
+				"num_frames": 5,
+				"size_x": 32,
+				"size_y": 32,
+				"center_x": 8,
+				"center_y": 16
+			},
+			"body": {
+				"texture_blue": "soldier_blue.bmp",
+				"texture_red": "soldier_red.bmp",
+				"size_x" : 32,
+				"size_y" : 32
+			}
+		}
+	},
+	{
+		"tag": "Rider",
+		"general_stats": {
+			"radius": 7.0,
+			"mass": 4.0,
+			"max_speed": 40.0,
+			"acceleration": 6.0,
+			"turn_speed": 0.33,
+			"on_target_dampening": 2.0,
+			"max_hp": 5,
+			"armor": 0
+		},
+		"melee_stats": {
+			"melee": true,
+			"range": 7.0,
+			"angle": 1.0,
+			"cooldown": 30,
+			"aoe": false,
+			"attack": 35,
+			"defense": 25,
+			"armor_piercing": 0,
+			"damage": 2
+		},
+		"ranged_stats": {
+			"ranged": false,
+			"range": 400.0,
+			"min_range": 7.0,
+			"radius": 0.1,
+			"heavy": false,
+			"draw_timer": 10,
+			"reload_timer": 300,
+			"max_speed_for_firing": 10.0,
+			"defense": 0,
+			"projectile_speed": 120.0,
+			"armor_piercing": 0,
+			"ally_protection_aoe": 10.0,
+			"aoe": 0.0,
+			"damage": 2
+		},
+		"keywords": {
+			"infantry": false,
+			"large": true,
+			"anti_infantry": false,
+			"anti_large": false
+		},
+		"textures": {
+			"legs": {
+				"texture": "bike wheels.bmp",
+				"size_x": 32,
+				"size_y": 32,
+				"step": 1.0
+			},
+			"arms": {
+				"texture": "bike weapon.bmp",
+				"num_frames": 6,
+				"size_x": 64,
+				"size_y": 64,
+				"frame_size_x": 32,
+				"frame_size_y": 32,
+				"ticks_per_frame": 2
+			},
+			"ranged": {
+				"texture": "soldier_crossbow.bmp",
+				"num_frames": 4,
+				"size_x": 32,
+				"size_y": 32
+			},
+			"projectile": {
+				"texture": "arrow.bmp",
+				"num_frames": 5,
+				"size_x": 32,
+				"size_y": 32,
+				"center_x": 8,
+				"center_y": 16
+			},
+			"body": {
+				"texture_blue": "bike head blue.bmp",
+				"texture_red": "bike head red.bmp",
+				"size_x" : 32,
+				"size_y" : 32
+			}
+		}
+	},
+	{
+		"tag": "Monster",
+		"general_stats": {
+			"radius": 15.0,
+			"mass": 20.0,
+			"max_speed": 40.0,
+			"acceleration": 2.8,
+			"turn_speed": 0.25,
+			"on_target_dampening": 3.2,
+			"max_hp": 50,
+			"armor": 0
+		},
+		"melee_stats": {
+			"melee": true,
+			"range": 15.0,
+			"angle": 0.5,
+			"cooldown": 70,
+			"aoe": true,
+			"attack": 55,
+			"defense": 40,
+			"armor_piercing": 0,
+			"damage": 4
+		},
+		"ranged_stats": {
+			"ranged": false,
+			"range": 400.0,
+			"min_range": 7.0,
+			"radius": 0.1,
+			"heavy": false,
+			"draw_timer": 10,
+			"reload_timer": 300,
+			"max_speed_for_firing": 10.0,
+			"defense": 0,
+			"projectile_speed": 120.0,
+			"armor_piercing": 0,
+			"ally_protection_aoe": 10.0,
+			"aoe": 0.0,
+			"damage": 2
+		},
+		"keywords": {
+			"infantry": false,
+			"large": true,
+			"anti_infantry": true,
+			"anti_large": false
+		},
+		"textures": {
+			"legs": {
+				"texture": "shark legs.bmp",
+				"size_x": 64,
+				"size_y": 64,
+				"step": 8.0
+			},
+			"arms": {
+				"texture": "shark arms roll.bmp",
+				"num_frames": 5,
+				"size_x": 96,
+				"size_y": 96,
+				"frame_size_x": 64,
+				"frame_size_y": 64,
+				"ticks_per_frame": 2
+			},
+			"ranged": {
+				"texture": "soldier_crossbow.bmp",
+				"num_frames": 4,
+				"size_x": 32,
+				"size_y": 32
+			},
+			"projectile": {
+				"texture": "arrow.bmp",
+				"num_frames": 5,
+				"size_x": 32,
+				"size_y": 32,
+				"center_x": 8,
+				"center_y": 16
+			},
+			"body": {
+				"texture_blue": "shark blue.bmp",
+				"texture_red": "shark red.bmp",
+				"size_x" : 64,
+				"size_y" : 64
+			}
+		}
+	},
+	{
+		"tag": "Crossbowman",
+		"general_stats": {
+			"radius": 5.0,
+			"mass": 1.0,
+			"max_speed": 15.0,
+			"acceleration": 3.0,
+			"turn_speed": 0.66,
+			"on_target_dampening": 3.0,
+			"max_hp": 2,
+			"armor": 0
+		},
+		"melee_stats": {
+			"melee": true,
+			"range": 7.0,
+			"angle": 0.33,
+			"cooldown": 70,
+			"aoe": false,
+			"attack": 15,
+			"defense": -10,
+			"armor_piercing": 0,
+			"damage": 1
+		},
+		"ranged_stats": {
+			"ranged": true,
+			"range": 400.0,
+			"min_range": 7.0,
+			"radius": 0.1,
+			"heavy": false,
+			"draw_timer": 10,
+			"reload_timer": 300,
+			"max_speed_for_firing": 10.0,
+			"defense": 0,
+			"projectile_speed": 50.0,
+			"armor_piercing": 0,
+			"ally_protection_aoe": 10.0,
+			"aoe": 0.0,
+			"damage": 2
+		},
+		"keywords": {
+			"infantry": true,
+			"large": false,
+			"anti_infantry": false,
+			"anti_large": false
+		},
+		"textures": {
+			"legs": {
+				"texture": "soldier_legs.bmp",
+				"size_x": 32,
+				"size_y": 32,
+				"step": 3.0
+			},
+			"arms": {
+				"texture": "soldier_dagger_melee.bmp",
+				"num_frames": 5,
+				"size_x": 32,
+				"size_y": 64,
+				"ticks_per_frame": 2
+			},
+			"ranged": {
+				"texture": "soldier_crossbow.bmp",
+				"num_frames": 4,
+				"size_x": 32,
+				"size_y": 32
+			},
+			"projectile": {
+				"texture": "arrow.bmp",
+				"num_frames": 5,
+				"size_x": 32,
+				"size_y": 32,
+				"center_x": 16,
+				"center_y": 7,
+				"length": 7.0
+			},
+			"body": {
+				"texture_blue": "soldier_blue.bmp",
+				"texture_red": "soldier_red.bmp",
+				"size_x" : 32,
+				"size_y" : 32
+			}
+		}
+	},
+	{
+		"tag": "Ballista",
+		"general_stats": {
+			"radius": 15.0,
+			"mass": 100.0,
+			"max_speed": 7.0,
+			"acceleration": 1.0,
+			"turn_speed": 0.2,
+			"on_target_dampening": 3.0,
+			"max_hp": 20,
+			"armor": 0
+		},
+		"melee_stats": {
+			"melee": false,
+			"range": 0.0,
+			"angle": 0.0,
+			"cooldown": 1000,
+			"aoe": false,
+			"attack": 0,
+			"defense": -10,
+			"armor_piercing": 0,
+			"damage": 0
+		},
+		"ranged_stats": {
+			"ranged": true,
+			"range": 800.0,
+			"min_range": 15.0,
+			"radius": 0.1,
+			"heavy": true,
+			"draw_timer": 10,
+			"reload_timer": 400,
+			"max_speed_for_firing": 5.0,
+			"defense": 0,
+			"projectile_speed": 50.0,
+			"armor_piercing": 0,
+			"ally_protection_aoe": 10.0,
+			"aoe": 30.0,
+			"damage": 5
+		},
+		"keywords": {
+			"infantry": false,
+			"large": false,
+			"anti_infantry": false,
+			"anti_large": false
+		},
+		"textures": {
+			"legs": {
+				"texture": "ballista wheels.bmp",
+				"size_x": 96,
+				"size_y": 96,
+				"step": 1.0
+			},
+			"arms": {
+				"texture": "soldier_dagger_melee.bmp",
+				"num_frames": 5,
+				"size_x": 32,
+				"size_y": 64
+			},
+			"ranged": {
+				"texture": "ballista reload.bmp",
+				"num_frames": 4,
+				"size_x": 96,
+				"size_y": 96
+			},
+			"projectile": {
+				"texture": "arrow.bmp",
+				"num_frames": 5,
+				"size_x": 32,
+				"size_y": 32,
+				"center_x": 16,
+				"center_y": 7,
+				"length": 20.0
+			},
+			"body": {
+				"texture_blue": "ballista blue.bmp",
+				"texture_red": "ballista red.bmp",
+				"size_x" : 96,
+				"size_y" : 96
+			}
+		}
+	}
+]

@@ -5,6 +5,7 @@
 #include <SDL_ttf.h>
 #include <string>
 
+
 class Texture {
 public:
 	int _width;
@@ -37,6 +38,7 @@ public:
 
 };
 
+
 class ImgTexture : public Texture{
 public:
 	ImgTexture(SDL_Renderer* renderer) : Texture(renderer) {}
@@ -58,7 +60,7 @@ public:
 		}
 	}
 
-	void renderZoomed(double x, double y, double rad, int SCREEN_WIDTH, int SCREEN_HEIGHT, double zoom, Eigen::Vector2d mapCenter, double angle = 0.0, SDL_Point* center = NULL, SDL_Rect* clip = NULL, SDL_RendererFlip flip = SDL_FLIP_NONE) {
+	void renderZoomed(double x, double y, double rad, int frame_size_x, int frame_size_y, int frame_origin_x, int frame_origin_y, int SCREEN_WIDTH, int SCREEN_HEIGHT, double zoom, Eigen::Vector2d mapCenter, double angle = 0.0, SDL_Point* center = NULL, SDL_Rect* clip = NULL, SDL_RendererFlip flip = SDL_FLIP_NONE) {
 		Eigen::Vector2d diag; diag << SCREEN_WIDTH / 2., SCREEN_HEIGHT / 2.;
 		double rrad = zoom * rad;
 		double xx = zoom*x - mapCenter.coeff(0) + diag.coeff(0);
@@ -73,20 +75,28 @@ public:
 				cx = center->x; cy = center->y;
 			}
 			else {
-				cx = clip->w / 2.; cy = clip->h / 2.;
+				cx = frame_size_x / 2. + frame_origin_x; cy = frame_size_y / 2. + frame_origin_y;
 			}
-			rec.x = xx - cx / 32 * 2 * rrad; rec.y = yy - cy / 32 * 2 * rrad; rec.w = clip->w / 32 * 2 * rrad; rec.h = clip->h / 32 * 2 * rrad;
-			point.x = cx / 32 * 2 * rrad; point.y = cy / 32 * 2 * rrad;
+			double temp_recw, temp_rech, temp_recx, temp_recy;
+			temp_recw = static_cast<double>(clip->w) / frame_size_x * 2. * rrad;
+			temp_rech = static_cast<double>(clip->h) / frame_size_y * 2. * rrad;
+			temp_recx = xx - (cx + 0) / frame_size_x * 2. * rrad;
+			temp_recy = yy - (cy + 0) / frame_size_y * 2. * rrad;
+			rec.x = temp_recx; rec.y = temp_recy; rec.w = temp_recw; rec.h = temp_rech;
+			double temp_px, temp_py;
+			temp_px = cx / frame_size_x * 2. * rrad;
+			temp_py = cy / frame_size_y * 2. * rrad;
+			point.x = temp_px; point.y = temp_py;
 		}
 		else {
 			rec.x = xx-rrad; rec.y = yy-rrad; rec.w = 2*rrad; rec.h = 2*rrad;
 			destCenter = NULL;
-			//rec << {xx - rrad,yy - rrad,2*rrad,2*rrad};
 		}
 		SDL_RenderCopyEx(renderer, texture, clip, &rec, angle, destCenter, flip);
 	};
 
 };
+
 
 class StringTexture : public Texture{
 public:

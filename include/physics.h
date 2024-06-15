@@ -34,7 +34,7 @@ void ReformUnit(Unit* unit) {
 	std::deque<RebasedSoldier*> temp2;
 	// Sorting soldiers by new "y coordinate" (front-back in formation)
 	for(int i = 0; i < unit->nrows; i++) {
-		for(int j = 0; j < unit->width; j++) {
+		for(int j = 0; j < unit->ncols; j++) {
 			Soldier* soldier = soldiers->at(i).at(j);
 			if(soldier) {
 				Eigen::Matrix2d rot;
@@ -70,7 +70,7 @@ void ReformUnit(Unit* unit) {
 	while(!temp1.empty()) {
 		std::deque<RebasedSoldier*> tempRow;
 		// Filling tempRow
-		while((!temp1.empty()) && tempRow.size() < unit->width) {
+		while((!temp1.empty()) && tempRow.size() < unit->ncols) {
 			RebasedSoldier* node = temp1.at(0); temp1.pop_front();
 			auto current = tempRow.begin();
 			int n = 0;
@@ -92,7 +92,7 @@ void ReformUnit(Unit* unit) {
 	}
 	// Pasting the new order into unit
 	for(int i = 0; i < unit->nrows; i++) {
-		for(int j = 0; j < unit->width; j++) {
+		for(int j = 0; j < unit->ncols; j++) {
 			if(!temp2.empty()) {
 				RebasedSoldier* r = temp2.at(0); temp2.pop_front();
 				(*soldiers).at(i).at(j) = r->soldier;
@@ -156,6 +156,7 @@ void TimeStep(Soldier* soldier, double dt) {
 	Eigen::Vector2d fullVel = soldier->vel + soldier->knockVel;	//knockVel will have to be atomic eventually
 	newVel = fullVel + soldier->force * dt;
 	double speed = soldier->vel.norm();
+	soldier->speed = speed;
 	//new angle and rotation
 	Eigen::Matrix2d rotT;
 	Eigen::Matrix2d rotDiff;
@@ -223,6 +224,8 @@ void TimeStep(Soldier* soldier, double dt) {
 		soldier->rot = newRot;
 		soldier->angle = newAngle;
 	}
+	soldier->angle = Angle(soldier->rot.coeff(0,1), soldier->rot.coeff(0,0));
+	soldier->forwardSpeed = newVel.coeff(0) * soldier->rot.coeff(0,0) + newVel.coeff(1) * soldier->rot.coeff(1, 0);
 	//new force
 	Eigen::Vector2d newForce;
 	if(closeToTarget || abs(angleDiff) < 0.25 || (inMelee && almostOnTarget)) {
@@ -352,7 +355,7 @@ void KnockKnock(Soldier* sold1, Soldier* sold2) {
 
 void CollisionScrying(Map* map, Unit* unit) {
 	for(int i = 0; i < unit->nrows; i++) {
-		for(int j = 0; j < unit->width; j++) {
+		for(int j = 0; j < unit->ncols; j++) {
 			Soldier* soldier = (*unit).soldiers.at(i).at(j);
 			if(soldier->placed && soldier->alive) {
 				int m = (int) (soldier->pos.coeff(1) / map->tilesize);
@@ -413,7 +416,6 @@ void ProjectileCollisionHandling(Map* map) {
 						}
 					}
 					if(projectile->aoerad > 0.) {
-						std::cout << "-----looking at neighbours " << tile->neighbours.size() << "-----\n";
 						for(auto ntile : tile->neighbours) {
 							for(auto soldier : ntile->soldiers) {
 								if((projectile->get_pos() - soldier->pos).norm() < soldier->rad + projectile->aoerad) {

@@ -10,41 +10,33 @@
 #include <iostream>
 #include <vector>
 #include <cstdlib>
+#include <map>
 
 class Unit;
 //class Player;
 
-void Populate(Unit* unit);
+void Populate(Unit* unit, std::map<std::string, SoldierInformation> classMap);
 void Place(Unit* unit, Eigen::Vector2d pos, Eigen::Matrix2d rot);
 void MoveTarget(Unit* unit, Eigen::Vector2d pos, Eigen::Matrix2d rot);
 void UpdatePos(Unit* unit);
 void UpdateVel(Unit* unit);
 void PosInUnitByID(Unit* unit);
 
-//SOLDIER_TYPES (handled in soldiers.h)
-
-enum UNIT_TYPE {
-	UNIT_GENERIC,
-	UNIT_TEMPLATE,
-	UNIT_INFANTRY,
-	UNIT_CAVALRY,
-	UNIT_MONSTER,
-	UNIT_LONE_RIDER,
-	UNIT_SHOOTAS,
-	UNIT_SLOW_SHOOTA
-};
-
 
 class Unit {
 	public:
-		virtual void ConversionEnabler() {}
+		//virtual void ConversionEnabler() {}
 		//array width and length have to be set manually in every declaration and defintion because there could only be one flexible array member but more would be needed
 		int maxSoldiers = 1;
-		double spacing = 0;
-		int width = 1;
+		//double spacing = 0;
+		double xspacing = 0.;
+		double yspacing = 0.;
+		int ncols = 1;//int width = 1;
 		int nrows = 1;//maxSoldiers / width;	// being not fun
-		int soldierType = SOLDIER_SOLDIER;
-		int type = UNIT_GENERIC;
+		//int soldierType = SOLDIER_SOLDIER;
+		//int type = UNIT_GENERIC;
+		std::string tag;
+		std::string soldierType;
 		Player* player;
 		std::vector<std::vector<Soldier*>> soldiers;//{_nrows, std::vector<Soldier*>(_width, NULL)};
 		std::vector<Soldier*> liveSoldiers;
@@ -73,166 +65,46 @@ class Unit {
 		//int targetUpdateCounter = 60;
 		std::vector<Unit*> targetedBy;
 		
-		void init() {
-			soldiers = std::vector<std::vector<Soldier*>>(nrows, std::vector<Soldier*>(width, NULL));
-			posInUnit = std::vector<std::vector<Eigen::Vector2d>>(nrows, std::vector<Eigen::Vector2d>(width, Eigen::Vector2d()));
+		void init(std::map<std::string, SoldierInformation> classMap) {
+			soldiers = std::vector<std::vector<Soldier*>>(nrows, std::vector<Soldier*>(ncols, NULL));
+			posInUnit = std::vector<std::vector<Eigen::Vector2d>>(nrows, std::vector<Eigen::Vector2d>(ncols, Eigen::Vector2d()));
 			nLiveSoldiers = 0;
-			Populate(this);
+			Populate(this, classMap);
 			PosInUnitByID(this);
 			enemyContact = false;
 		}
 
-		Unit(bool subclass, Player* player) {
+		Unit(UnitInformation info, Player* player, std::map<std::string, SoldierInformation> classMap) {
+			tag = info.tag;
+			soldierType = info.soldier_type;
+			maxSoldiers = info.formation_max_soldiers;
+			ncols = info.formation_columns;
+			nrows = info.formation_rows;
+			xspacing = info.formation_x_spacing;
+			yspacing = info.formation_y_spacing;
+
+			ranged = info.ranged_ranged;
+			range = info.ranged_range;
+			rangedAngle = info.ranged_angle;
+
+			this->player = player;
+
 			nSoldiers = 0;
 			placed = false;
-			this->player = player;
-			if(!subclass) {
-				//maxSoldiers = 1;
-				//spacing = 0;
-				//width = 1;
-				//nrows = 1;
-				//soldierType = SOLDIER_SOLDIER;
-				//type = UNIT_GENERIC;
 
-				init();
-			}
+			init(classMap);
+
 		}
 
-		Unit(Player* player) : Unit(false, player) {}
+		//Unit(Player* player) : Unit(false, player) {}
 				
 };
 
-class UnitSubClassTemplate : public Unit {
-	public:
-		UnitSubClassTemplate(Player* player) : Unit(true, player) {
-			maxSoldiers = 16;
-			spacing = 50.;
-			width = 4;
-			nrows = 4;
-			soldierType = SOLDIER_SUBCLASSTEMPLATE;
-			Populate(this);
-			PosInUnitByID(this);
-			type = UNIT_TEMPLATE;
-
-			init();
-		};
-};
-
-class Infantry : public Unit {
-	public:
-		Infantry(Player* player) : Unit(true, player) {
-			maxSoldiers = 90;
-			spacing = 12.;
-			width = 10;
-			nrows = 9;
-			soldierType = SOLDIER_INFANTRYMAN;
-			type = UNIT_INFANTRY;
-
-			init();
-		};
-};
-
-class Cavalry : public Unit {
-	public:
-		Cavalry(Player* player) : Unit(true, player) {
-			maxSoldiers = 16;
-			spacing = 18.;
-			width = 4;
-			nrows = 4;
-			soldierType = SOLDIER_RIDER;
-			type = UNIT_CAVALRY;
-
-			init();
-		};
-};
-
-class MonsterUnit : public Unit {
-	public:
-		MonsterUnit(Player* player) : Unit(true, player) {
-			maxSoldiers = 1;
-			spacing = 0.;
-			width = 1;
-			nrows = 1;
-			soldierType = SOLDIER_MONSTER;
-			type = UNIT_MONSTER;
-
-			init();
-		};
-};
-
-class LoneRider : public Unit {
-	public:
-		LoneRider(Player* player) : Unit(true, player) {
-			maxSoldiers = 1;
-			spacing = 0.;
-			width = 1;
-			nrows = 1;
-			soldierType = SOLDIER_RIDER;
-			type = UNIT_LONE_RIDER;
-
-			init();
-		};
-};
-
-class Shootas : public Unit {
-	public:
-		Shootas(Player* player) : Unit(true, player) {
-			maxSoldiers = 64;
-			spacing = 12.;
-			width = 8;
-			nrows = 8;
-			soldierType = SOLDIER_SHOOTA;
-			type = UNIT_SHOOTAS;
-
-			ranged = true;
-			range = 400;
-			rangedAngle = 1.;//1./3.;
-
-			init();
-		};
-};
-
-class SlowShootaUnit : public Unit {
-	public:
-		SlowShootaUnit(Player* player) : Unit(true, player) {
-			maxSoldiers = 1;
-			spacing = 0.;
-			width = 1;
-			nrows = 1;
-			soldierType = SOLDIER_SLOW_SHOOTA;
-			type = UNIT_SLOW_SHOOTA;
-
-			ranged = true;
-			range = 700;
-			rangedAngle = 1.;//1./3.;
-
-			init();
-		};
-};
-
-
-void Populate(Unit* unit) {
+void Populate(Unit* unit, std::map<std::string, SoldierInformation> classMap) {
 	std::vector<std::vector<Soldier*>>* soldiers = &(unit->soldiers);
 	for(int i = 0; i < unit->nrows; i++) {
-		for(int j = 0; j < unit->width; j++) {
-			switch (unit->soldierType) {
-				case SOLDIER_SOLDIER:
-					(*soldiers).at(i).at(j) = new Soldier(unit); break;
-				case SOLDIER_SUBCLASSTEMPLATE:
-					(*soldiers).at(i).at(j) = new SoldierSubClassTemplate(unit); break;
-				case SOLDIER_INFANTRYMAN:
-					(*soldiers).at(i).at(j) = new InfantryMan(unit); break;
-				case SOLDIER_RIDER:
-					(*soldiers).at(i).at(j) = new Rider(unit); break;
-				case SOLDIER_MONSTER:
-					(*soldiers).at(i).at(j) = new Monster(unit); break;
-				case SOLDIER_SHOOTA:
-					(*soldiers).at(i).at(j) = new Shoota(unit); break;
-				case SOLDIER_SLOW_SHOOTA:
-					(*soldiers).at(i).at(j) = new SlowShoota(unit); break;
-				default:
-					std::cout << "[ERROR:] Population of Unit: Soldier type does not exist!\n";
-			}
+		for(int j = 0; j < unit->ncols; j++) {
+			(*soldiers).at(i).at(j) = new Soldier(classMap.at(unit->soldierType), unit);
 			unit->liveSoldiers.push_back(unit->soldiers.at(i).at(j));
 			unit->nLiveSoldiers++;
 			if(unit->soldiers.at(i).at(j)->ranged)
@@ -245,7 +117,7 @@ void Place(Unit* unit, Eigen::Vector2d pos, Eigen::Matrix2d rot) {
 	std::vector<std::vector<Soldier*>>* soldiers = &(unit->soldiers);
 	std::vector<std::vector<Eigen::Vector2d>>* posInUnit = &(unit->posInUnit);
 	for(int i = 0; i < unit->nrows; i++) {
-		for (int j = 0; j < unit->width; j++) {
+		for (int j = 0; j < unit->ncols; j++) {
 			if (unit->nSoldiers < unit->maxSoldiers) {
 				Soldier* soldier = (*soldiers)[i][j];
 				soldier->pos = pos + rot * (*posInUnit)[i][j];
@@ -255,6 +127,8 @@ void Place(Unit* unit, Eigen::Vector2d pos, Eigen::Matrix2d rot) {
 				soldier->rotTarget = soldier->rot;
 				soldier->angleTarget = Angle(rot.coeff(0,1),rot.coeff(0,0));
 				soldier->vel << 0., 0.;
+				soldier->speed = 0.;
+				soldier->forwardSpeed = 0.;
 				soldier->knockVel << 0., 0.;
 				soldier->force << 0., 0.;
 				unit->nSoldiers++;
@@ -280,7 +154,7 @@ void MoveTarget(Unit* unit) {
 	std::vector<std::vector<Soldier*>>* soldiers = &(unit->soldiers);
 	std::vector<std::vector<Eigen::Vector2d>>* posInUnit = &(unit->posInUnit);
 	for(int i = 0; i < unit->nrows; i++) {
-		for(int j = 0; j < unit->width; j++) {
+		for(int j = 0; j < unit->ncols; j++) {
 			Soldier* soldier = soldiers->at(i).at(j);
 			if(soldier->placed && soldier->alive) {	//change to something like soldier->alive
 				Order* o = unit->orders.at(soldier->currentOrder);
@@ -309,7 +183,7 @@ void UpdatePos(Unit* unit) {
 	Eigen::Vector2d pos;
 	pos << 0., 0.;
 	for(int i = 0; i < unit->nrows; i++) {
-		for(int j = 0; j < unit->width; j++) {
+		for(int j = 0; j < unit->ncols; j++) {
 			Soldier* soldier = (*soldiers)[i][j];
 			if(soldier->placed && soldier->alive) {
 				if(soldier->currentOrder == unit->currentOrder) {
@@ -330,7 +204,7 @@ void UpdateVel(Unit* unit) {
 	Eigen::Vector2d vel;
 	vel << 0., 0.;
 	for(int i = 0; i < unit->nrows; i++) {
-		for(int j = 0; j < unit->width; j++) {
+		for(int j = 0; j < unit->ncols; j++) {
 			Soldier* soldier = (*soldiers)[i][j];
 			if(soldier->placed && soldier->alive) {
 				if(soldier->currentOrder == unit->currentOrder) {
@@ -347,11 +221,11 @@ void UpdateVel(Unit* unit) {
 void PosInUnitByID(Unit* unit) {
 	//std::vector<std::vector<Soldier*>>* soldiers = unit->soldiers();
 	std::vector<std::vector<Eigen::Vector2d>>* posInUnit = &(unit->posInUnit);
-	double x0 = unit->spacing*(unit->nrows - 1)/2.;
-	double y0 = unit->spacing*(unit->width - 1)/2.;
+	double x0 = unit->xspacing*(unit->nrows - 1)/2.;
+	double y0 = unit->yspacing*(unit->ncols - 1)/2.;
 	for(int i = 0; i < unit->nrows; i++) {
-		for(int j = 0; j < unit->width; j++) {
-			(*posInUnit).at(i).at(j) << x0 - i*unit->spacing, y0 - j*unit->spacing;
+		for(int j = 0; j < unit->ncols; j++) {
+			(*posInUnit).at(i).at(j) << x0 - i*unit->xspacing, y0 - j*unit->yspacing;
 		}
 	}
 }
@@ -434,8 +308,8 @@ void SoldierNextOrder(Soldier* soldier, Eigen::Vector2d posInUnit) {
 
 Rrectangle SoldierRectangle(Soldier* soldier) {
 	Unit* unit = soldier->unit;
-	double halfWidth = (unit->width - 1) * unit->spacing * 0.5 + 1.*soldier->rad;
-	double halfDepth = (unit->nrows - 1) * unit->spacing * 0.5 + 1.*soldier->rad;
+	double halfWidth = (unit->ncols - 1) * unit->yspacing * 0.5 + 1.*soldier->rad;
+	double halfDepth = (unit->nrows - 1) * unit->xspacing * 0.5 + 1.*soldier->rad;
 	Order* o = unit->orders.at(soldier->currentOrder);
 	Eigen::Vector2d pos;
 	Eigen::Matrix2d rot;
@@ -448,8 +322,8 @@ Rrectangle SoldierRectangle(Soldier* soldier) {
 }
 
 Rrectangle UnitRectangle(Unit* unit, int orderID) {
-	double halfWidth = (unit->width - 1) * unit->spacing * 0.5;
-	double halfDepth = (unit->nrows - 1) * unit->spacing * 0.5;
+	double halfWidth = (unit->ncols - 1) * unit->yspacing * 0.5;
+	double halfDepth = (unit->nrows - 1) * unit->xspacing * 0.5;
 	Order* o = unit->orders.at(orderID);
 	Eigen::Vector2d pos;
 	Eigen::Matrix2d rot;
@@ -462,14 +336,14 @@ Rrectangle UnitRectangle(Unit* unit, int orderID) {
 }
 
 Rrectangle OnSpotUnitRectangle(Unit* unit) {
-	double halfWidth = (unit->width - 1) * unit->spacing * 0.5;
-	double halfDepth = (unit->nrows - 1) * unit->spacing * 0.5;
+	double halfWidth = (unit->ncols - 1) * unit->yspacing * 0.5;
+	double halfDepth = (unit->nrows - 1) * unit->xspacing * 0.5;
 	return Rrectangle(halfWidth, halfDepth, unit->pos, unit->rot);
 };
 
 Rrectangle UnitRectangle(Unit* unit, int orderID, std::vector<Order*> orders) {
-	double halfWidth = (unit->width - 1) * unit->spacing * 0.5;
-	double halfDepth = (unit->nrows - 1) * unit->spacing * 0.5;
+	double halfWidth = (unit->ncols - 1) * unit->yspacing * 0.5;
+	double halfDepth = (unit->nrows - 1) * unit->xspacing * 0.5;
 	Order* o = orders.at(orderID);
 	Eigen::Vector2d pos;
 	Eigen::Matrix2d rot;
