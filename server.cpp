@@ -43,6 +43,7 @@ void OpenWindow(Map* map) {
 	model = new Model(em, map);
 	model->loadSoldierTypes("config/templates/classes.json");
 	model->loadUnitTypes("config/templates/units.json");
+	model->loadDamageInfo();
 	dynamic_cast<GameEventManager*>(em)->model = model;
 	// #### set up players with units from armylist.json
 	Player* player1 = new Player(true);

@@ -6,7 +6,6 @@
 
 using json = nlohmann::json;
 
-//class json;
 
 class AnimationInformation {
 public:
@@ -82,6 +81,7 @@ public:
 
 	SoldierInformation(json input);
 };
+
 
 class UnitInformation {
 public:

@@ -9,7 +9,6 @@
 #include <input.h>
 #include <textures.h>
 #include <animations.h>
-#include <animations2.h>
 
 #include <SDL.h>
 #include <SDL_ttf.h>
@@ -75,20 +74,10 @@ private:
 		StringTexture* textInput;		// displays current text input
 		StringTexture* objInformation;	// displays information about selected objects
 		std::string info;
-		// #### instead of individual textures we need texture maps
-		ImgTexture* soldierBlue;
-		ImgTexture* soldierRed;
-		ImgTexture* soldierBlueGreen;
-		ImgTexture* soldierRedGreen;
+
 		ImgTexture* objCircle;
 		ImgTexture* token;
-		ImgTexture* swordBlue;
-		ImgTexture* swordRed;
-		ImgTexture* swish;
 		ImgTexture* damage;
-
-		std::vector<OldSoldierAnimation*> animations;
-		std::vector<double> soldierAngles;
 		std::map<std::string, ImgTexture*> blueLegTextures;
 		std::map<std::string, ImgTexture*> redLegTextures;
 		std::vector<LegAnimation*> legs;
@@ -107,7 +96,9 @@ private:
 
 	public:
 		void loadTextures();
-		void animateSoldier(SoldierAnimation* anime, ZoomableGUIController* ctrl);
+		void loadDamageTexture();
+		void animateSelectionCircle(SoldierAnimation* anime, ZoomableGUIController* ctrl);
+		void animateSoldier(SoldierAnimation* anime, ZoomableGUIController* ctrl, bool hpAlpha = true);
 		void animateProjectile(ProjectileAnimation* anime, ZoomableGUIController* ctrl);
 
 		View(EventManager* em, Map* map, SDL_Window* window, SDL_Renderer* renderer) : GeneralView(em, window, renderer) {
@@ -126,18 +117,11 @@ private:
 			objCircle->loadFromImage("textures/circle_purple.bmp");
 			token = new ImgTexture(renderer);
 			token->loadFromImage("textures/circles.bmp");
-			swordBlue = new ImgTexture(renderer);
-			swordBlue->loadFromImage("textures/sword_blue_roll.bmp");
-			swordRed = new ImgTexture(renderer);
-			swordRed->loadFromImage("textures/sword_red_roll.bmp");
-			swish = new ImgTexture(renderer);
-			swish->loadFromImage("textures/sword_swish_roll.bmp");
-			damage = new ImgTexture(renderer);
-			damage->loadFromImage("textures/damage_tick_roll.bmp");
 
 			GameEventManager* gem = Gem();
 			model = gem->model;
 			loadTextures();
+			loadDamageTexture();
 		}
 	private:
 		void Update() {
@@ -295,29 +279,32 @@ private:
 			debug("Drew selected unit stuff.");
 			SDL_Rect segment;
 			SDL_Point center;
-			// #### COMPUTE PARAMETERS FOR ALL SOLDIERS
-			// #### DRAW LEG ANIMATIONS
+			// drawing green circles under soldiers of selected unit
+			if(model->selectedUnit) {
+				for(auto anime : legs) {			
+					if(model->selectedUnit == anime->soldier->unit && anime->soldier->alive) {
+						animateSelectionCircle(anime, ctrl);
+					}
+				}
+			}
+			// drawing soldiers
 			for(auto anime : legs) {
-				//anime->stage = 1;
 				animateSoldier(anime, ctrl);
 			}
-			// #### DRAW MELEE ANIMATIONS
 			for(auto anime : melee) {
-				//anime->stage = 3;
 				animateSoldier(anime, ctrl);
 			}
-			// #### BODY ANIMATIONS
 			for(auto anime : bodies) {
 				animateSoldier(anime, ctrl);
 			}
-			// #### DRAW RANGED ANIMATIONS
 			for(auto anime : ranged) {
 				animateSoldier(anime, ctrl);
 			}
-			// #### DRAW DAMAGE TICKS
+			// drawing hit markers
 			for(auto anime : damages) {
-				// animateDamage(anime);
+				animateSoldier(anime, ctrl, false);
 			}
+			// drawing projectiles
 			for(auto anime : projectiles) {
 				animateProjectile(anime, ctrl);
 				if(anime->projectile->dead) {
@@ -326,88 +313,10 @@ private:
 					//delete tempProj;	///////// VERY IMPORTANT
 				}
 			}
-
-			for(auto anime : animations) {
+			// optionally drawing debug info
+			for(auto anime : bodies) {
 				Soldier* soldier = anime->soldier;
 				if(soldier->placed) {
-					double ang = Angle(soldier->rot.coeff(0,1), soldier->rot.coeff(0,0)) * 180 / M_PI;
-					switch(anime->type) {
-					case ANIMATION_ATTACK: {
-						bool player1 = (soldier->unit->player == Gem()->model->players.at(0));
-						if(soldier->alive) {
-							// (debug) drawing indiv path
-							if(!soldier->indivPath.empty()) {
-								Point p0(soldier->pos);
-								for(int i = 0; i < soldier->indivPath.size(); i++) {
-									Point p1 (soldier->indivPath.at(i));
-									DrawLine(&p0, &p1, renderer, colorGrey, SCREEN_WIDTH, SCREEN_HEIGHT, ctrl->zoom, ctrl->center);
-									p0 = Point(p1.pos);
-								}
-							}
-							//base circle
-							SDL_SetTextureAlphaMod(token->texture, 255*std::min(double(soldier->hp) / soldier->maxHP, 1.));
-							if(player1) {
-								segment.x = 0; segment.y = 0; segment.w = 32; segment.h = 32;						
-							}
-							else {
-								segment.x = 0; segment.y = 32; segment.w = 32; segment.h = 32;											
-							}
-							//token->renderZoomed(anime->soldier->pos.coeff(0), soldier->pos.coeff(1), soldier->rad,
-							//	SCREEN_WIDTH, SCREEN_HEIGHT, ctrl->zoom, ctrl->center,
-							//	ang, NULL, &segment);
-							SDL_SetTextureAlphaMod(token->texture, 255);
-						}
-						//green circle
-						if(soldier->alive && soldier->unit == Gem()->model->selectedUnit) {
-							segment.x = 0; segment.y = 64; segment.w = 32; segment.h = 32;																	
-							token->renderZoomed(soldier->pos.coeff(0), soldier->pos.coeff(1), soldier->rad, 32, 32, 0, 0,
-								SCREEN_WIDTH, SCREEN_HEIGHT, ctrl->zoom, ctrl->center,
-								ang, NULL, &segment);
-						}
-						//sword
-						segment.x = 0 + anime->stage * 32; segment.y = 0;
-						segment.w = 32; segment.h = 64;
-						center.x = 16; center.y = 48;
-						if(soldier->alive) {
-							double d_ang = 0;
-							if(soldier->meleeAOE && anime->stage != 0) {
-								d_ang = 180./M_PI*soldier->meleeAngle * (-1 + 2./6 * anime->stage);
-							}
-							else if(soldier->meleeSwingTarget && anime->stage != 0){
-								Eigen::Vector2d dx = soldier->meleeSwingTarget->pos - soldier->pos;
-								double dist = dx.norm();
-								d_ang = 180./M_PI * Angle(-dx.coeff(1)/dist, dx.coeff(0)/dist) - ang;
-							}
-							if(player1) {
-								/*swordBlue->renderZoomed(soldier->pos.coeff(0), soldier->pos.coeff(1), soldier->rad, 32, 32,
-									SCREEN_WIDTH, SCREEN_HEIGHT, ctrl->zoom, ctrl->center,
-									ang + 90 + d_ang, &center, &segment);*/
-							}
-							else {
-								/*swordRed->renderZoomed(soldier->pos.coeff(0), soldier->pos.coeff(1), soldier->rad, 32, 32,
-									SCREEN_WIDTH, SCREEN_HEIGHT, ctrl->zoom, ctrl->center,
-									ang + 90 + d_ang, &center, &segment);*/						
-							}
-							//swish
-							if(!soldier->meleeAOE) {
-								/*swish->renderZoomed(soldier->pos.coeff(0), soldier->pos.coeff(1), soldier->rad, 32, 32,
-										SCREEN_WIDTH, SCREEN_HEIGHT, ctrl->zoom, ctrl->center,
-										ang + 90 + d_ang, &center, &segment);*/
-							}
-						}
-						}break;
-
-					case ANIMATION_DAMAGE:
-						segment.x = 0 + anime->stage*32; segment.y = 0;
-						segment.w = 32; segment.h = 32;
-						center.x = 16; center.y = 16;
-						/*damage->renderZoomed(soldier->pos.coeff(0), soldier->pos.coeff(1), soldier->rad, 32, 32, 0, 0,
-							SCREEN_WIDTH, SCREEN_HEIGHT, ctrl->zoom, ctrl->center,
-							0, &center, &segment);*/
-						break;
-					}
-
-					//if(soldier->debugFlag1) {
 					if(soldier->debugFlag1) {
 						DrawCircle(soldier->pos.coeff(0), soldier->pos.coeff(1), soldier->rad, renderer, colorOrange, SCREEN_WIDTH, SCREEN_HEIGHT, ctrl->zoom, ctrl->center);
 					}
@@ -420,13 +329,7 @@ private:
 
 				}
 			}
-			// #### DRAW PROJECTILES
-			for(auto projectile : model->projectiles) {
-				// animateProjectile(anime);
-				//Point p1(projectile->get_pos());
-				//Point p2(projectile->get_pos() - projectile->get_vel() / projectile->get_vel().norm() * 15);
-				//DrawLine(&p1, &p2, renderer, colorOrange, SCREEN_WIDTH, SCREEN_HEIGHT, ctrl->zoom, ctrl->center);
-			}
+
 			// writing text
 			if(ctrl->shift()) {
 				controls = _load_map + "\n" + _quit;
@@ -501,11 +404,12 @@ private:
 			}
 			else if(ev->type == UNIT_ROSTER_MODIFIED_EVENT) {
 				debug("Unit roster was modified. Generating new animations...");
-				animations.clear();
+				//animations.clear();
 				legs.clear();
 				melee.clear();
 				ranged.clear();
 				bodies.clear();
+				damages.clear();
 				projectiles.clear();
 				debug("Cleared old animations.");
 				for(auto player : Gem()->model->players) {
@@ -513,8 +417,8 @@ private:
 					for(auto unit : player->units) {
 						for(auto row : unit->soldiers) {
 							for(auto soldier : row) {
-								animations.push_back(new OldAttackAnimation(soldier));
-								animations.push_back(new DamageAnimation(soldier));
+								//animations.push_back(new OldAttackAnimation(soldier));
+								//animations.push_back(new DamageAnimation(soldier));
 								LegAnimation* leg = new LegAnimation(soldier, model->SoldierTypes.at(soldier->tag).anime_legs_information);
 								if(player->player1)
 									leg->texture = blueLegTextures.at(soldier->tag);
@@ -543,6 +447,9 @@ private:
 								else
 									body->texture = redBodyTextures.at(soldier->tag);
 								bodies.push_back(body);
+								DamageAnimation* dmg = new DamageAnimation(soldier, model->damageInfo);
+								dmg->texture = damage;
+								damages.push_back(dmg);
 							}
 						}
 					}
@@ -558,35 +465,9 @@ private:
 			}
 			else if(ev->type == TICK_EVENT) {
 				debug("TickEvent: view - begin");
-				for(auto anime : animations) {
+				/*for(auto anime : animations) {
 					switch(anime->type) {
-					case ANIMATION_ATTACK:
-						if(!anime->running && !anime->onCooldown && !anime->soldier->MeleeTimer.done()) {
-						//if(!anime->running && !anime->onCooldown && anime->soldier->meleeCooldownTicks > 0) {
-							anime->running = true;
-							anime->onCooldown = true;
-							anime->ticksToNextStage = 1;
-						}
-						else if(anime->running) {
-							if(anime->ticksToNextStage == 0) {
-								if(anime->stage == 6) {
-									anime->stage = 0;
-									anime->ticksToNextStage = 0;
-									anime->running = false;
-								}
-								else {
-									anime->stage = (anime->stage + 1) % 7;
-									anime->ticksToNextStage = 1;
-								}
-							}
-							else
-								anime->ticksToNextStage--;
-						}
-						else if(anime->onCooldown && anime->soldier->MeleeTimer.done())
-						//else if(anime->onCooldown && anime->soldier->meleeCooldownTicks == 0)
-							anime->onCooldown = false;
-						break;
-					case ANIMATION_DAMAGE:{
+					case 0:{
 						DamageAnimation* danime = dynamic_cast<DamageAnimation*>(anime);
 						if(!anime->running && anime->soldier->hp < danime->lastHP) {
 							anime->running = true;
@@ -610,7 +491,7 @@ private:
 						}
 						}break;
 					}
-				}
+				}*/
 				Update();
 				debug("TickEvent: view - end");
 			}
@@ -841,33 +722,37 @@ void View::loadTextures() {
 	}
 }
 
-/*void View::animateBody(SoldierAnimation* body, double ang, ZoomableGUIController* ctrl) {
-	Soldier* soldier = body->soldier;
-	if(soldier->alive && soldier->placed) {
-		SDL_SetTextureAlphaMod(body->texture->texture, 255*std::min(double(soldier->hp) / soldier->maxHP, 1.));
-		body->texture->renderZoomed(body->soldier->pos.coeff(0), soldier->pos.coeff(1), soldier->rad, body->info.size_x, body->info.size_y,
-				SCREEN_WIDTH, SCREEN_HEIGHT, ctrl->zoom, ctrl->center,
-				ang, NULL);
-		SDL_SetTextureAlphaMod(body->texture->texture, 255);
-	}
-}*/
+void View::loadDamageTexture() {
+	damage = new ImgTexture(renderer);
+	damage->loadFromImage(("textures/" + model->damageInfo.texture).c_str());
+}
 
-void View::animateSoldier(SoldierAnimation* anime, ZoomableGUIController* ctrl) {
+void View::animateSelectionCircle(SoldierAnimation* anime, ZoomableGUIController* ctrl) {
 	Soldier* soldier = anime->soldier;
-	if(soldier->alive && soldier->placed) {
-		//double ang = (Angle(soldier->rot.coeff(0,1), soldier->rot.coeff(0,0)) * 180) / M_PI + 90;
-		double ang = soldier->angle * 180 / M_PI + 90;
+	SDL_Rect segment;
+	segment.x = 0; segment.y = 64; segment.w = 32; segment.h = 32;
+	token->renderZoomed(soldier->pos.coeff(0), soldier->pos.coeff(1), soldier->rad, 32, 32, 0, 0, SCREEN_WIDTH, SCREEN_HEIGHT, ctrl->zoom, ctrl->center, 0, NULL, &segment);
+}
+
+void View::animateSoldier(SoldierAnimation* anime, ZoomableGUIController* ctrl, bool hpAlpha) {
+	Soldier* soldier = anime->soldier;
+	if((soldier->alive && soldier->placed) || !hpAlpha) {
+		double ang;
+		if(hpAlpha) ang = soldier->angle * 180 / M_PI + 90;
+		else ang = 0.;
 		SDL_Rect clip;
 		clip.x = 0 + anime->stage * anime->info.size_x;
 		clip.y = 0;
 		clip.h = anime->info.size_y;
 		clip.w = anime->info.size_x;
-		SDL_SetTextureAlphaMod(anime->texture->texture, 255*std::min(double(soldier->hp) / soldier->maxHP, 1.));		
+		if(hpAlpha)
+			SDL_SetTextureAlphaMod(anime->texture->texture, 255*std::min(double(soldier->hp) / soldier->maxHP, 1.));		
 		anime->texture->renderZoomed(soldier->pos.coeff(0), soldier->pos.coeff(1), soldier->rad, 
 			anime->info.frame_size_x, anime->info.frame_size_y, anime->info.frame_origin_x, anime->info.frame_origin_y,
 			SCREEN_WIDTH, SCREEN_HEIGHT, ctrl->zoom, ctrl->center,
 			ang, NULL, &clip);
-		SDL_SetTextureAlphaMod(anime->texture->texture, 255);
+		if(hpAlpha)
+			SDL_SetTextureAlphaMod(anime->texture->texture, 255);
 		anime->advance();
 	}
 }

@@ -3,7 +3,7 @@
 
 #include <extra_math.h>
 #include <base.h>
-#include <soldiers2.h>
+#include <soldiers.h>
 #include <units.h>
 #include <orders.h>
 #include <map.h>

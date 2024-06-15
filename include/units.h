@@ -1,7 +1,7 @@
 #ifndef UNITS
 #define UNITS
 
-#include <soldiers2.h>
+#include <soldiers.h>
 #include <orders.h>
 #include <player.h>
 #include <timer.h>

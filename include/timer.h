@@ -47,7 +47,6 @@ public:
 		return current;
 	}
 
-	//Constructor
 	Timer(int max) {
 		set_max(max);
 		reset();

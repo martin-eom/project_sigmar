@@ -1,10 +1,11 @@
-#ifndef OLDSOLDIERS
-#define OLDSOLDIERS
+#ifndef SOLDIERS2
+#define SOLDIERS2
 
 #include <extra_math.h>
 #include <timer.h>
 #include <debug.h>
-#include <projectiles.h>
+#include <information.h>
+//#include <projectiles.h>
 
 #ifndef _USE_MATH_DEFINES
 #define _USE_MATH_DEFINES
@@ -15,16 +16,6 @@
 #include <ostream>
 #include <queue>
 #include <cstdlib>
-
-enum SOLDIER_IDS {
-	SOLDIER_SOLDIER,
-	SOLDIER_SUBCLASSTEMPLATE,
-	SOLDIER_INFANTRYMAN,
-	SOLDIER_RIDER,
-	SOLDIER_MONSTER,
-	SOLDIER_SHOOTA,
-	SOLDIER_SLOW_SHOOTA
-};
 
 
 class Soldier;
@@ -55,28 +46,27 @@ struct compareContainers {
 };
 
 
-class Soldier {
+class Soldier : public Point{
 	public:
-		virtual void ConversionEnabler() {}
-
-		//soldier specific attributes
-		double rad = 5;
-		double mass = 1;
-		double defaultMaxSpeed = 15;
-		double maxSpeed = defaultMaxSpeed;
-		double accel = 3;	//acceleration the soldier can use
-		double turn = M_PI/1.5;	//turnspeed
+		double rad;
+		double mass;
+		double defaultMaxSpeed;
+		double maxSpeed;
+		double accel;	//acceleration the soldier can use
+		double turn;	//turnspeed
 		double linearDamp;	//coefficient for linear dampening (with regard to velocity)
 		double squareDamp;	//coefficient for square dampening
-		double onTargetDamp = 3;	//dampening when close to posTarget
-		int type = SOLDIER_SOLDIER;
+		double onTargetDamp;	//dampening when close to posTarget
+		std::string tag;
 
-		int maxHP = 2;
+		int maxHP;
+		bool melee;
 		double meleeRange = 0.;
 		double meleeAngle = 1./3.;
 		virtual int damage(Soldier* target) {return 1;}
 		Timer MeleeTimer = Timer(60);
 		//int meleeCooldownTicks = 61;
+		int meleeDamage = 1;
 		int meleeAttack = 0;
 		int meleeDefense = 0;
 		int armor = 0;
@@ -97,12 +87,12 @@ class Soldier {
 		Timer DrawTimer = Timer(0);
 		Timer ReloadTimer = Timer(0);
 		Soldier* rangedTarget = NULL;
-		// drawCDTicks = 0;
-		//int reloadCDTicks = 0;
 		int rangedDamage = 0;
 		double rangedSpeed = 0.;
 		double maxSpeedForFiring = 0.;
-		int projectileType = 0;
+		double projectileSpeed = 0.;
+		int rangedArmorPiercing = 0;
+		double projectileAOE = 0.;
 		
 		//general members
 		double Force, damp, defaultDamp;
@@ -110,10 +100,12 @@ class Soldier {
 		int currentOrder;
 		bool arrived;
 		Eigen::Vector2i gridpos;
-		Eigen::Vector2d pos;
+		//Eigen::Vector2d pos; // handled by inheriting from Point
 		Eigen::Vector2d posTarget;
 		Eigen::Vector2d oldPosTarget;
 		Eigen::Vector2d vel;
+		double speed;
+		double forwardSpeed;
 		Eigen::Vector2d knockVel;
 		Eigen::Vector2d force;
 		Eigen::Matrix2d rot;
@@ -129,16 +121,10 @@ class Soldier {
 		Soldier* meleeSwingTarget;	// target they are striking at the moment
 		bool charging;
 		Timer chargeTimer = Timer(30);
-		//int chargeGapTicks;
 		Timer noTargetTimer = Timer(60);
-		//int cantSeeTargetTimer = 0;
 		Eigen::Matrix2d meleeCone;
 		std::vector<Eigen::Vector2d> indivPath;	// individual pathfinding when los to original next target is lost
 		Timer indivPathTimer = Timer(60);
-		//int indivPathCooldown = 60;
-		//int indivPathCDMax = 60;
-		//int drawTimer;
-		//int reloadTimer;
 		double tans;
 
 		bool debugFlag1;
@@ -159,12 +145,8 @@ class Soldier {
 			meleeSwingTarget = NULL;
 			charging = true;
 			chargeTimer.reset();
-			//chargeGapTicks = 30;
 			noTargetTimer.unset();
 			indivPathTimer.set_max(int((2 + rand()/RAND_MAX)*30));
-			//indivPathCDMax = int((2 + rand()/RAND_MAX)*30);
-			//drawTimer = 0;
-			//reloadTimer = 0;
 			int reloadShift = rand()%30 - 15;
 			ReloadTimer.set_max(std::max(ReloadTimer.get_max() + reloadShift, 1));
 			tans = sin(rangedRad) / cos(rangedRad);
@@ -176,23 +158,51 @@ class Soldier {
 			this->unit = unit;		
 		}
 
-		Soldier() {}
+		Soldier() {};
 
-		Soldier(Unit* unit) : Soldier(){
-			//rad = 5.;
-			//mass = 1.;
-			//defaultMaxSpeed = 15.;
-			//maxSpeed = defaultMaxSpeed;
-			//accel = 3.;	//acceleration the soldier can use
-			//turn = M_PI/1.5;	//turnspeed
-			//onTargetDamp = 3.;	//dampening when close to posTarget
-			//type = SOLDIER_SOLDIER;
+		Soldier(SoldierInformation info, Unit* unit) : Soldier(){
+			tag = info.tag;
+			rad = info.radius;
+			mass = info.mass;
+			defaultMaxSpeed = info.max_speed;
+			maxSpeed = defaultMaxSpeed;
+			accel = info.acceleration;
+			turn = M_PI * info.turn_speed;
+			onTargetDamp = info.on_target_dampening;
+			maxHP = info.max_hp;
+			armor = info.armor;
 
-			//maxHP = 2;
-			//meleeRange = 0.;
-			//meleeAngle = 1./3.;
-			//meleeCooldownTicks = 61;
+			melee = info.melee_melee;
+			meleeRange = info.melee_range;
+			meleeAngle = info.melee_angle;
+			MeleeTimer.set_max(info.melee_cooldown);
+			meleeAOE = info.melee_aoe;
+			meleeAttack = info.melee_attack;
+			meleeDefense = info.melee_defense;
+			armorPiercing = info.melee_armor_piercing;
+			meleeDamage = info.melee_damage;
 
+			ranged = info.ranged_ranged;
+			rangedRange = info.ranged_range;
+			rangedMinRange = info.ranged_min_range;
+			rangedRad = info.ranged_radius;
+			rangedHeavy = info.ranged_heavy;
+			DrawTimer.set_max(info.ranged_draw_timer);
+			ReloadTimer.set_max(info.ranged_reload_timer);
+			maxSpeedForFiring = info.ranged_max_speed_for_firing;
+			rangedDefense = info.ranged_defense;
+			projectileSpeed = info.ranged_projectile_speed;
+			rangedSpeed = info.ranged_projectile_speed;
+			rangedArmorPiercing = info.ranged_armor_piercing;
+			rangedAOE = info.ranged_ally_protection_aoe;
+			projectileAOE = info.ranged_aoe;
+			rangedDamage = info.ranged_damage;
+
+			infantry = info.kw_infantry;
+			large = info.kw_large;
+			antiInfantry = info.kw_anti_infantry;
+			antiLarge = info.kw_anti_large;
+			
 			init(unit);
 		}
 		
@@ -204,236 +214,6 @@ class Soldier {
 		Circle SoldierCircle() {
 			return Circle(pos, rad);
 		}
-};
-
-class SoldierSubClassTemplate : public Soldier {
-	public:		
-		SoldierSubClassTemplate(Unit* unit) : Soldier() {
-			rad = 7.;
-			mass = 3.;
-			defaultMaxSpeed = 50.;
-			maxSpeed = defaultMaxSpeed;
-			accel = 6.;
-			turn = M_PI/3;
-			onTargetDamp = 3.;	//dampening when close to posTarget
-			type = SOLDIER_SUBCLASSTEMPLATE;
-
-			maxHP = 2;
-			meleeRange = 0.;
-			meleeAngle = 1./3.;
-			MeleeTimer.set_max(60);
-			//meleeCooldownTicks = 61;
-
-			meleeAttack = 0;
-			meleeDefense = 0;
-			armor = 0;
-			armorPiercing = 0;
-			infantry = false;
-			large = false;
-			antiInfantry = false;
-			antiLarge = false;
-
-			init(unit);
-		};
-		
-		int damage(Soldier* target) {return 1;}
-
-};
-
-class InfantryMan : public Soldier {
-	public:
-		InfantryMan(Unit* unit) : Soldier() {
-			rad = 5.;
-			mass = 1.;
-			defaultMaxSpeed = 15.;
-			maxSpeed = defaultMaxSpeed;
-			accel = 3.;
-			turn = M_PI/1.5;
-			onTargetDamp = 3.;	//dampening when close to posTarget
-			type = SOLDIER_INFANTRYMAN;
-
-			maxHP = 2;
-			meleeRange = 7.;
-			meleeAngle = 1./3.;
-			MeleeTimer.set_max(70);
-			//meleeCooldownTicks = 71;
-
-			meleeAttack = 25;
-			meleeDefense = 20;
-			infantry = true;
-			rangedDefense = 0;
-
-			init(unit);
-		};
-
-		int damage(Soldier* target) {debug("Ahhhhh!");return 1;}
-};
-
-class Rider : public Soldier {
-	public:
-		Rider(Unit* unit) : Soldier() {
-			rad = 7.;
-			mass = 4.;
-			defaultMaxSpeed = 40.;
-			maxSpeed = defaultMaxSpeed;
-			accel = 6.;
-			turn = M_PI/3;
-			onTargetDamp = 2.;	//dampening when close to posTarget
-			type = SOLDIER_RIDER;
-
-			maxHP = 5;
-			meleeRange = 7.;
-			meleeAngle = 1.;
-			MeleeTimer.set_max(30);
-			//meleeCooldownTicks = 31;
-
-			meleeAttack = 35;
-			meleeDefense = 25;
-			large = true;
-			rangedDefense = 40;
-
-			init(unit);
-		};
-
-		int damage(Soldier* target) {
-			debug("Hyahh!");
-			int dmg = 2;
-			double speed = vel.norm();
-			if(speed > maxSpeed/5.) dmg++;
-			if(speed > 2*maxSpeed/5.) dmg++;
-			if(speed > 4*maxSpeed/5.) dmg++;
-			return dmg;
-		}
-};
-
-class Monster : public Soldier {
-	public:
-		Monster(Unit* unit) : Soldier() {
-			rad = 15.;
-			mass = 20.;
-			defaultMaxSpeed = 40.;
-			maxSpeed = defaultMaxSpeed;
-			accel = 2.8;
-			turn = M_PI/4;
-			onTargetDamp = 3.2;	//dampening when close to posTarget
-			type = SOLDIER_MONSTER;
-
-			maxHP = 50;
-			meleeRange = 15.;
-			meleeAngle = 1./2.;
-			MeleeTimer.set_max(70);
-			//meleeCooldownTicks = 71;
-
-			meleeAttack = 55;
-			meleeDefense = 40;
-			rangedDefense = 40;
-			large = true;
-			antiInfantry = true;
-			meleeAOE = true;
-
-			init(unit);
-		};
-
-		int damage(Soldier* target) {debug("RARR!"); return 4;}
-};
-
-class Shoota : public Soldier {
-	public:		
-		Shoota(Unit* unit) : Soldier() {
-			rad = 5.;
-			mass = 1.;
-			defaultMaxSpeed = 15.;
-			maxSpeed = defaultMaxSpeed;
-			accel = 3.;
-			turn = M_PI/1.5;
-			onTargetDamp = 3.;	//dampening when close to posTarget
-			type = SOLDIER_SHOOTA;
-
-			maxHP = 2;
-			meleeRange = 7.;
-			meleeAngle = 1./3.;
-			MeleeTimer.set_max(70);
-			//meleeCooldownTicks = 61;
-
-			meleeAttack = 15;
-			meleeDefense = -10;
-			armor = 0;
-			armorPiercing = 0;
-			infantry = true;
-			large = false;
-			antiInfantry = false;
-			antiLarge = false;
-
-			ranged = true;
-			rangedRange = 400.;
-			rangedMinRange = 7.;
-			rangedRad = 0.1;//M_PI / 6;
-			DrawTimer = Timer(10);
-			ReloadTimer = Timer(300);
-			// drawCDTicks = 0;
-			//int reloadCDTicks = 0;
-			rangedDamage = 2;
-			rangedSpeed = 120.;
-			maxSpeedForFiring = 10.;
-			projectileType = PROJECTILE_ARROW;
-			rangedMinRange = 60;
-			rangedAOE = 10;
-
-			init(unit);
-		};
-		
-		int damage(Soldier* target) {return 1;}
-
-};
-
-class SlowShoota : public Soldier {
-	public:		
-		SlowShoota(Unit* unit) : Soldier() {
-			rad = 5.;
-			mass = 1.;
-			defaultMaxSpeed = 15.;
-			maxSpeed = defaultMaxSpeed;
-			accel = 3.;
-			turn = M_PI/60.;
-			onTargetDamp = 3.;	//dampening when close to posTarget
-			type = SOLDIER_SLOW_SHOOTA;
-
-			maxHP = 2;
-			meleeRange = 7.;
-			meleeAngle = 1./3.;
-			MeleeTimer.set_max(70);
-			//meleeCooldownTicks = 61;
-
-			meleeAttack = 15;
-			meleeDefense = -10;
-			armor = 0;
-			armorPiercing = 0;
-			infantry = true;
-			large = false;
-			antiInfantry = false;
-			antiLarge = false;
-
-			ranged = true;
-			rangedRange = 700.;
-			rangedMinRange = 7.;
-			rangedRad = 0.1;//M_PI / 6;
-			rangedHeavy = true;
-			DrawTimer = Timer(10);
-			ReloadTimer = Timer(600);
-			// drawCDTicks = 0;
-			//int reloadCDTicks = 0;
-			rangedDamage = 0;
-			rangedSpeed = 120.;
-			maxSpeedForFiring = 10.;
-			projectileType = PROJECTILE_GRENADE;
-			rangedMinRange = 60;
-			rangedAOE = 40.; // determines when not shooting close to allies
-
-			init(unit);
-		};
-		
-		int damage(Soldier* target) {return 1;}
-
 };
 
 

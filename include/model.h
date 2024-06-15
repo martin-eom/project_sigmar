@@ -2,14 +2,14 @@
 #define MODEL
 
 #include <base.h>
-#include <soldiers2.h>
+#include <soldiers.h>
 #include <units.h>
 #include <map.h>
 #include <physics.h>
 #include <player.h>
 #include <vector>
 #include <pathfinding.h>
-#include <projectiles2.h>
+#include <projectiles.h>
 #include <information.h>
 //#include <fileio2.h>
 
@@ -134,6 +134,7 @@ class Model : public Listener{
 	public:
 		std::map<std::string, SoldierInformation> SoldierTypes;
 		std::map<std::string, UnitInformation> UnitTypes;
+		AnimationInformation damageInfo;
 		//std::vector<SoldierInformation> SoldierTypes;
 		//std::vector<UnitInformation> UnitTypes;
 
@@ -150,6 +151,7 @@ class Model : public Listener{
 		void loadSoldierTypes(std::string filename);
 		void loadUnitTypes(std::string filename);
 		void loadArmyLists(std::string filename);
+		void loadDamageInfo();
 	
 		Model(EventManager* em, Map* map) : Listener(em) {
 			this->map = map;
