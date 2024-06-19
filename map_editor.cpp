@@ -23,6 +23,7 @@ SDL_Window* window = NULL;
 SDL_Renderer* renderer = NULL;
 
 EventManager* em;
+MapEditorModel* model;
 Map* map;
 MapEditorController* ctrl;
 MapEditorView* view;
@@ -46,13 +47,17 @@ void OpenWindow(Map* new_map) {
 	}
 	em = new GameEventManager(30);
 	debug("Created GameEventManager");
+	model = new MapEditorModel();
+	debug("Created MapEditorModel");
+	model->init();
+	debug("Initialized MapEditorModel");
 	ctrl = new MapEditorController(em, initial_SCREEN_WIDTH, initial_SCREEN_HEIGHT, new_map);
 	debug("Created MapEditorController");
 	debug("zoom: " + std::to_string(ctrl->zoom));
 	dynamic_cast<GameEventManager*>(em)->ctrl = ctrl;
 	debug("Assigned MapEditorController to GameEventManager.");
 	std::cout << ctrl << "\n" << dynamic_cast<GameEventManager*>(em)->ctrl << "\n";
-	view = new MapEditorView(em, window, renderer, new_map);
+	view = new MapEditorView(em, window, renderer, new_map, model);
 	debug("Created MapEditorView");
 	dynamic_cast<GameEventManager*>(em)->view = view;
 	debug("Assigned MapEditorView to GameEventManager.");

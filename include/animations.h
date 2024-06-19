@@ -15,6 +15,7 @@ public:
 	ImgTexture* texture;
 	AnimationInformation info;
 	int stage = 0;
+	Timer toNextStage = Timer(5);
 
 	Animation(Point* object) {
 		this->object = object;
@@ -23,8 +24,17 @@ public:
 	Animation(Point* object, AnimationInformation info) {
 		this->object = object;
 		this->info = info;
+		toNextStage.set_max(info.ticks_per_frame);
 	}
 
+	void advance() {
+		if(toNextStage.done()) {
+			stage = (stage + 1) % info.num_frames;
+			toNextStage.reset();
+		}
+		else
+			toNextStage.decrement();
+	}
 };
 
 class SoldierAnimation : public Animation {
@@ -46,7 +56,7 @@ class LegAnimation : public SoldierAnimation {
 public:
 	bool upwards = true;
 	int nextStage = 0;
-	Timer toNextStage = Timer(5);
+	//Timer toNextStage = Timer(5);
 
 	LegAnimation(Point* object, AnimationInformation info) : SoldierAnimation(object, info) {}
 
@@ -126,7 +136,7 @@ public:
 
 class MeleeAnimation : public SoldierAnimation {
 public:
-	Timer toNextStage = Timer(6);
+	//Timer toNextStage = Timer(6);
 	bool running = false;
 	bool onCooldown = true;
 
@@ -195,29 +205,29 @@ class DamageAnimation : public SoldierAnimation {
 public:
 	bool running = false;
 	int last_hp;
-	Timer ticksToNextStage;
+	//Timer ticksToNextStage;
 
 	DamageAnimation(Soldier* soldier, AnimationInformation info) : SoldierAnimation(soldier, info) {
 		last_hp = soldier->hp;
-		ticksToNextStage.set_max(info.ticks_per_frame);
-		ticksToNextStage.set(-1);
+		toNextStage.set_max(info.ticks_per_frame);
+		toNextStage.set(-1);
 	}
 
 	void advance() {
 		if(!running && soldier->hp < last_hp) {
 			running = true;
-			ticksToNextStage.reset();
+			toNextStage.reset();
 			last_hp = soldier->hp;
 		}
 		else if(running) {
-			if(ticksToNextStage.done()) {
+			if(toNextStage.done()) {
 				stage = (stage+1)%info.num_frames;
-				ticksToNextStage.reset();
+				toNextStage.reset();
 				if(stage == 0)
 					running = false;
 			}
 			else
-				ticksToNextStage.decrement();
+				toNextStage.decrement();
 		}
 	}
 };

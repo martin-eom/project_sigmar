@@ -134,6 +134,7 @@ class Model : public Listener{
 	public:
 		std::map<std::string, SoldierInformation> SoldierTypes;
 		std::map<std::string, UnitInformation> UnitTypes;
+		SettingsInformation settings;
 		AnimationInformation damageInfo;
 		//std::vector<SoldierInformation> SoldierTypes;
 		//std::vector<UnitInformation> UnitTypes;
@@ -152,6 +153,8 @@ class Model : public Listener{
 		void loadUnitTypes(std::string filename);
 		void loadArmyLists(std::string filename);
 		void loadDamageInfo();
+		void loadSettings(std::string filename);
+		void init();
 	
 		Model(EventManager* em, Map* map) : Listener(em) {
 			this->map = map;
@@ -624,127 +627,129 @@ class Model : public Listener{
 										bool outOfRangeTarget = true;
 										soldier->meleeSwingTarget = NULL;
 										//debug("looping through enemies in melee range");
-										while(!soldier->enemiesInMeleeRange.empty()) {
-											SoldierNeighbourContainer enemy = soldier->enemiesInMeleeRange.top();
-											Circle circ = enemy.soldier->SoldierCircle();
-											if((targets.empty() || soldier->meleeAOE) && ConeCircleCollision(soldier->pos, soldier->rot, soldier->meleeCone, soldier->rad, &circ) && enemy.inTrueRange) {
-												soldier->meleeTarget = enemy.soldier; // in/excluding this line could significantly change how flanking works
-												outOfRangeTarget = false;
-												targets.push_back(enemy);
-												if(!soldier->meleeAOE)
-													soldier->meleeSwingTarget = enemy.soldier;
-												if(!newTarget || (soldier->meleeAOE && !soldier->meleeTarget && !soldier->meleeTarget->alive)) {		// what to do here
-													soldier->meleeTarget = enemy.soldier;
-													newTarget = true;
+										if(soldier->melee) {
+											while(!soldier->enemiesInMeleeRange.empty()) {
+												SoldierNeighbourContainer enemy = soldier->enemiesInMeleeRange.top();
+												Circle circ = enemy.soldier->SoldierCircle();
+												if((targets.empty() || soldier->meleeAOE) && ConeCircleCollision(soldier->pos, soldier->rot, soldier->meleeCone, soldier->rad, &circ) && enemy.inTrueRange) {
+													soldier->meleeTarget = enemy.soldier; // in/excluding this line could significantly change how flanking works
+													outOfRangeTarget = false;
+													targets.push_back(enemy);
+													if(!soldier->meleeAOE)
+														soldier->meleeSwingTarget = enemy.soldier;
+													if(!newTarget || (soldier->meleeAOE && !soldier->meleeTarget && !soldier->meleeTarget->alive)) {		// what to do here
+														soldier->meleeTarget = enemy.soldier;
+														newTarget = true;
+													}
+													//debug("Set target!");
 												}
-												//debug("Set target!");
+												else
+													notInCone.push_back(enemy);
+												soldier->enemiesInMeleeRange.pop();
 											}
-											else
-												notInCone.push_back(enemy);
-											soldier->enemiesInMeleeRange.pop();
-										}
-										if(!newTarget && !notInCone.empty()) {
-											soldier->meleeTarget = notInCone.at(0).soldier;
-											newTarget = true;
-											notInCone.clear();
-										}
-										//handling "charging" status
-										//	while charging soldiers will push into the enemy position
-										//  if they have no target in front of them for 1 second they will stop charging and seek out enemies close to them
-										//if(unit->orders.at(soldier->currentOrder)->type == ORDER_ATTACK) {
-										Order* o = unit->orders.at(soldier->currentOrder);
-										if(o->target) {
-											if(soldier->charging) {
-												if(unit->enemyContact) {
-													if(!targets.empty() && (!soldier->meleeAOE && soldier->unit->maxSoldiers == 1) && o->type == ORDER_ATTACK)	{//lone monsters stop charging after impact
-														soldier->chargeTimer.reset();
-														//soldier->chargeGapTicks = 30;
+											if(!newTarget && !notInCone.empty()) {
+												soldier->meleeTarget = notInCone.at(0).soldier;
+												newTarget = true;
+												notInCone.clear();
+											}
+											//handling "charging" status
+											//	while charging soldiers will push into the enemy position
+											//  if they have no target in front of them for 1 second they will stop charging and seek out enemies close to them
+											//if(unit->orders.at(soldier->currentOrder)->type == ORDER_ATTACK) {
+											Order* o = unit->orders.at(soldier->currentOrder);
+											if(o->target) {
+												if(soldier->charging) {
+													if(unit->enemyContact) {
+														if(!targets.empty() && (!soldier->meleeAOE && soldier->unit->maxSoldiers == 1) && o->type == ORDER_ATTACK)	{//lone monsters stop charging after impact
+															soldier->chargeTimer.reset();
+															//soldier->chargeGapTicks = 30;
+														}
+														else {
+															if(!soldier->chargeTimer.done())
+															//if(soldier->chargeGapTicks > 0)
+																soldier->chargeTimer.decrement();
+																//soldier->chargeGapTicks--;
+															else
+																soldier->charging = false;
+														}
 													}
 													else {
-														if(!soldier->chargeTimer.done())
-														//if(soldier->chargeGapTicks > 0)
-															soldier->chargeTimer.decrement();
-															//soldier->chargeGapTicks--;
-														else
-															soldier->charging = false;
+														if((!targets.empty() && targets.at(0).soldier->unit == o->target) || ((unit->pos - unit->posTarget).norm() < 20 && o->type == ORDER_ATTACK)) {
+															unit->enemyContact = true;
+														}
 													}
 												}
 												else {
-													if((!targets.empty() && targets.at(0).soldier->unit == o->target) || ((unit->pos - unit->posTarget).norm() < 20 && o->type == ORDER_ATTACK)) {
-														unit->enemyContact = true;
-													}
-												}
-											}
-											else {
-												debug("SEEK AND DESTROY!");
-												//target finding
-												//AttackOrder* ao = dynamic_cast<AttackOrder*>(o);
-												if((!soldier->meleeTarget || !soldier->meleeTarget->alive) && !o->target->liveSoldiers.empty()) {
-													Soldier* target = NULL;
-													if(soldier->meleeAOE && soldier->unit->maxSoldiers == 1) {
-														double maxDist = 0;
-														for(int i = 0; i < 8; i++) {
-															Soldier* current = o->target->liveSoldiers.at(rand()%o->target->liveSoldiers.size());
-															double dist = (current->pos - soldier->pos).norm();
-															if(dist > maxDist) {
-																target = current;
-																maxDist = dist;
+													debug("SEEK AND DESTROY!");
+													//target finding
+													//AttackOrder* ao = dynamic_cast<AttackOrder*>(o);
+													if((!soldier->meleeTarget || !soldier->meleeTarget->alive) && !o->target->liveSoldiers.empty()) {
+														Soldier* target = NULL;
+														if(soldier->meleeAOE && soldier->unit->maxSoldiers == 1) {
+															double maxDist = 0;
+															for(int i = 0; i < 8; i++) {
+																Soldier* current = o->target->liveSoldiers.at(rand()%o->target->liveSoldiers.size());
+																double dist = (current->pos - soldier->pos).norm();
+																if(dist > maxDist) {
+																	target = current;
+																	maxDist = dist;
+																}
 															}
 														}
-													}
-													else {
-														double minDist = std::numeric_limits<double>::infinity();
-														for(int i = 0; i < 10; i++) {
-															Soldier* current = o->target->liveSoldiers.at(rand()%o->target->liveSoldiers.size());
-															double dist = (current->pos - soldier->pos).norm();
-															if(dist < minDist) {
-																target = current;
-																minDist = dist;
+														else {
+															double minDist = std::numeric_limits<double>::infinity();
+															for(int i = 0; i < 10; i++) {
+																Soldier* current = o->target->liveSoldiers.at(rand()%o->target->liveSoldiers.size());
+																double dist = (current->pos - soldier->pos).norm();
+																if(dist < minDist) {
+																	target = current;
+																	minDist = dist;
+																}
 															}
 														}
+														soldier->meleeTarget = target;
 													}
-													soldier->meleeTarget = target;
 												}
 											}
-										}
-										if(soldier->unit->orders.at(soldier->currentOrder)->target
-										&& soldier->meleeTarget && !soldier->charging) {//soldier->unit->enemyContact) {
-											if(!soldier->noTargetTimer.done()) {
-											//if(soldier->cantSeeTargetTimer > 0) {
-												soldier->noTargetTimer.decrement();
-												//soldier->cantSeeTargetTimer--;
-											}
-											else {
-												Circle c1(soldier->pos, soldier->rad);
-												Circle c2(soldier->meleeTarget->pos, soldier->meleeTarget->rad);
-												if(!FreePath(&c1, &c2, map)) {
-													soldier->meleeTarget = NULL;
+											if(soldier->unit->orders.at(soldier->currentOrder)->target
+											&& soldier->meleeTarget && !soldier->charging) {//soldier->unit->enemyContact) {
+												if(!soldier->noTargetTimer.done()) {
+												//if(soldier->cantSeeTargetTimer > 0) {
+													soldier->noTargetTimer.decrement();
+													//soldier->cantSeeTargetTimer--;
 												}
-												soldier->noTargetTimer.reset();
-												//soldier->cantSeeTargetTimer = 60;
+												else {
+													Circle c1(soldier->pos, soldier->rad);
+													Circle c2(soldier->meleeTarget->pos, soldier->meleeTarget->rad);
+													if(!FreePath(&c1, &c2, map)) {
+														soldier->meleeTarget = NULL;
+													}
+													soldier->noTargetTimer.reset();
+													//soldier->cantSeeTargetTimer = 60;
 
-											}
-										}
-										// resolving attacks
-										if(!targets.empty() && soldier->MeleeTimer.done()) {
-										//if(!targets.empty() && soldier->meleeCooldownTicks == 0) {
-											soldier->MeleeTimer.reset();
-											//soldier->meleeCooldownTicks = 31;
-											for(auto targetContainer : targets) {
-												Soldier* target = targetContainer.soldier;
-												double hitChance = 0.35 + 0.01*(soldier->meleeAttack - target->meleeDefense) + 0.15*(soldier->antiInfantry && target->infantry) + 0.15*(soldier->antiLarge && target->large);
-												hitChance = std::min(std::max(0.08, hitChance), 0.9);
-												if(std::rand()/double(RAND_MAX) < hitChance) {
-													int dmg = soldier->meleeDamage;
-													// melee damage function
-													dmg = dmg * (1 + 0.3*(soldier->antiInfantry && target->infantry) + 0.3*(soldier->antiLarge && target->large));
-													damages.push(DamageTick(target, dmg));
 												}
 											}
+											// resolving attacks
+											if(!targets.empty() && soldier->MeleeTimer.done()) {
+											//if(!targets.empty() && soldier->meleeCooldownTicks == 0) {
+												soldier->MeleeTimer.reset();
+												//soldier->meleeCooldownTicks = 31;
+												for(auto targetContainer : targets) {
+													Soldier* target = targetContainer.soldier;
+													double hitChance = 0.35 + 0.01*(soldier->meleeAttack - target->meleeDefense) + 0.15*(soldier->antiInfantry && target->infantry) + 0.15*(soldier->antiLarge && target->large);
+													hitChance = std::min(std::max(0.08, hitChance), 0.9);
+													if(std::rand()/double(RAND_MAX) < hitChance) {
+														int dmg = soldier->meleeDamage;
+														// melee damage function
+														dmg = dmg * (1 + 0.3*(soldier->antiInfantry && target->infantry) + 0.3*(soldier->antiLarge && target->large));
+														damages.push(DamageTick(target, dmg));
+													}
+												}
+											}
+											soldier->MeleeTimer.decrement();
+											//if(soldier->meleeCooldownTicks > 0)
+											//	soldier->meleeCooldownTicks--;
 										}
-										soldier->MeleeTimer.decrement();
-										//if(soldier->meleeCooldownTicks > 0)
-										//	soldier->meleeCooldownTicks--;
 									}
 								}
 							}
@@ -881,6 +886,26 @@ class Model : public Listener{
 			}
 		}
 };
+
+class MapEditorModel {
+public:
+	void loadSettings(std::string filename);
+
+	MapEditorSettingsInformation settings;
+
+	MapEditorModel() {}
+
+	void init() {
+		loadSettings("config/map_editor_settings.json");
+	}
+};
+
+void Model::init() {
+	loadSoldierTypes("config/templates/classes.json");
+	loadUnitTypes("config/templates/units.json");
+	//loadDamageInfo();
+	loadSettings("config/game_settings.json");
+}
 
 
 #endif

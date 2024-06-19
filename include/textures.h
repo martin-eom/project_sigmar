@@ -60,9 +60,11 @@ public:
 		}
 	}
 
-	void renderZoomed(double x, double y, double rad, int frame_size_x, int frame_size_y, int frame_origin_x, int frame_origin_y, int SCREEN_WIDTH, int SCREEN_HEIGHT, double zoom, Eigen::Vector2d mapCenter, double angle = 0.0, SDL_Point* center = NULL, SDL_Rect* clip = NULL, SDL_RendererFlip flip = SDL_FLIP_NONE) {
+	void renderZoomed(double x, double y, double rad, int frame_size_x, int frame_size_y, int frame_origin_x, int frame_origin_y, int SCREEN_WIDTH, int SCREEN_HEIGHT, double zoom, Eigen::Vector2d mapCenter, double angle = 0.0, SDL_Point* center = NULL, SDL_Rect* clip = NULL, SDL_RendererFlip flip = SDL_FLIP_NONE, double aspect = 1.0) {
 		Eigen::Vector2d diag; diag << SCREEN_WIDTH / 2., SCREEN_HEIGHT / 2.;
 		double rrad = zoom * rad;
+		double xrad = rrad;
+		double yrad = rrad / aspect;
 		double xx = zoom*x - mapCenter.coeff(0) + diag.coeff(0);
 		double yy = zoom*y - mapCenter.coeff(1) + diag.coeff(1);
 		yy = SCREEN_HEIGHT - yy;
@@ -78,18 +80,18 @@ public:
 				cx = frame_size_x / 2. + frame_origin_x; cy = frame_size_y / 2. + frame_origin_y;
 			}
 			double temp_recw, temp_rech, temp_recx, temp_recy;
-			temp_recw = static_cast<double>(clip->w) / frame_size_x * 2. * rrad;
-			temp_rech = static_cast<double>(clip->h) / frame_size_y * 2. * rrad;
-			temp_recx = xx - (cx + 0) / frame_size_x * 2. * rrad;
-			temp_recy = yy - (cy + 0) / frame_size_y * 2. * rrad;
+			temp_recw = static_cast<double>(clip->w) / frame_size_x * 2. * xrad;
+			temp_rech = static_cast<double>(clip->h) / frame_size_y * 2. * yrad;
+			temp_recx = xx - (cx + 0) / frame_size_x * 2. * xrad;
+			temp_recy = yy - (cy + 0) / frame_size_y * 2. * yrad;
 			rec.x = temp_recx; rec.y = temp_recy; rec.w = temp_recw; rec.h = temp_rech;
 			double temp_px, temp_py;
-			temp_px = cx / frame_size_x * 2. * rrad;
-			temp_py = cy / frame_size_y * 2. * rrad;
+			temp_px = cx / frame_size_x * 2. * xrad;
+			temp_py = cy / frame_size_y * 2. * yrad;
 			point.x = temp_px; point.y = temp_py;
 		}
 		else {
-			rec.x = xx-rrad; rec.y = yy-rrad; rec.w = 2*rrad; rec.h = 2*rrad;
+			rec.x = xx-xrad; rec.y = yy-yrad; rec.w = 2*xrad; rec.h = 2*yrad/aspect;
 			destCenter = NULL;
 		}
 		SDL_RenderCopyEx(renderer, texture, clip, &rec, angle, destCenter, flip);

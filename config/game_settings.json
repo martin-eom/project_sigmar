@@ -1,0 +1,18 @@
+{
+	"damage_tick": {
+		"texture": "damage_tick_roll.bmp",
+		"size_x" : 32,
+		"size_y" : 32,
+		"num_frames" : 7,
+		"ticks_per_frame": 3
+	},
+	"custom_background": false,
+	"background_animation": {
+		"texture": "desert.bmp",
+		"size_x": 600,
+		"size_y": 337,
+		"num_frames": 1,
+		"ticks_per_frame" : 1000
+	},
+	"show_map_object_outlines": true
+}
