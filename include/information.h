@@ -102,4 +102,26 @@ public:
 	UnitInformation(json input);
 };
 
+
+class SettingsInformation {
+public:
+	AnimationInformation damageInfo;
+	bool custom_background;
+	AnimationInformation backgroundInfo;
+	bool show_map_object_outlines;
+
+	SettingsInformation() {}
+	SettingsInformation(json input);
+};
+
+
+class MapEditorSettingsInformation {
+public:
+	bool custom_background;
+	AnimationInformation backgroundInfo;
+
+	MapEditorSettingsInformation() {}
+	MapEditorSettingsInformation(json input);
+};
+
 #endif

@@ -1,7 +1,0 @@
-{
-	"texture" : "damage_tick_roll.bmp",
-	"size_x" : 32,
-	"size_y" : 32,
-	"num_frames" : 7,
-	"ticks_per_frame" : 3
-}

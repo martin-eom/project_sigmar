@@ -240,6 +240,19 @@ UnitInformation::UnitInformation(json input) {
 	ranged_angle = input["ranged_stats"]["angle"];
 }
 
+SettingsInformation::SettingsInformation(json input) {
+	damageInfo = AnimationInformation(input["damage_tick"]);
+	custom_background = input["custom_background"];
+	if(custom_background)
+		backgroundInfo = AnimationInformation(input["background_animation"]);
+	show_map_object_outlines = input["show_map_object_outlines"];
+}
+
+MapEditorSettingsInformation::MapEditorSettingsInformation(json input) {
+	custom_background = input["custom_background"];
+	if(custom_background)
+		backgroundInfo = AnimationInformation(input["background_animation"]);
+}
 void Model::loadSoldierTypes(std::string filename) {
 	json input = fromFile(filename);
 	for(auto entry : input) {
@@ -277,6 +290,16 @@ void Model::loadArmyLists(std::string filename) {
 void Model::loadDamageInfo() {
 	json input = fromFile("config/templates/damage_tick.json");
 	damageInfo = AnimationInformation(input);
+}
+
+void Model::loadSettings(std::string filename) {
+	json input = fromFile(filename);
+	settings = SettingsInformation(input);
+}
+
+void MapEditorModel::loadSettings(std::string filename) {
+	json input = fromFile(filename);
+	settings = MapEditorSettingsInformation(input);
 }
 
 #endif

@@ -6,6 +6,7 @@
 #include <events.h>
 #include <player.h>
 #include <fileio.h>
+#include <information.h>
 
 #include <stdio.h>
 #include <iostream>

@@ -41,9 +41,11 @@ void OpenWindow(Map* map) {
 	em = new GameEventManager(30);
 	dynamic_cast<GameEventManager*>(em)->map = map;
 	model = new Model(em, map);
-	model->loadSoldierTypes("config/templates/classes.json");
-	model->loadUnitTypes("config/templates/units.json");
-	model->loadDamageInfo();
+	//model->loadSoldierTypes("config/templates/classes.json");
+	//model->loadUnitTypes("config/templates/units.json");
+	//model->loadDamageInfo();
+	//model->loadSettings("config/game_settings.json");
+	model->init();
 	dynamic_cast<GameEventManager*>(em)->model = model;
 	// #### set up players with units from armylist.json
 	Player* player1 = new Player(true);
@@ -112,6 +114,7 @@ int main(int argc, char* argv[1]) {
 	}
 	SDL_StopTextInput();
 
+	//map = new Map("maps/desert.json");
 	map = new Map("maps/testmap.json");
 	OpenWindow(map);
 

@@ -78,6 +78,8 @@ private:
 		ImgTexture* objCircle;
 		ImgTexture* token;
 		ImgTexture* damage;
+		ImgTexture* backgroundTexture;
+		Animation* background;
 		std::map<std::string, ImgTexture*> blueLegTextures;
 		std::map<std::string, ImgTexture*> redLegTextures;
 		std::vector<LegAnimation*> legs;
@@ -95,8 +97,10 @@ private:
 		std::vector<ProjectileAnimation*> projectiles;
 
 	public:
+		void loadBackground();
 		void loadTextures();
 		void loadDamageTexture();
+		void animateBackground(Animation* anime, ZoomableGUIController* ctrl);
 		void animateSelectionCircle(SoldierAnimation* anime, ZoomableGUIController* ctrl);
 		void animateSoldier(SoldierAnimation* anime, ZoomableGUIController* ctrl, bool hpAlpha = true);
 		void animateProjectile(ProjectileAnimation* anime, ZoomableGUIController* ctrl);
@@ -120,6 +124,7 @@ private:
 
 			GameEventManager* gem = Gem();
 			model = gem->model;
+			loadBackground();
 			loadTextures();
 			loadDamageTexture();
 		}
@@ -131,19 +136,24 @@ private:
 			auto model = gem->model;
 			SDL_SetRenderDrawColor(renderer, 0x00, 0x00, 0x00, 0xFF);
 			SDL_RenderClear(renderer);
+			if(damages.size() > 0) {
+			animateBackground(background, ctrl);
+			}
 			//drawing map objects
-			for(auto obj : map->mapObjects) {
-				switch(obj->type()) {
-				case MAP_CIRCLE: {
-					Circle* circ = dynamic_cast<Circle*>(obj);
-					objCircle->renderZoomed(circ->pos.coeff(0), circ->pos.coeff(1), circ->rad, 32, 32, 0, 0,
-						SCREEN_WIDTH, SCREEN_HEIGHT, ctrl->zoom, ctrl->center);
-					break;}
-				case MAP_BORDER:
-				case MAP_RECTANGLE: {
-					Rrectangle* rec = dynamic_cast<Rrectangle*>(obj);
-					DrawRectangle(rec, renderer, colorPurple, SCREEN_WIDTH, SCREEN_HEIGHT, ctrl->zoom, ctrl->center);
-					break;}
+			if(model->settings.show_map_object_outlines) {
+				for(auto obj : map->mapObjects) {
+					switch(obj->type()) {
+					case MAP_CIRCLE: {
+						Circle* circ = dynamic_cast<Circle*>(obj);
+						objCircle->renderZoomed(circ->pos.coeff(0), circ->pos.coeff(1), circ->rad, 32, 32, 0, 0,
+							SCREEN_WIDTH, SCREEN_HEIGHT, ctrl->zoom, ctrl->center);
+						break;}
+					case MAP_BORDER:
+					case MAP_RECTANGLE: {
+						Rrectangle* rec = dynamic_cast<Rrectangle*>(obj);
+						DrawRectangle(rec, renderer, colorPurple, SCREEN_WIDTH, SCREEN_HEIGHT, ctrl->zoom, ctrl->center);
+						break;}
+					}
 				}
 			}
 			//drawing waypoints
@@ -447,7 +457,7 @@ private:
 								else
 									body->texture = redBodyTextures.at(soldier->tag);
 								bodies.push_back(body);
-								DamageAnimation* dmg = new DamageAnimation(soldier, model->damageInfo);
+								DamageAnimation* dmg = new DamageAnimation(soldier, model->settings.damageInfo);
 								dmg->texture = damage;
 								damages.push_back(dmg);
 							}
@@ -545,21 +555,28 @@ class MapEditorView : public GeneralView {
 	int textWindowGap = 50;
 
 private:
+	MapEditorModel* model;
+
 	int textwidth;
 	StringTexture* textControls;
 	StringTexture* textInputAdvice;
 	StringTexture* textInput;
 	StringTexture* objDimensions;
+	ImgTexture* backgroundTexture;
+	Animation* background;
 
 public:
 	Map* map;
 	std::string textbox;
 
+	void loadBackground();
+	void animateBackground(Animation* anime, ZoomableGUIController* ctrl);
+
 	MapEditorController* Ctrl() {
 		return dynamic_cast<MapEditorController*>(Gem()->ctrl);
 	}
 
-	MapEditorView(EventManager* em, SDL_Window* window, SDL_Renderer* renderer, Map* map) : GeneralView(em, window, renderer) {
+	MapEditorView(EventManager* em, SDL_Window* window, SDL_Renderer* renderer, Map* map, MapEditorModel* model) : GeneralView(em, window, renderer) {
 		this->map = map;
 		textwidth = SCREEN_WIDTH - 2*textWindowGap;
 		textbox = "";
@@ -567,12 +584,15 @@ public:
 		textInputAdvice = new StringTexture(renderer);
 		textInput = new StringTexture(renderer);
 		objDimensions = new StringTexture(renderer);
+		this->model = model;
+		loadBackground();
 	}
 private:
 	void Update() {
 		MapEditorController* ctrl = Ctrl();
 		SDL_SetRenderDrawColor(renderer, 0x00, 0x00, 0x00, 0xFF);
 		SDL_RenderClear(renderer);
+		animateBackground(background, ctrl);
 		Eigen::Matrix2d rot; rot << 1, 0, 0, 1;
 		Eigen::Vector2d map_center; map_center << map->width / 2, map->height / 2;
 		Rrectangle map_bg(map->height / 2 - 1, map->width / 2 - 1, map_center, rot);
@@ -687,6 +707,25 @@ private:
 };
 
 
+void View::loadBackground() {
+	if(model->settings.custom_background) {
+		background = new Animation(new Point(), model->settings.backgroundInfo);
+		backgroundTexture = new ImgTexture(renderer);
+		backgroundTexture->loadFromImage(("textures/" + model->settings.backgroundInfo.texture).c_str());
+		background->texture = backgroundTexture;
+		//std::cout << "################ " << ("textures/" + model->settings.backgroundInfo.texture).c_str();
+	}
+}
+
+void MapEditorView::loadBackground() {
+	if(model->settings.custom_background) {
+		background = new Animation(new Point(), model->settings.backgroundInfo);
+		backgroundTexture = new ImgTexture(renderer);
+		backgroundTexture->loadFromImage(("textures/" + model->settings.backgroundInfo.texture).c_str());
+		background->texture = backgroundTexture;
+	}
+}
+
 void View::loadTextures() {
 	std::map<std::string, SoldierInformation>::iterator it;
 	for(it = model->SoldierTypes.begin(); it!=model->SoldierTypes.end(); it++) {
@@ -724,7 +763,7 @@ void View::loadTextures() {
 
 void View::loadDamageTexture() {
 	damage = new ImgTexture(renderer);
-	damage->loadFromImage(("textures/" + model->damageInfo.texture).c_str());
+	damage->loadFromImage(("textures/" + model->settings.damageInfo.texture).c_str());
 }
 
 void View::animateSelectionCircle(SoldierAnimation* anime, ZoomableGUIController* ctrl) {
@@ -732,6 +771,44 @@ void View::animateSelectionCircle(SoldierAnimation* anime, ZoomableGUIController
 	SDL_Rect segment;
 	segment.x = 0; segment.y = 64; segment.w = 32; segment.h = 32;
 	token->renderZoomed(soldier->pos.coeff(0), soldier->pos.coeff(1), soldier->rad, 32, 32, 0, 0, SCREEN_WIDTH, SCREEN_HEIGHT, ctrl->zoom, ctrl->center, 0, NULL, &segment);
+}
+
+void View::animateBackground(Animation* anime, ZoomableGUIController* ctrl) {
+	if(model->settings.custom_background) {
+		SDL_Rect clip;
+		clip.x = 0 + anime->stage * anime->info.size_x;
+		clip.y = 0;
+		clip.w = anime->info.size_x;
+		clip.h = anime->info.size_y;
+		double rad = 0.5*map->width;
+		double aspect = static_cast<double>(map->width) / map->height;
+		double center_x = 0.5*map->width;
+		double center_y = 0.5*map->height;
+		anime->texture->renderZoomed(center_x, center_y, rad, 
+			anime->info.frame_size_x, anime->info.frame_size_y, anime->info.frame_origin_x, anime->info.frame_origin_y,
+			SCREEN_WIDTH, SCREEN_HEIGHT, ctrl->zoom, ctrl->center,
+			0.0, NULL, &clip, SDL_FLIP_NONE, aspect);
+		anime->advance();
+	}
+}
+
+void MapEditorView::animateBackground(Animation* anime, ZoomableGUIController* ctrl) {
+	if(model->settings.custom_background) {
+		SDL_Rect clip;
+		clip.x = 0 + anime->stage * anime->info.size_x;
+		clip.y = 0;
+		clip.w = anime->info.size_x;
+		clip.h = anime->info.size_y;
+		double rad = 0.5*map->width;
+		double aspect = static_cast<double>(map->width) / map->height;
+		double center_x = 0.5*map->width;
+		double center_y = 0.5*map->height;
+		anime->texture->renderZoomed(center_x, center_y, rad, 
+			anime->info.frame_size_x, anime->info.frame_size_y, anime->info.frame_origin_x, anime->info.frame_origin_y,
+			SCREEN_WIDTH, SCREEN_HEIGHT, ctrl->zoom, ctrl->center,
+			0.0, NULL, &clip, SDL_FLIP_NONE, aspect);
+		anime->advance();
+	}
 }
 
 void View::animateSoldier(SoldierAnimation* anime, ZoomableGUIController* ctrl, bool hpAlpha) {
@@ -743,8 +820,8 @@ void View::animateSoldier(SoldierAnimation* anime, ZoomableGUIController* ctrl, 
 		SDL_Rect clip;
 		clip.x = 0 + anime->stage * anime->info.size_x;
 		clip.y = 0;
-		clip.h = anime->info.size_y;
 		clip.w = anime->info.size_x;
+		clip.h = anime->info.size_y;
 		if(hpAlpha)
 			SDL_SetTextureAlphaMod(anime->texture->texture, 255*std::min(double(soldier->hp) / soldier->maxHP, 1.));		
 		anime->texture->renderZoomed(soldier->pos.coeff(0), soldier->pos.coeff(1), soldier->rad, 
