@@ -100,7 +100,8 @@ void ReformUnit(Unit* unit) {
 			}
 		}
 	}
-	PosInUnitByID(unit);
+	//PosInUnitByID(unit);
+	unit->PosInUnitByID();
 	debug("Reforming unit succeeded");
 }
 
@@ -391,7 +392,7 @@ void ProjectileCollisionHandling(Map* map) {
 				//map_objects
 				for(auto obj : tile->mapObjects) {
 					if(!projectile->dead) {
-						switch(obj->type()) {
+						switch(obj->type) {
 						case MAP_RECTANGLE:
 						case MAP_BORDER:
 							if(PointRectangleCollision(&p, dynamic_cast<Rrectangle*>(obj))) {
@@ -411,7 +412,7 @@ void ProjectileCollisionHandling(Map* map) {
 				//soldiers
 				if(!projectile->dead && projectile->get_progress() > 0.99) {
 					for(auto soldier : tile->soldiers) {
-						if((projectile->get_pos() - soldier->pos).norm() < (soldier->rad + projectile->aoerad)) {
+						if((projectile->pos - soldier->pos).norm() < (soldier->rad + projectile->aoerad)) {
 							projectile->targets.push_back(soldier);
 						}
 					}
@@ -506,7 +507,7 @@ void MapObjectCollisionHandling(Map* map) {
 			for(auto soldier : tile->soldiers) {
 				if(soldier) {
 					for(auto object : tile->mapObjects) {
-						switch(object->type()) {
+						switch(object->type) {
 						case MAP_RECTANGLE:
 						case MAP_BORDER:
 							SoldierRectangleCollision(soldier, dynamic_cast<Rrectangle*>(object));

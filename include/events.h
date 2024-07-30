@@ -16,6 +16,7 @@ enum EVENT_IDS {
 	QUIT_EVENT,
 	CLICK_EVENT,
 	GIVE_ORDERS_REQUEST,
+	GIVE_ALL_ORDERS_REQUEST,
 	REMEMBER_ORDERS,
 	APPEND_ORDERS_REQUEST,
 	UNIT_MOVE_REQUEST,
@@ -31,6 +32,8 @@ enum EVENT_IDS {
 	CTRL_STATE_EVENT,
 	INPUT_RECEIVED_EVENT,
 	CHANGE_TEXTBOX_EVENT,
+	GAME_PAUSED_EVENT,
+	CONTINUE_GAME_EVENT,
 	PROJECTILE_SPAWN_EVENT
 };
 
@@ -107,6 +110,21 @@ class GiveOrdersRequest : public Event {
 			this->unit = unit;
 			this->orders = orders;
 		}
+};
+
+class Player;
+
+class GiveAllOrdersRequest : public Event {
+public:
+	Player* player;
+	std::vector<std::vector<Order*>> orderList;
+
+	GiveAllOrdersRequest(Player* player, std::vector<std::vector<Order*>> orderList) : Event() {
+		name = "GiveAllOrdersRequest";
+		type = GIVE_ALL_ORDERS_REQUEST;
+		this->player = player;
+		this->orderList = orderList;
+	}
 };
 
 class RememberOrders : public Event {
@@ -273,6 +291,21 @@ public:
 	}
 };
 
+class GamePausedEvent : public Event {
+public:
+	GamePausedEvent() : Event() {
+		name = "GamePausedEvent";
+		type = GAME_PAUSED_EVENT;
+	}
+};
+
+class ContinueGameEvent : public Event {
+public:
+	ContinueGameEvent() : Event() {
+		name = "ContinueGameEvent";
+		type = CONTINUE_GAME_EVENT;
+	}
+};
 
 class Projectile;
 

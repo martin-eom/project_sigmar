@@ -17,6 +17,7 @@ enum MAP_OBJECT_TYPES {
 	MAP_NONE,
 	MAP_RECTANGLE,
 	MAP_BORDER,
+	MAP_DEPLOYMENT_ZONE,
 	MAP_CIRCLE,
 	MAP_WAYPOINT
 };
@@ -25,235 +26,277 @@ class Map;
 
 class MapObject {
 public:
-	virtual int type() {return MAP_NONE;}
+	int type;
 	virtual void AutoWaypoints(double rad, Map* map) {}
-	MapObject() {}
+	MapObject() {type = MAP_NONE;}
 };
 
 class MapCircle : public MapObject, public Circle {
 public:
-	int type() {return MAP_CIRCLE;}
-	MapCircle(Eigen::Vector2d pos, double rad) : MapObject(), Circle(pos, rad) {}
+	MapCircle(Eigen::Vector2d pos, double rad) : MapObject(), Circle(pos, rad) {type = MAP_CIRCLE;}
 	void AutoWaypoints(double rad, Map* map);
 };
 
-class MapWaypoint : public MapObject, public Circle {
+class MapWaypoint : public MapCircle {
 public:
-	int type() {return MAP_WAYPOINT;}
 	bool _auto;
-	MapWaypoint(Eigen::Vector2d pos, double rad) : MapObject(), Circle(pos, rad) {_auto = false;}
+	MapWaypoint(Eigen::Vector2d pos, double rad) : MapCircle(pos, rad) {_auto = false; type = MAP_WAYPOINT;}
 };
 
 class MapRectangle : public MapObject, public Rrectangle {
 public:
-	int type() {return MAP_RECTANGLE;}
-	MapRectangle(double hl, double hw, Eigen::Vector2d pos, Eigen::Matrix2d rot) : MapObject(), Rrectangle(hl, hw, pos, rot) {}
+	MapRectangle(double hl, double hw, Eigen::Vector2d pos, Eigen::Matrix2d rot) : MapObject(), Rrectangle(hl, hw, pos, rot) {type = MAP_RECTANGLE;}
 	void AutoWaypoints(double rad, Map* map);
 };
 
-class MapBorder : public MapObject, public Rrectangle {
+class MapBorder : public MapRectangle {
 public:
-	int type() {return MAP_BORDER;}
-	MapBorder(double hl, double hw, Eigen::Vector2d pos, Eigen::Matrix2d rot) : MapObject(), Rrectangle(hl, hw, pos, rot) {}
+	MapBorder(double hl, double hw, Eigen::Vector2d pos, Eigen::Matrix2d rot) : MapRectangle(hl, hw, pos, rot) {type = MAP_BORDER;}
+};
+
+class DeploymentZone : public MapRectangle {
+public:
+	int player_id = 0;
+	DeploymentZone(double hl, double hw, Eigen::Vector2d pos, Eigen::Matrix2d rot) : MapRectangle(hl, hw, pos, rot) {type = MAP_DEPLOYMENT_ZONE;}
+	DeploymentZone(double hl, double hw, Eigen::Vector2d pos, Eigen::Matrix2d rot, int player_id) : DeploymentZone(hl, hw, pos, rot) {
+		this->player_id = player_id;
+	}
 };
 
 class gridpiece{
-	public:
-		std::vector<Soldier*> soldiers;
-		std::vector<Soldier*> p1Soldiers;
-		std::vector<Soldier*> p2Soldiers;
-		std::vector<MapObject*> mapObjects;
-		std::vector<Projectile*> projectiles;
-		std::vector<gridpiece*> neighbours;
-		std::vector<gridpiece*> redundantNeighbours;
-		Rrectangle* rec;
+public:
+	std::vector<Soldier*> soldiers;
+	std::vector<Soldier*> p1Soldiers;
+	std::vector<Soldier*> p2Soldiers;
+	std::vector<MapObject*> mapObjects;
+	std::vector<Projectile*> projectiles;
+	std::vector<gridpiece*> neighbours;
+	std::vector<gridpiece*> redundantNeighbours;
+	Rrectangle* rec;
 };
 
 class Map {
-	public:
-		const static int optimalTileSize = 31;
-		int tilesize;
-		int width;
-		int height;
-		int nrows;
-		int ncols;
-		std::vector<std::vector<gridpiece*>> tiles;
-		std::vector<MapObject*> mapObjects;
-		std::vector<MapWaypoint*> waypoints;
-		std::vector<MapBorder*> borders;
-		std::vector<std::vector<float>> wp_path_dist;
-		std::vector<std::vector<int>> wp_path_next;
+public:
+	const static int optimalTileSize = 31;
+	int tilesize;
+	int width;
+	int height;
+	int nrows;
+	int ncols;
+	std::vector<std::vector<gridpiece*>> tiles;
+	std::vector<MapObject*> mapObjects;
+	std::vector<MapWaypoint*> waypoints;
+	std::vector<MapBorder*> borders;
+	std::vector<DeploymentZone*> deploymentZones;
+	std::vector<std::vector<float>> wp_path_dist;
+	std::vector<std::vector<int>> wp_path_next;
 		
-	private:
-		void init() {
-			nrows = height / tilesize + bool(height % tilesize);
-			ncols = width / tilesize + bool(width % tilesize);
-			tiles = std::vector<std::vector<gridpiece*>>(nrows, std::vector<gridpiece*>(ncols, NULL));
-			for(int i = 0; i < nrows; i++) {
-				for(int j = 0; j < ncols; j++) {
-					tiles.at(i).at(j) = new gridpiece();
-					Eigen::Vector2d center;
-					center << tilesize/2. + j*tilesize, tilesize/2. + i*tilesize;
-					Eigen::Matrix2d rot;
-					rot << 1., 0., 0., 1.;
-					tiles.at(i).at(j)->rec = new Rrectangle(tilesize / 2., tilesize / 2., center, rot);
-				}
-			}
-			for(int i = 0; i < nrows - 1; i++) {
-				for(int j = 0; j < ncols - 1; j++) {
-					tiles.at(i).at(j)->neighbours.push_back(tiles.at(i+1).at(j));
-					tiles.at(i).at(j)->neighbours.push_back(tiles.at(i).at(j+1));
-					tiles.at(i).at(j)->neighbours.push_back(tiles.at(i+1).at(j+1));
-					if(i == 0) {
-						tiles.at(nrows-1).at(j)->neighbours.push_back(tiles.at(nrows-1).at(j+1));
-					}
-				}
-				tiles.at(i).at(ncols-1)->neighbours.push_back(tiles.at(i+1).at(ncols-1));
-			}
-			for(int i = 1; i < nrows; i++) {
-				for(int j = 1; j < ncols; j++) {
-					if(i+1 < nrows && j-1 > 0)
-						tiles.at(i).at(j)->redundantNeighbours.push_back(tiles.at(i+1).at(j-1));
-					if(j-1 > 0)
-						tiles.at(i).at(j)->redundantNeighbours.push_back(tiles.at(i).at(j-1));
-					if(i-1 > 0 && j-1 > 0)
-						tiles.at(i).at(j)->redundantNeighbours.push_back(tiles.at(i-1).at(j-1));
-					if(i-1 > 0)
-						tiles.at(i).at(j)->redundantNeighbours.push_back(tiles.at(i-1).at(j));
-					if(i-1 > 0 && j+1 < ncols)
-						tiles.at(i).at(j)->redundantNeighbours.push_back(tiles.at(i-1).at(j+1));
-				}
-			}
-			//creating map borders, but not adding them to objects yet
-			double hw = 0.5*width;
-			double hl = 0.5*height;
-			double ht = 0.5*tilesize;
-			Eigen::Vector2d pos;
-			Eigen::Matrix2d rot; rot << 1, 0, 0, 1;
-			pos << hw, height + ht;
-			borders.push_back(new MapBorder(ht, hw, pos, rot));
-			pos << width + ht, hl;
-			borders.push_back(new MapBorder(hl, ht, pos, rot));
-			pos << hw, -ht;
-			borders.push_back(new MapBorder(ht, hw, pos, rot));
-			pos << -ht, hl;
-			borders.push_back(new MapBorder(hl, ht, pos, rot));
-		}
+	void Cleangrid();
+	void Assign(Soldier* soldier, int i, int j);
+	void ProjectileAssign(Projectile* projectile, int i, int j);
+	void AddMapObject(MapObject* obj);
+	void RemoveMapObject(MapObject* obj);
+	bool Borders();
+	void toggelBorders();
+
+private:
+	void initGridPieces();
+	void setNeighbours();
+	void setRedundantNeighbours();
+	void createBorders();
+	void init();
 		
-	public:
-		Map(int width, int height, int tilesize) {
-			this->width = width;
-			this->height = height;
-			this->tilesize = tilesize;
-			init();
+public:
+	Map(int width, int height, int tilesize) {
+		this->width = width;
+		this->height = height;
+		this->tilesize = tilesize;
+		init();
+	}
+
+	Map(int width, int height) : Map(width, height, optimalTileSize) {}
+	Map(std::string filename);	//defined in fileio.h
+};
+
+void Map::init() {
+	nrows = height / tilesize + bool(height % tilesize);
+	ncols = width / tilesize + bool(width % tilesize);
+	tiles = std::vector<std::vector<gridpiece*>>(nrows, std::vector<gridpiece*>(ncols, NULL));
+	initGridPieces();
+	setNeighbours();
+	setRedundantNeighbours();
+	//creating map borders, but not adding them to objects yet
+	createBorders();
+}
+
+void Map::initGridPieces() {
+	for(int i = 0; i < nrows; i++) {
+		for(int j = 0; j < ncols; j++) {
+			tiles.at(i).at(j) = new gridpiece();
+			Eigen::Vector2d center;
+			center << tilesize/2. + j*tilesize, tilesize/2. + i*tilesize;
+			Eigen::Matrix2d rot;
+			rot << 1., 0., 0., 1.;
+			tiles.at(i).at(j)->rec = new Rrectangle(tilesize / 2., tilesize / 2., center, rot);		
 		}
+	}
+}
 
-		Map(int width, int height) : Map(width, height, optimalTileSize) {}
+void Map::setNeighbours() {
+	for(int i = 0; i < nrows - 1; i++) {
+		for(int j = 0; j < ncols - 1; j++) {
+			tiles.at(i).at(j)->neighbours.push_back(tiles.at(i+1).at(j));
+			tiles.at(i).at(j)->neighbours.push_back(tiles.at(i).at(j+1));
+			tiles.at(i).at(j)->neighbours.push_back(tiles.at(i+1).at(j+1));
+			if(i == 0) {
+				tiles.at(nrows-1).at(j)->neighbours.push_back(tiles.at(nrows-1).at(j+1));
+			}
+		}
+		tiles.at(i).at(ncols-1)->neighbours.push_back(tiles.at(i+1).at(ncols-1));
+	}
+}
 
-		Map(std::string filename);	//defined in fileio.h
-		
-		void Cleangrid() {
-			for(int i = 0; i < nrows; i++) {
-				for(int j = 0; j < ncols; j++) {
-					tiles.at(i).at(j)->soldiers.clear();
-					tiles.at(i).at(j)->p1Soldiers.clear();
-					tiles.at(i).at(j)->p2Soldiers.clear();
-					tiles.at(i).at(j)->projectiles.clear();
+void Map::setRedundantNeighbours() {
+	for(int i = 1; i < nrows; i++) {
+		for(int j = 1; j < ncols; j++) {
+			if(i+1 < nrows && j-1 > 0)
+				tiles.at(i).at(j)->redundantNeighbours.push_back(tiles.at(i+1).at(j-1));
+			if(j-1 > 0)
+				tiles.at(i).at(j)->redundantNeighbours.push_back(tiles.at(i).at(j-1));
+			if(i-1 > 0 && j-1 > 0)
+				tiles.at(i).at(j)->redundantNeighbours.push_back(tiles.at(i-1).at(j-1));
+			if(i-1 > 0)
+				tiles.at(i).at(j)->redundantNeighbours.push_back(tiles.at(i-1).at(j));
+			if(i-1 > 0 && j+1 < ncols)
+				tiles.at(i).at(j)->redundantNeighbours.push_back(tiles.at(i-1).at(j+1));
+		}
+	}
+}
+
+void Map::createBorders() {
+	double hw = 0.5*width;
+	double hl = 0.5*height;
+	double ht = 0.5*tilesize;
+	Eigen::Vector2d pos;
+	Eigen::Matrix2d rot; rot << 1, 0, 0, 1;
+	pos << hw, height + ht;
+	borders.push_back(new MapBorder(ht, hw, pos, rot));
+	pos << width + ht, hl;
+	borders.push_back(new MapBorder(hl, ht, pos, rot));
+	pos << hw, -ht;
+	borders.push_back(new MapBorder(ht, hw, pos, rot));
+	pos << -ht, hl;
+	borders.push_back(new MapBorder(hl, ht, pos, rot));
+}
+
+void Map::Cleangrid() {
+	for(int i = 0; i < nrows; i++) {
+		for(int j = 0; j < ncols; j++) {
+			tiles.at(i).at(j)->soldiers.clear();
+			tiles.at(i).at(j)->p1Soldiers.clear();
+			tiles.at(i).at(j)->p2Soldiers.clear();
+			tiles.at(i).at(j)->projectiles.clear();
+		}
+	}
+}
+
+void Map::Assign(Soldier* soldier, int i, int j) {
+	tiles.at(i).at(j)->soldiers.push_back(soldier);
+	if(soldier->unit->player->player1)
+		tiles.at(i).at(j)->p1Soldiers.push_back(soldier);
+	else
+		tiles.at(i).at(j)->p2Soldiers.push_back(soldier);
+}
+
+void Map::ProjectileAssign(Projectile* projectile, int i, int j) {
+	tiles.at(i).at(j)->projectiles.push_back(projectile);		
+}
+
+void Map::AddMapObject(MapObject* obj) {
+	switch(obj->type) {
+	case MAP_CIRCLE: {
+		Circle* circ = dynamic_cast<Circle*>(obj);
+		Circle extended = Circle(circ->pos, circ->rad + 0.5*tilesize);
+		for(auto row : tiles) {
+			for(auto tile : row) {
+				if(CircleRectangleCollision(&extended, tile->rec)) {
+					tile->mapObjects.push_back(obj);
 				}
 			}
 		}
-		
-		void Assign(Soldier* soldier, int i, int j) {
-			tiles.at(i).at(j)->soldiers.push_back(soldier);
-			if(soldier->unit->player->player1)
-				tiles.at(i).at(j)->p1Soldiers.push_back(soldier);
-			else
-				tiles.at(i).at(j)->p2Soldiers.push_back(soldier);
-		}
-
-		void ProjectileAssign(Projectile* projectile, int i, int j) {
-			tiles.at(i).at(j)->projectiles.push_back(projectile);		
-		}
-
-		void AddMapObject(MapObject* obj) {
-			switch(obj->type()) {
-			case MAP_CIRCLE: {
-				Circle* circ = dynamic_cast<Circle*>(obj);
-				Circle extended = Circle(circ->pos, circ->rad + 0.5*tilesize);
-				for(auto row : tiles) {
-					for(auto tile : row) {
-						if(CircleRectangleCollision(&extended, tile->rec)) {
-							tile->mapObjects.push_back(obj);
-						}
-					}
+		break;}
+	case MAP_BORDER:
+	case MAP_RECTANGLE: {
+		Rrectangle* rec = dynamic_cast<Rrectangle*>(obj);
+		Rrectangle extended = Rrectangle(rec->hl + 0.5*tilesize, rec->hw + 0.5*tilesize, rec->pos, rec->rot);
+		for(auto row : tiles) {
+			for(auto tile : row) {
+				if(RectangleRectangleCollision(&extended, tile->rec)) {
+					tile->mapObjects.push_back(obj);
 				}
-				break;}
-			case MAP_BORDER:
-			case MAP_RECTANGLE: {
-				Rrectangle* rec = dynamic_cast<Rrectangle*>(obj);
-				Rrectangle extended = Rrectangle(rec->hl + 0.5*tilesize, rec->hw + 0.5*tilesize, rec->pos, rec->rot);
-				for(auto row : tiles) {
-					for(auto tile : row) {
-						if(RectangleRectangleCollision(&extended, tile->rec)) {
-							tile->mapObjects.push_back(obj);
-						}
-					}
-				}
-				}break;
-			case MAP_WAYPOINT:
-				waypoints.push_back(dynamic_cast<MapWaypoint*>(obj));
-				break;
 			}
-			mapObjects.push_back(obj);
 		}
+		}break;
+	case MAP_DEPLOYMENT_ZONE:
+		deploymentZones.push_back(dynamic_cast<DeploymentZone*>(obj));
+		break;
+	case MAP_WAYPOINT:
+		waypoints.push_back(dynamic_cast<MapWaypoint*>(obj));
+		break;
+	}
+	mapObjects.push_back(obj);
+}
 
-		void RemoveMapObject(MapObject* obj) {
-			std::erase(mapObjects, obj);
-			switch(obj->type()) {
-			case MAP_CIRCLE:
-			case MAP_RECTANGLE:
+void Map::RemoveMapObject(MapObject* obj) {
+	std::erase(mapObjects, obj);
+	switch(obj->type) {
+	case MAP_CIRCLE:
+	case MAP_RECTANGLE:
+		for(auto row : tiles) {
+			for(auto tile : row) {
+				std::erase(tile->mapObjects, obj);
+			}
+		}
+		break;
+	case MAP_DEPLOYMENT_ZONE:
+		std::erase(deploymentZones, dynamic_cast<DeploymentZone*>(obj));
+		break;
+	case MAP_WAYPOINT:
+		std::erase(waypoints, dynamic_cast<MapWaypoint*>(obj));
+		break;
+	}
+}
+
+bool Map::Borders() {
+	for(auto obj : mapObjects) {
+		if(obj->type == MAP_BORDER) return true;
+	}
+	return false;
+}
+
+void Map::toggelBorders() {
+	if(Borders()) {
+		std::vector<MapObject*> reference = mapObjects;
+		for(auto obj : reference) {
+			if(obj->type == MAP_BORDER) {
+				std::erase(mapObjects, obj);
 				for(auto row : tiles) {
 					for(auto tile : row) {
 						std::erase(tile->mapObjects, obj);
 					}
 				}
-				break;
-			case MAP_WAYPOINT:
-				std::erase(waypoints, dynamic_cast<MapWaypoint*>(obj));
-				break;
 			}
 		}
+		std::cout << "Toggled off map borders.\n";
+	}
+	else {
+		for(auto border : borders) {
+			AddMapObject(border);
+		}
+		std::cout << "Toggled on map borders.\n";
+	}
+}
 
-		bool Borders() {
-			for(auto obj : mapObjects) {
-				if(obj->type() == MAP_BORDER) return true;
-			}
-			return false;
-		}
-
-		void toggelBorders() {
-			if(Borders()) {
-				std::vector<MapObject*> reference = mapObjects;
-				for(auto obj : reference) {
-					if(obj->type() == MAP_BORDER) {
-						std::erase(mapObjects, obj);
-						for(auto row : tiles) {
-							for(auto tile : row) {
-								std::erase(tile->mapObjects, obj);
-							}
-						}
-					}
-				}
-				std::cout << "Toggled on map borders.\n";
-			}
-			else {
-				for(auto border : borders) {
-					AddMapObject(border);
-				}
-				std::cout << "Toggled off map borders.\n";
-			}
-		}
-};
 
 void SoldierCircleCollision(Soldier* soldier, Circle* circle) {
 	double collisionStrength = 2.;
@@ -406,14 +449,9 @@ void SoldierRectangleCollision(Soldier* soldier, Rrectangle* rec) {
 void MapCircle::AutoWaypoints(double rad, Map* map) {
 	double sin = rad / (2 * (rad + this->rad));
 	double cos = std::sqrt(std::pow(rad + this->rad, 2) - std::pow(rad / 2, 2)) / (rad + this->rad);
-	debug(std::to_string(sin));
-	debug(std::to_string(cos));
 	double ang = Angle(sin, cos);
 	int nwaypoints = std::ceil(2*M_PI / ang);
 	nwaypoints = ceil(nwaypoints * 0.75);
-	debug(std::to_string(nwaypoints));
-	debug(std::to_string(M_PI));
-	debug(std::to_string(ang));
 	double dphi = 2*M_PI / nwaypoints;
 	for(int i = 0; i < nwaypoints; i=i+1) {
 		sin = std::sin(i*dphi); cos = std::cos(i*dphi);
@@ -450,7 +488,7 @@ void AutoWaypoints(double rad, Map* map) {
 	//creating new automatic waypoints
 	std::vector<MapObject*> objreference = map->mapObjects;
 	for(auto obj : objreference) {
-		switch(obj->type()) {
+		switch(obj->type) {
 		case MAP_CIRCLE:
 			dynamic_cast<MapCircle*>(obj)->AutoWaypoints(rad, map);
 			break;
@@ -464,7 +502,7 @@ void AutoWaypoints(double rad, Map* map) {
 	for(auto wp : wpreference) {
 		bool collision = false;
 		for(auto obj : objreference) {
-			switch(obj->type()) {
+			switch(obj->type) {
 			case MAP_CIRCLE:
 				if(LenientCircleCircleCollision(dynamic_cast<Circle*>(obj), dynamic_cast<Circle*>(wp)))
 					collision = true;
