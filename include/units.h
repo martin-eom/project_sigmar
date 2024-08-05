@@ -38,6 +38,7 @@ public:
 	double rangedAngle = 0.;
 	// generated members
 	Player* player;
+	int model_index;
 	std::vector<std::vector<Soldier*>> soldiers;//{_nrows, std::vector<Soldier*>(_width, NULL)};
 	std::vector<Soldier*> liveSoldiers;
 	std::vector<std::vector<Eigen::Vector2d>> posInUnit;;//{_nrows, std::vector<Eigen::Vector2d>(_width, Eigen::Vector2d())};
@@ -101,6 +102,12 @@ public:
 		init(classMap);
 
 	}				
+};
+
+struct UnitSorter {
+	inline bool operator() (const Unit* unit1, const Unit* unit2) {
+		return (unit1->nLiveSoldiers < unit2->nLiveSoldiers);
+	}
 };
 
 void Unit::Populate(std::map<std::string, SoldierInformation> classMap) {

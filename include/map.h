@@ -202,6 +202,7 @@ void Map::Cleangrid() {
 
 void Map::Assign(Soldier* soldier, int i, int j) {
 	tiles.at(i).at(j)->soldiers.push_back(soldier);
+	soldier->tile_index = tiles.at(i).at(j)->soldiers.size() - 1;
 	if(soldier->unit->player->player1)
 		tiles.at(i).at(j)->p1Soldiers.push_back(soldier);
 	else

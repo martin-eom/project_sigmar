@@ -16,6 +16,7 @@
 #include <ostream>
 #include <queue>
 #include <cstdlib>
+#include <omp.h>
 
 
 class Soldier;
@@ -104,6 +105,10 @@ class Soldier : public Circle{
 		//Eigen::Vector2d pos; // handled by inheriting from Point
 		Eigen::Vector2d posTarget;
 		Eigen::Vector2d oldPosTarget;
+		int map_row;
+		int map_column;
+		int model_index;
+		int tile_index;
 		Eigen::Vector2d vel;
 		double speed;
 		double forwardSpeed;

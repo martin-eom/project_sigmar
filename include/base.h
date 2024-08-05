@@ -15,6 +15,7 @@
 #include <algorithm>
 #include <string>
 #include <cmath>
+#include <chrono>
 
 
 
@@ -26,9 +27,13 @@ class EventManager {
 	public:
 		std::list<int> noPrint = {GENERIC_EVENT, TICK_EVENT, SDL_EVENT, CHANGE_TEXTBOX_EVENT};
 		std::list<Listener*> listeners;
+		std::vector<double> times;
 		int fps = 30;
 		double dt = 1./30.;
 		virtual void _polymorphism(){};	//necessary to make the class polymorphic
+
+		bool measureTime = false;
+		bool showTimes = false;
 		
 		EventManager() {};
 		EventManager(int fps){
@@ -38,10 +43,13 @@ class EventManager {
 				
 		void RegisterListener(Listener* listener) {
 			listeners.push_back(listener);
+			times.push_back(0);
 		}
 		
 		void UnregisterListener(Listener* listener) {
+			int n_listener = std::distance(listeners.begin(), std::find(listeners.begin(), listeners.end(), listener));
 			listeners.remove(listener);
+			times.erase(std::next(times.begin(), n_listener));
 		}
 		
 		void Post(Event* ev);
@@ -67,7 +75,25 @@ void EventManager::Post(Event* ev) {
 		std::cout << " - posted " << ev->name << "\n";
 	}
 	for(auto listener : listeners) {
-		listener->Notify(ev);
+		if(measureTime) {
+			auto start = std::chrono::system_clock::now();
+			listener->Notify(ev);
+			auto end = std::chrono::system_clock::now();
+			times.at(std::distance(listeners.begin(), std::find(listeners.begin(), listeners.end(), listener))) += std::chrono::duration<double>(end - start).count();		
+		}
+		else
+			listener->Notify(ev);
+
+		if(showTimes) {
+			std::cout << "######### EM TIMING ###########\n";
+			for(auto time : times) {
+				std::cout << time << "\n";
+			}
+			std::cout << "###############################\n";
+			showTimes = false;
+			measureTime = false;
+			//while(true) {}
+		}
 	}
 }
 

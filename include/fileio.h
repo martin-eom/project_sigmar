@@ -325,9 +325,25 @@ void Model::loadArmyLists(std::string filename) {
 	for(auto entry : input) {
 		for(auto unitName : entry) {
 			std::cout << "adding " << unitName << " to player " << nplayer << "\n";
-			players[nplayer]->units.push_back(new Unit(UnitTypes.at(unitName), players[nplayer], SoldierTypes));
+			Unit* unit = new Unit(UnitTypes.at(unitName), players[nplayer], SoldierTypes);
+			players[nplayer]->units.push_back(unit);
+			units.push_back(unit);
+			unit->model_index = units.size() - 1;
+			unit_locks.push_back(new omp_lock_t());
+			omp_init_lock(unit_locks.at(unit_locks.size() - 1));
+			for(auto soldier : unit->liveSoldiers) {
+				soldiers.push_back(soldier);
+				soldier->model_index = soldiers.size() - 1;
+				soldier_locks.push_back(new omp_lock_t());
+				omp_init_lock(soldier_locks.at(soldier_locks.size() - 1));
+			}
 		}
 		nplayer++;
+	}
+	std::sort(units.begin(), units.end(), UnitSorter());
+	std::reverse(units.begin(), units.end());
+	for(auto unit : units) {
+		std::cout << unit->nLiveSoldiers << "\n";
 	}
 }
 
