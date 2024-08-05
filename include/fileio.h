@@ -20,16 +20,39 @@ json fromFile(std::string filename) {
 	return j;
 }
 
+void getMapObjects(json* j, Map* map);
+void getPathInfo(json* j, Map* map);
+
 json MapToJson(Map* map) {
 	json j;
 	j["width"] = map->width;
 	j["height"] = map->height;
 	j["tilesize"] = map->tilesize;
+	getMapObjects(&j, map);
+	getPathInfo(&j, map);
+	return j;
+}
+
+void readMapObjectsFromJSON(json* j, Map* map);
+void readPathInfoFromJSON(json* j, Map* map);
+
+Map::Map(std::string filename) {
+	json j = fromFile(filename);
+	width = j["width"];
+	height = j["height"];
+	tilesize = j["tilesize"];
+	init();
+	readMapObjectsFromJSON(&j, this);
+	readPathInfoFromJSON(&j, this);
+}
+
+void getMapObjects(json* j, Map* map) {
 	json circles = json::array();
 	json rectangles = json::array();
 	json waypoints = json::array();
+	json deployment_zones = json::array();
 	for(auto obj : map->mapObjects) {
-		switch(obj->type()) {
+		switch(obj->type) {
 		case MAP_CIRCLE: {
 			Circle* circ = dynamic_cast<Circle*>(obj);
 			json jcirc;
@@ -45,7 +68,7 @@ json MapToJson(Map* map) {
 			jrec["hw"] = rec->hw;
 			jrec["pos"] = {rec->pos.coeff(0), rec->pos.coeff(1)};
 			jrec["rot"] = {rec->rot.coeff(0,0), rec->rot.coeff(0,1), rec->rot.coeff(1,0), rec->rot.coeff(1,1)};
-			if(obj->type() == MAP_BORDER) jrec["b"] = 1;
+			if(obj->type == MAP_BORDER) jrec["b"] = 1;
 			else jrec["b"] = 0;
 			rectangles.push_back(jrec);
 			break;}
@@ -60,9 +83,22 @@ json MapToJson(Map* map) {
 			break;}
 		}
 	}
-	j["circles"] = circles;
-	j["rectangles"] = rectangles;
-	j["waypoints"] = waypoints;
+	for(auto dz : map->deploymentZones) {
+		json jdz;
+		jdz["hl"] = dz->hl;
+		jdz["hw"] = dz->hw;
+		jdz["pos"] = {dz->pos.coeff(0), dz->pos.coeff(1)};
+		jdz["rot"] = {dz->rot.coeff(0,0), dz->rot.coeff(0,1), dz->rot.coeff(1,0), dz->rot.coeff(1,1)};
+		jdz["id"] = dz->player_id;
+		deployment_zones.push_back(jdz);
+	}
+	(*j)["circles"] = circles;
+	(*j)["rectangles"] = rectangles;
+	(*j)["waypoints"] = waypoints;
+	(*j)["deployment_zones"] = deployment_zones;
+}
+
+void getPathInfo(json* j, Map* map) {
 	json wp_dist = json::array();
 	for(auto row : map->wp_path_dist) {
 		json jrow = json::array();
@@ -71,7 +107,7 @@ json MapToJson(Map* map) {
 		}
 		wp_dist.push_back(jrow);
 	}
-	j["wp_dist"] = wp_dist;
+	(*j)["wp_dist"] = wp_dist;
 	json wp_next = json::array();
 	for(auto row : map->wp_path_next) {
 		json jrow = json::array();
@@ -80,22 +116,16 @@ json MapToJson(Map* map) {
 		}
 		wp_next.push_back(jrow);
 	}
-	j["wp_next"] = wp_next;
-	return j;
+	(*j)["wp_next"] = wp_next;
 }
 
-Map::Map(std::string filename) {
-	json j = fromFile(filename);
-	width = j["width"];
-	height = j["height"];
-	tilesize = j["tilesize"];
-	init();
-	for(auto jcirc : j["circles"]) {
+void readMapObjectsFromJSON(json* j, Map* map) {
+	for(auto jcirc : (*j)["circles"]) {
 		Eigen::Vector2d pos; pos << jcirc["pos"][0], jcirc["pos"][1];
 		MapCircle* circ = new MapCircle(pos, jcirc["rad"]);
-		AddMapObject(circ);
+		map->AddMapObject(circ);
 	}
-	for(auto jrec : j["rectangles"]) {
+	for(auto jrec : (*j)["rectangles"]) {
 		Eigen::Vector2d pos; pos << jrec["pos"][0], jrec["pos"][1];
 		Eigen::Matrix2d rot; rot << jrec["rot"][0], jrec["rot"][1], jrec["rot"][2], jrec["rot"][3];
 		MapObject* rec;
@@ -104,30 +134,40 @@ Map::Map(std::string filename) {
 			else rec = new MapRectangle(jrec["hl"], jrec["hw"], pos, rot);
 		}
 		else rec = new MapRectangle(jrec["hl"], jrec["hw"], pos, rot);
-		AddMapObject(rec);
+		map->AddMapObject(rec);
 	}
-	debug("Non-pathfinding map elements loaded successfully.");
-	if(j.contains("waypoints")) {
-		for(auto jcirc : j["waypoints"]) {
+	if((*j).contains("deployment_zones")){
+		for(auto jdz : (*j)["deployment_zones"]) {
+			Eigen::Vector2d pos; pos << jdz["pos"][0], jdz["pos"][1];
+			Eigen::Matrix2d rot; rot << jdz["rot"][0], jdz["rot"][1], jdz["rot"][2], jdz["rot"][3];
+			DeploymentZone* dz = new DeploymentZone(jdz["hl"], jdz["hw"], pos, rot, jdz["id"]);
+			map->AddMapObject(dz);
+		}
+	}
+}
+
+void readPathInfoFromJSON(json* j, Map* map) {
+	if((*j).contains("waypoints")) {
+		for(auto jcirc : (*j)["waypoints"]) {
 			debug("Loading waypoint.");
 			Eigen::Vector2d pos; pos << jcirc["pos"][0], jcirc["pos"][1];
 			MapWaypoint* circ = new MapWaypoint(pos, jcirc["rad"]);
 			if(jcirc.contains("auto")) {
 				if(int(jcirc["auto"])) circ->_auto = true;
 			}
-			AddMapObject(circ);
+			map->AddMapObject(circ);
 		}
-		if(j.contains("wp_dist") && j.contains("wp_next")) {
-			for(auto jrow : j["wp_dist"]) {
-				wp_path_dist.push_back(std::vector<float>());
+		if((*j).contains("wp_dist") && (*j).contains("wp_next")) {
+			for(auto jrow : (*j)["wp_dist"]) {
+				map->wp_path_dist.push_back(std::vector<float>());
 				for(auto entry : jrow) {
-					wp_path_dist.at(wp_path_dist.size()-1).push_back(entry);
+					map->wp_path_dist.at(map->wp_path_dist.size()-1).push_back(entry);
 				}
 			}
-			for(auto jrow : j["wp_next"]) {
-				wp_path_next.push_back(std::vector<int>());
+			for(auto jrow : (*j)["wp_next"]) {
+				map->wp_path_next.push_back(std::vector<int>());
 				for(auto entry : jrow) {
-					wp_path_next.at(wp_path_next.size()-1).push_back(entry);
+					map->wp_path_next.at(map->wp_path_next.size()-1).push_back(entry);
 				}
 			}
 		}
@@ -246,6 +286,16 @@ SettingsInformation::SettingsInformation(json input) {
 	if(custom_background)
 		backgroundInfo = AnimationInformation(input["background_animation"]);
 	show_map_object_outlines = input["show_map_object_outlines"];
+	turn_duration = input["turn_duration"];
+	simulation_mode = input["simulation_mode"];
+	base_melee_attack = input["base_melee_attack"];
+	ranged_base_attack = input["ranged_base_attack"];
+	max_hit_chance = input["max_hit_chance"];
+	min_hit_chance = input["min_hit_chance"];
+	anti_large_attack_bonus = input["anti_large_attack_bonus"];
+	anti_large_damage_bonus = input["anti_large_damage_bonus"];
+	anti_infantry_attack_bonus = input["anti_infantry_attack_bonus"];
+	anti_infantry_damage_bonus = input["anti_infantry_damage_bonus"];
 }
 
 MapEditorSettingsInformation::MapEditorSettingsInformation(json input) {
@@ -259,9 +309,6 @@ void Model::loadSoldierTypes(std::string filename) {
 		SoldierInformation info = SoldierInformation(entry);
 		SoldierTypes.emplace(info.tag, info);
 	}
-	for(std::map<std::string, SoldierInformation>::iterator it = SoldierTypes.begin(); it != SoldierTypes.end(); ++it) {
-		std::cout << "SoldierType key: " << it->first << "\n";
-	}
 }
 
 void Model::loadUnitTypes(std::string filename) {
@@ -269,9 +316,6 @@ void Model::loadUnitTypes(std::string filename) {
 	for(auto entry : input) {
 		UnitInformation info = UnitInformation(entry);
 		UnitTypes.emplace(info.tag, info);
-	}
-	for(std::map<std::string, UnitInformation>::iterator it = UnitTypes.begin(); it != UnitTypes.end(); ++it) {
-		std::cout << "UnitType key: " << it->first << "\n";
 	}
 }
 
@@ -281,9 +325,25 @@ void Model::loadArmyLists(std::string filename) {
 	for(auto entry : input) {
 		for(auto unitName : entry) {
 			std::cout << "adding " << unitName << " to player " << nplayer << "\n";
-			players[nplayer]->units.push_back(new Unit(UnitTypes.at(unitName), players[nplayer], SoldierTypes));
+			Unit* unit = new Unit(UnitTypes.at(unitName), players[nplayer], SoldierTypes);
+			players[nplayer]->units.push_back(unit);
+			units.push_back(unit);
+			unit->model_index = units.size() - 1;
+			unit_locks.push_back(new omp_lock_t());
+			omp_init_lock(unit_locks.at(unit_locks.size() - 1));
+			for(auto soldier : unit->liveSoldiers) {
+				soldiers.push_back(soldier);
+				soldier->model_index = soldiers.size() - 1;
+				soldier_locks.push_back(new omp_lock_t());
+				omp_init_lock(soldier_locks.at(soldier_locks.size() - 1));
+			}
 		}
 		nplayer++;
+	}
+	std::sort(units.begin(), units.end(), UnitSorter());
+	std::reverse(units.begin(), units.end());
+	for(auto unit : units) {
+		std::cout << unit->nLiveSoldiers << "\n";
 	}
 }
 
@@ -295,6 +355,9 @@ void Model::loadDamageInfo() {
 void Model::loadSettings(std::string filename) {
 	json input = fromFile(filename);
 	settings = SettingsInformation(input);
+	if(settings.simulation_mode) state = MODEL_SIMULATION;
+	else state = MODEL_GAME_PAUSED;
+	toNextState.set_max(settings.turn_duration);
 }
 
 void MapEditorModel::loadSettings(std::string filename) {

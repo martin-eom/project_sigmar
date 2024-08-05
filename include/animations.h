@@ -204,7 +204,7 @@ public:
 class DamageAnimation : public SoldierAnimation {
 public:
 	bool running = false;
-	int last_hp;
+	double last_hp;
 	//Timer ticksToNextStage;
 
 	DamageAnimation(Soldier* soldier, AnimationInformation info) : SoldierAnimation(soldier, info) {

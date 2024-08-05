@@ -16,6 +16,7 @@
 #include <ostream>
 #include <queue>
 #include <cstdlib>
+#include <omp.h>
 
 
 class Soldier;
@@ -38,7 +39,6 @@ public:
 
 };
 
-
 struct compareContainers {
 	bool operator()(const SoldierNeighbourContainer& c1,const SoldierNeighbourContainer& c2) {
 		return c1.dist > c2.dist;
@@ -46,39 +46,31 @@ struct compareContainers {
 };
 
 
-class Soldier : public Point{
+class Soldier : public Circle{
 	public:
-		double rad;
+		// general stats
+		//double rad;
 		double mass;
 		double defaultMaxSpeed;
 		double maxSpeed;
 		double accel;	//acceleration the soldier can use
 		double turn;	//turnspeed
-		double linearDamp;	//coefficient for linear dampening (with regard to velocity)
-		double squareDamp;	//coefficient for square dampening
 		double onTargetDamp;	//dampening when close to posTarget
 		std::string tag;
-
+		// melee stats
 		int maxHP;
 		bool melee;
 		double meleeRange = 0.;
 		double meleeAngle = 1./3.;
 		virtual int damage(Soldier* target) {return 1;}
 		Timer MeleeTimer = Timer(60);
-		//int meleeCooldownTicks = 61;
-		int meleeDamage = 1;
-		int meleeAttack = 0;
-		int meleeDefense = 0;
-		int armor = 0;
-		int armorPiercing = 0;
-		bool infantry = false;
-		bool large = false;
-		bool antiInfantry = false;
-		bool antiLarge = false;
+		double meleeDamage = 1.;
+		double meleeAttack = 0.;
+		double meleeDefense = 0.;
+		double armor = 0.;
+		double armorPiercing = 0.;
 		bool meleeAOE = false;
-		int rangedDefense = 0;
-		double rangedAOE = 0.;
-
+		// ranged stats
 		bool ranged = false;
 		double rangedRange = 0.;
 		double rangedMinRange = 0.;
@@ -87,14 +79,24 @@ class Soldier : public Point{
 		Timer DrawTimer = Timer(0);
 		Timer ReloadTimer = Timer(0);
 		Soldier* rangedTarget = NULL;
-		int rangedDamage = 0;
+		double rangedDamage = 0.;
 		double rangedSpeed = 0.;
 		double maxSpeedForFiring = 0.;
 		double projectileSpeed = 0.;
-		int rangedArmorPiercing = 0;
+		double rangedArmorPiercing = 0.;
 		double projectileAOE = 0.;
-		
-		//general members
+		double rangedDefense = 0.;
+		double rangedAOE = 0.;
+		// keywords
+		bool infantry = false;
+		bool large = false;
+		bool antiInfantry = false;
+		bool antiLarge = false;
+		bool shielded = false;
+
+		// computed members
+		double linearDamp;	//coefficient for linear dampening (with regard to velocity)
+		double squareDamp;	//coefficient for square dampening
 		double Force, damp, defaultDamp;
 		bool placed = false;
 		int currentOrder;
@@ -103,6 +105,10 @@ class Soldier : public Point{
 		//Eigen::Vector2d pos; // handled by inheriting from Point
 		Eigen::Vector2d posTarget;
 		Eigen::Vector2d oldPosTarget;
+		int map_row;
+		int map_column;
+		int model_index;
+		int tile_index;
 		Eigen::Vector2d vel;
 		double speed;
 		double forwardSpeed;
@@ -115,7 +121,7 @@ class Soldier : public Point{
 		Unit* unit;
 		//std::vector<Soldier*> enemiesInMeleeRange;
 		std::priority_queue<SoldierNeighbourContainer, std::vector<SoldierNeighbourContainer>, compareContainers> enemiesInMeleeRange;
-		int hp;
+		double hp;
 		bool alive;
 		Soldier* meleeTarget;	// target they will turn to eventually
 		Soldier* meleeSwingTarget;	// target they are striking at the moment
@@ -211,9 +217,9 @@ class Soldier : public Point{
 			damp = Force / pow(maxSpeed, 2);
 		};
 
-		Circle SoldierCircle() {
+		/*Circle SoldierCircle() {
 			return Circle(pos, rad);
-		}
+		}*/
 };
 
 

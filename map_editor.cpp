@@ -143,6 +143,36 @@ int main(int argc, char* argv[1]) {
 				em->Post(&ev);
 				T_OF_NEXT_TICK = CURRENT_TICK + em->dt * 1000;
 			}
+
+			auto reshapingRectangle = [&](int axis, int prevState) {
+				if(!SDL_IsTextInputActive()) {
+					std::string axisText;
+					switch(axis) {
+					case REC_AXIS_HEIGHT: axisText = "enter new rectangle height: "; break;
+					case REC_AXIS_WIDTH: axisText = "enter new rectangle width: "; break;
+					}
+					ResetTextbox(axisText, true, ctrl, view);
+				}
+				if(ctrl->input_confirmed) {
+					ctrl->input_confirmed = false;
+					if(Isdouble(ctrl->input)) {
+						switch(axis) {
+						case REC_AXIS_WIDTH: {
+							ctrl->lastRecWidth = stod(ctrl->input);
+							Rrectangle* rec = dynamic_cast<Rrectangle*>(ctrl->objToPlace);
+							rec->Reshape(stod(ctrl->input)/2, rec->hw);
+							}break;
+						case REC_AXIS_HEIGHT: {
+							ctrl->lastRecHeight = stod(ctrl->input);
+							Rrectangle* rec = dynamic_cast<Rrectangle*>(ctrl->objToPlace);
+							rec->Reshape(rec->hl, stod(ctrl->input)/2);
+							}break;
+						}
+					}
+					ctrl->state = prevState;
+				}			
+			}; 
+
 			switch(ctrl->state) {
 			case EDITOR_IDLE:
 				ResetTextbox("", false, ctrl, view);
@@ -224,11 +254,13 @@ int main(int argc, char* argv[1]) {
 					ctrl->state = EDITOR_PLACING_WP;
 				}
 				break;
-			case EDITOR_PLACING_RECTANGLE: {
+			case EDITOR_PLACING_RECTANGLE:
+			case EDITOR_PLACING_DP_ZONE: {
 				ResetTextbox("", false, ctrl, view);
 				dynamic_cast<Rrectangle*>(ctrl->objToPlace)->Reposition(ctrl->mousePos);
 				break;}
-			case EDITOR_ROTATING_RECTANGLE: {
+			case EDITOR_ROTATING_RECTANGLE: 
+			case EDITOR_ROTATING_DP_ZONE: {
 				ResetTextbox("", false, ctrl, view);
 				Rrectangle* rec = dynamic_cast<Rrectangle*>(ctrl->objToPlace);
 				Eigen::Vector2d diff = ctrl->mousePos - rec->pos;
@@ -240,7 +272,7 @@ int main(int argc, char* argv[1]) {
 				}
 				break;}
 			case EDITOR_ENTERING_REC_WIDTH:
-				if(!SDL_IsTextInputActive()) {
+				/*if(!SDL_IsTextInputActive()) {
 					ResetTextbox("enter new rectangle width: ", true, ctrl, view);
 				}
 				if(ctrl->input_confirmed) {
@@ -251,10 +283,14 @@ int main(int argc, char* argv[1]) {
 						rec->Reshape(stod(ctrl->input)/2, rec->hw);
 					}
 					ctrl->state = EDITOR_PLACING_RECTANGLE;
-				}
+				}*/
+				reshapingRectangle(REC_AXIS_WIDTH, EDITOR_PLACING_RECTANGLE);
+				break;
+			case EDITOR_ENTERING_DP_ZONE_WIDTH:
+				reshapingRectangle(REC_AXIS_WIDTH, EDITOR_PLACING_DP_ZONE);
 				break;
 			case EDITOR_ENTERING_REC_HEIGHT:
-				if(!SDL_IsTextInputActive()) {
+				/*if(!SDL_IsTextInputActive()) {
 					ResetTextbox("enter new rectangle height: ", true, ctrl, view);
 				}
 				if(ctrl->input_confirmed) {
@@ -265,6 +301,23 @@ int main(int argc, char* argv[1]) {
 						rec->Reshape(rec->hl, stod(ctrl->input)/2);
 					}
 					ctrl->state = EDITOR_PLACING_RECTANGLE;
+				}*/
+				reshapingRectangle(REC_AXIS_HEIGHT, EDITOR_PLACING_RECTANGLE);
+				break;
+			case EDITOR_ENTERING_DP_ZONE_HEIGHT:
+				reshapingRectangle(REC_AXIS_HEIGHT, EDITOR_PLACING_DP_ZONE);
+				break;
+			case EDITOR_ENTERING_DP_ZONE_ID:
+				if(!SDL_IsTextInputActive()) {
+					ResetTextbox("enter new deployment zone id: ", true, ctrl, view);
+				}
+				if(ctrl->input_confirmed) {
+					ctrl->input_confirmed = false;
+					if(Isint(ctrl->input)) {
+						DeploymentZone* dz = dynamic_cast<DeploymentZone*>(ctrl->objToPlace);
+						dz->player_id = stoi(ctrl->input);
+					}
+					ctrl->state = EDITOR_PLACING_DP_ZONE;
 				}
 				break;
 			case EDITOR_SELECTING:
@@ -276,11 +329,13 @@ int main(int argc, char* argv[1]) {
 				break;
 			case EDITOR_MOVING:
 				if(ctrl->objToPlace) {
-					switch(ctrl->objToPlace->type()) {
+					switch(ctrl->objToPlace->type) {
 					case MAP_CIRCLE:
 						ctrl->state = EDITOR_PLACING_CIRCLE; break;
 					case MAP_RECTANGLE:
 						ctrl->state = EDITOR_PLACING_RECTANGLE; break;
+					case MAP_DEPLOYMENT_ZONE:
+						ctrl->state = EDITOR_PLACING_DP_ZONE; break;
 					case MAP_WAYPOINT:
 						ctrl->state = EDITOR_PLACING_WP; break;
 					default:
@@ -291,11 +346,13 @@ int main(int argc, char* argv[1]) {
 				break;
 			case EDITOR_COPYING:
 				if(ctrl->objToPlace) {
-					switch(ctrl->objToPlace->type()) {
+					switch(ctrl->objToPlace->type) {
 					case MAP_CIRCLE:
 						ctrl->state = EDITOR_PLACING_CIRCLE; break;
 					case MAP_RECTANGLE:
 						ctrl->state = EDITOR_PLACING_RECTANGLE; break;
+					case MAP_DEPLOYMENT_ZONE:
+						ctrl->state = EDITOR_PLACING_DP_ZONE; break;
 					case MAP_WAYPOINT:
 						ctrl->state = EDITOR_PLACING_WP; break;
 					default:

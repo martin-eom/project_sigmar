@@ -1,6 +1,6 @@
 [
 	{
-		"tag": "Infantry",
+		"tag": "ShieldedInfantry",
 		"formation": {
 			"maxSoldiers": 90,
 			"rows": 9,
@@ -8,7 +8,7 @@
 			"xspacing": 12.0,
 			"yspacing": 12.0
 		},
-		"class": "Infantryman",
+		"class": "ShieldedSoldier",
 		"ranged_stats": {
 			"ranged": false,
 			"range": 400.0,

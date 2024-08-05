@@ -15,110 +15,121 @@
 class Unit;
 //class Player;
 
-void Populate(Unit* unit, std::map<std::string, SoldierInformation> classMap);
-void Place(Unit* unit, Eigen::Vector2d pos, Eigen::Matrix2d rot);
-void MoveTarget(Unit* unit, Eigen::Vector2d pos, Eigen::Matrix2d rot);
-void UpdatePos(Unit* unit);
-void UpdateVel(Unit* unit);
-void PosInUnitByID(Unit* unit);
+//void Populate(Unit* unit, std::map<std::string, SoldierInformation> classMap);
+//void Place(Unit* unit, Eigen::Vector2d pos, Eigen::Matrix2d rot);
+//void MoveTarget(Unit* unit, Eigen::Vector2d pos, Eigen::Matrix2d rot);
+//void UpdatePos(Unit* unit);
+//void UpdateVel(Unit* unit);
+//void PosInUnitByID(Unit* unit);
 
 
 class Unit {
-	public:
-		//virtual void ConversionEnabler() {}
-		//array width and length have to be set manually in every declaration and defintion because there could only be one flexible array member but more would be needed
-		int maxSoldiers = 1;
-		//double spacing = 0;
-		double xspacing = 0.;
-		double yspacing = 0.;
-		int ncols = 1;//int width = 1;
-		int nrows = 1;//maxSoldiers / width;	// being not fun
-		//int soldierType = SOLDIER_SOLDIER;
-		//int type = UNIT_GENERIC;
-		std::string tag;
-		std::string soldierType;
-		Player* player;
-		std::vector<std::vector<Soldier*>> soldiers;//{_nrows, std::vector<Soldier*>(_width, NULL)};
-		std::vector<Soldier*> liveSoldiers;
-		std::vector<std::vector<Eigen::Vector2d>> posInUnit;;//{_nrows, std::vector<Eigen::Vector2d>(_width, Eigen::Vector2d())};
-		//virtual std::vector<std::vector<Soldier*>>* soldiers() {return &_soldiers;}
-		//virtual std::vector<std::vector<Eigen::Vector2d>>* posInUnit() {return &_posInUnit;}
-		int nSoldiers;
-		int nLiveSoldiers;
-		int currentOrder;
-		int nSoldiersArrived;
-		int nSoldiersOnFirstOrder;
-		bool placed;
-		Eigen::Vector2d pos;
-		Eigen::Vector2d posTarget;
-		Eigen::Matrix2d rot;
-		Eigen::Matrix2d rotTarget;
-		std::vector<Order*> orders;
-		Eigen::Vector2d vel;
-		bool enemyContact;
-		Timer targetUpdateTimer = Timer(60);
-		bool ranged = false;
-		double range = 0.;
-		double rangedAngle = 0.;
-		Timer rangedTargetUpdateTimer = Timer(int(80 + (rand()/RAND_MAX)*20));
-		Unit* rangedTarget = NULL;
-		//int targetUpdateCounter = 60;
-		std::vector<Unit*> targetedBy;
-		
-		void init(std::map<std::string, SoldierInformation> classMap) {
-			soldiers = std::vector<std::vector<Soldier*>>(nrows, std::vector<Soldier*>(ncols, NULL));
-			posInUnit = std::vector<std::vector<Eigen::Vector2d>>(nrows, std::vector<Eigen::Vector2d>(ncols, Eigen::Vector2d()));
-			nLiveSoldiers = 0;
-			Populate(this, classMap);
-			PosInUnitByID(this);
-			enemyContact = false;
-		}
+public:
+	// loaded stats
+	std::string tag;
+	int maxSoldiers = 1;
+	int ncols = 1;
+	int nrows = 1;
+	double xspacing = 0.;
+	double yspacing = 0.;
+	std::string soldierType;
+	bool ranged = false;
+	double range = 0.;
+	double rangedAngle = 0.;
+	// generated members
+	Player* player;
+	int model_index;
+	std::vector<std::vector<Soldier*>> soldiers;//{_nrows, std::vector<Soldier*>(_width, NULL)};
+	std::vector<Soldier*> liveSoldiers;
+	std::vector<std::vector<Eigen::Vector2d>> posInUnit;;//{_nrows, std::vector<Eigen::Vector2d>(_width, Eigen::Vector2d())};
+	int nSoldiers;
+	int nLiveSoldiers;
+	int currentOrder;
+	int nSoldiersArrived;
+	int nSoldiersOnFirstOrder;
+	bool placed;
+	Eigen::Vector2d pos;
+	Eigen::Vector2d posTarget;
+	Eigen::Matrix2d rot;
+	Eigen::Matrix2d rotTarget;
+	std::vector<Order*> orders;
+	Eigen::Vector2d vel;
+	bool enemyContact;
+	Timer targetUpdateTimer = Timer(60);
+	Timer rangedTargetUpdateTimer = Timer(int(80 + (rand()/RAND_MAX)*20));
+	Unit* rangedTarget = NULL;
+	std::vector<Unit*> targetedBy;
+	
+	void Populate(std::map<std::string, SoldierInformation> classMap);
+	void Place(Eigen::Vector2d pos, Eigen::Matrix2d rot);
+	void MoveTarget();
+	void UpdatePos();
+	void UpdateVel();
+	void PosInUnitByID();
+	bool CurrentOrderCompleted();
+	void NextOrder();
+	void DeleteObsoleteOrder();
 
-		Unit(UnitInformation info, Player* player, std::map<std::string, SoldierInformation> classMap) {
-			tag = info.tag;
-			soldierType = info.soldier_type;
-			maxSoldiers = info.formation_max_soldiers;
-			ncols = info.formation_columns;
-			nrows = info.formation_rows;
-			xspacing = info.formation_x_spacing;
-			yspacing = info.formation_y_spacing;
+	void init(std::map<std::string, SoldierInformation> classMap) {
+		soldiers = std::vector<std::vector<Soldier*>>(nrows, std::vector<Soldier*>(ncols, NULL));
+		posInUnit = std::vector<std::vector<Eigen::Vector2d>>(nrows, std::vector<Eigen::Vector2d>(ncols, Eigen::Vector2d()));
+		nLiveSoldiers = 0;
+		//Populate(this, classMap);
+		Populate(classMap);
+		//PosInUnitByID(this);
+		PosInUnitByID();
+		enemyContact = false;
+	}
 
-			ranged = info.ranged_ranged;
-			range = info.ranged_range;
-			rangedAngle = info.ranged_angle;
+	Unit(UnitInformation info, Player* player, std::map<std::string, SoldierInformation> classMap) {
+		tag = info.tag;
+		soldierType = info.soldier_type;
+		maxSoldiers = info.formation_max_soldiers;
+		ncols = info.formation_columns;
+		nrows = info.formation_rows;
+		xspacing = info.formation_x_spacing;
+		yspacing = info.formation_y_spacing;
 
-			this->player = player;
+		ranged = info.ranged_ranged;
+		range = info.ranged_range;
+		rangedAngle = info.ranged_angle;
 
-			nSoldiers = 0;
-			placed = false;
+		this->player = player;
 
-			init(classMap);
+		nSoldiers = 0;
+		placed = false;
 
-		}
+		init(classMap);
 
-		//Unit(Player* player) : Unit(false, player) {}
-				
+	}				
 };
 
-void Populate(Unit* unit, std::map<std::string, SoldierInformation> classMap) {
-	std::vector<std::vector<Soldier*>>* soldiers = &(unit->soldiers);
-	for(int i = 0; i < unit->nrows; i++) {
-		for(int j = 0; j < unit->ncols; j++) {
-			(*soldiers).at(i).at(j) = new Soldier(classMap.at(unit->soldierType), unit);
-			unit->liveSoldiers.push_back(unit->soldiers.at(i).at(j));
-			unit->nLiveSoldiers++;
-			if(unit->soldiers.at(i).at(j)->ranged)
-				unit->soldiers.at(i).at(j)->ReloadTimer.unset();
+struct UnitSorter {
+	inline bool operator() (const Unit* unit1, const Unit* unit2) {
+		return (unit1->nLiveSoldiers < unit2->nLiveSoldiers);
+	}
+};
+
+void Unit::Populate(std::map<std::string, SoldierInformation> classMap) {
+	//std::vector<std::vector<Soldier*>>* soldiers = &(this->soldiers);
+	std::vector<std::vector<Soldier*>>* soldiers = &(this->soldiers);
+	for(int i = 0; i < nrows; i++) {
+		for(int j = 0; j < ncols; j++) {
+			(*soldiers).at(i).at(j) = new Soldier(classMap.at(soldierType), this);
+			liveSoldiers.push_back(this->soldiers.at(i).at(j));
+			nLiveSoldiers++;
+			if(this->soldiers.at(i).at(j)->ranged)
+				this->soldiers.at(i).at(j)->ReloadTimer.unset();
 		}
 	}
 };
 
-void Place(Unit* unit, Eigen::Vector2d pos, Eigen::Matrix2d rot) {
-	std::vector<std::vector<Soldier*>>* soldiers = &(unit->soldiers);
-	std::vector<std::vector<Eigen::Vector2d>>* posInUnit = &(unit->posInUnit);
-	for(int i = 0; i < unit->nrows; i++) {
-		for (int j = 0; j < unit->ncols; j++) {
-			if (unit->nSoldiers < unit->maxSoldiers) {
+void Unit::Place(Eigen::Vector2d pos, Eigen::Matrix2d rot) {
+	std::vector<std::vector<Soldier*>>* soldiers = &(this->soldiers);
+	std::vector<std::vector<Eigen::Vector2d>>* posInUnit = &(this->posInUnit);
+	for(int i = 0; i < nrows; i++) {
+		for (int j = 0; j < ncols; j++) {
+			if (nSoldiers < maxSoldiers) {
 				Soldier* soldier = (*soldiers)[i][j];
 				soldier->pos = pos + rot * (*posInUnit)[i][j];
 				soldier->posTarget = soldier->pos;
@@ -131,33 +142,33 @@ void Place(Unit* unit, Eigen::Vector2d pos, Eigen::Matrix2d rot) {
 				soldier->forwardSpeed = 0.;
 				soldier->knockVel << 0., 0.;
 				soldier->force << 0., 0.;
-				unit->nSoldiers++;
+				nSoldiers++;
 				soldier->placed = true;
 				soldier->currentOrder = 0;
 				soldier->arrived = false;
 			}
 		}
 	}
-	unit->pos = pos;
-	unit->posTarget = unit->pos;
-	unit->rot = rot;
-	unit->rotTarget = unit->rot;
-	unit->vel << 0., 0.;
-	unit->placed = true;
-	unit->nSoldiersArrived = 0;
-	unit->nSoldiersOnFirstOrder = unit->nSoldiers;
-	std::cout  << "Unit placed with " << unit->nLiveSoldiers << " live soldiers.\n";
+	this->pos = pos;
+	posTarget = this->pos;
+	this->rot = rot;
+	rotTarget = this->rot;
+	vel << 0., 0.;
+	placed = true;
+	nSoldiersArrived = 0;
+	nSoldiersOnFirstOrder = nSoldiers;
+	std::cout  << "Unit placed with " << nLiveSoldiers << " live soldiers.\n";
 }
 
 
-void MoveTarget(Unit* unit) {
-	std::vector<std::vector<Soldier*>>* soldiers = &(unit->soldiers);
-	std::vector<std::vector<Eigen::Vector2d>>* posInUnit = &(unit->posInUnit);
-	for(int i = 0; i < unit->nrows; i++) {
-		for(int j = 0; j < unit->ncols; j++) {
+void Unit::MoveTarget() {
+	std::vector<std::vector<Soldier*>>* soldiers = &(this->soldiers);
+	std::vector<std::vector<Eigen::Vector2d>>* posInUnit = &(this->posInUnit);
+	for(int i = 0; i < nrows; i++) {
+		for(int j = 0; j < ncols; j++) {
 			Soldier* soldier = soldiers->at(i).at(j);
 			if(soldier->placed && soldier->alive) {	//change to something like soldier->alive
-				Order* o = unit->orders.at(soldier->currentOrder);
+				Order* o = orders.at(soldier->currentOrder);
 				if(o->type == ORDER_MOVE ||true) {
 					//MoveOrder* mo = dynamic_cast<MoveOrder*>(o);
 					//soldier->posTarget = mo->pos + mo->rot * posInUnit->at(i).at(j);
@@ -168,25 +179,25 @@ void MoveTarget(Unit* unit) {
 			}
 		}
 	}
-	Order* o = unit->orders.at(unit->currentOrder);
+	Order* o = orders.at(currentOrder);
 	if(o->type == ORDER_MOVE || true) {
 		//MoveOrder* mo = dynamic_cast<MoveOrder*>(o);
-		unit->posTarget = o->pos;
-		unit->rot = o->rot;
-		unit->rotTarget = o->rot;
+		posTarget = o->pos;
+		this->rot = o->rot;
+		rotTarget = o->rot;
 	}
 }
 
-void UpdatePos(Unit* unit) {
-	std::vector<std::vector<Soldier*>>* soldiers = &(unit->soldiers);
+void Unit::UpdatePos() {
+	std::vector<std::vector<Soldier*>>* soldiers = &(this->soldiers);
 	int nSoldiers = 0;
 	Eigen::Vector2d pos;
 	pos << 0., 0.;
-	for(int i = 0; i < unit->nrows; i++) {
-		for(int j = 0; j < unit->ncols; j++) {
+	for(int i = 0; i < nrows; i++) {
+		for(int j = 0; j < ncols; j++) {
 			Soldier* soldier = (*soldiers)[i][j];
 			if(soldier->placed && soldier->alive) {
-				if(soldier->currentOrder == unit->currentOrder) {
+				if(soldier->currentOrder == currentOrder) {
 					pos += soldier->pos;
 					nSoldiers++;
 				}
@@ -195,19 +206,19 @@ void UpdatePos(Unit* unit) {
 	}
 	if(nSoldiers > 0)
 		pos /= nSoldiers;
-	unit->pos = pos;
+	this->pos = pos;
 }
 
-void UpdateVel(Unit* unit) {
-	std::vector<std::vector<Soldier*>>* soldiers = &(unit->soldiers);
+void Unit::UpdateVel() {
+	std::vector<std::vector<Soldier*>>* soldiers = &(this->soldiers);
 	int nSoldiers = 0;
 	Eigen::Vector2d vel;
 	vel << 0., 0.;
-	for(int i = 0; i < unit->nrows; i++) {
-		for(int j = 0; j < unit->ncols; j++) {
+	for(int i = 0; i < nrows; i++) {
+		for(int j = 0; j < ncols; j++) {
 			Soldier* soldier = (*soldiers)[i][j];
 			if(soldier->placed && soldier->alive) {
-				if(soldier->currentOrder == unit->currentOrder) {
+				if(soldier->currentOrder == currentOrder) {
 					vel += soldier->vel;
 					nSoldiers++;
 				}
@@ -215,24 +226,24 @@ void UpdateVel(Unit* unit) {
 		}
 	}
 	vel /= nSoldiers;
-	unit->vel = vel;
+	this->vel = vel;
 }
 
-void PosInUnitByID(Unit* unit) {
+void Unit::PosInUnitByID() {
 	//std::vector<std::vector<Soldier*>>* soldiers = unit->soldiers();
-	std::vector<std::vector<Eigen::Vector2d>>* posInUnit = &(unit->posInUnit);
-	double x0 = unit->xspacing*(unit->nrows - 1)/2.;
-	double y0 = unit->yspacing*(unit->ncols - 1)/2.;
-	for(int i = 0; i < unit->nrows; i++) {
-		for(int j = 0; j < unit->ncols; j++) {
-			(*posInUnit).at(i).at(j) << x0 - i*unit->xspacing, y0 - j*unit->yspacing;
+	std::vector<std::vector<Eigen::Vector2d>>* posInUnit = &(this->posInUnit);
+	double x0 = xspacing*(nrows - 1)/2.;
+	double y0 = yspacing*(ncols - 1)/2.;
+	for(int i = 0; i < nrows; i++) {
+		for(int j = 0; j < ncols; j++) {
+			(*posInUnit).at(i).at(j) << x0 - i*xspacing, y0 - j*yspacing;
 		}
 	}
 }
 
-bool CurrentOrderCompleted(Unit* unit) {
-	if(unit->placed) {
-		Order* currentOrder = unit->orders.at(unit->currentOrder);
+bool Unit::CurrentOrderCompleted() {
+	if(placed) {
+		Order* currentOrder = orders.at(this->currentOrder);
 		switch(currentOrder->type) {
 		case ORDER_ATTACK:
 			return (dynamic_cast<AttackOrder*>(currentOrder)->target->nLiveSoldiers) <= 0; break;
@@ -244,12 +255,12 @@ bool CurrentOrderCompleted(Unit* unit) {
 			if(mo->moveType == MOVE_FORMUP) {
 				//debug("Form up:");
 				//std::cout << (unit->nSoldiersArrived >= 0.9*unit->nLiveSoldiers) << "\n";
-				return unit->nSoldiersArrived >= 0.9*unit->nLiveSoldiers; break;
+				return nSoldiersArrived >= 0.9*nLiveSoldiers; break;
 			}
 			else {
 				//debug("Passing through:");
 				//std::cout << (unit->nSoldiersArrived > 0) << "\n";
-				return unit->nSoldiersArrived > 0; break;
+				return nSoldiersArrived > 0; break;
 			}
 		}
 		default:
@@ -258,31 +269,31 @@ bool CurrentOrderCompleted(Unit* unit) {
 	}
 }
 
-void UnitNextOrder(Unit* unit) {
-	Order* o = unit->orders.at(unit->currentOrder);
+void Unit::NextOrder() {
+	Order* o = orders.at(currentOrder);
 	if(o->type == ORDER_ATTACK) {
-		std::erase(dynamic_cast<AttackOrder*>(o)->target->targetedBy, unit);
-		unit->enemyContact = false;
+		std::erase(dynamic_cast<AttackOrder*>(o)->target->targetedBy, this);
+		enemyContact = false;
 	}
-	unit->currentOrder++;
-	unit->nSoldiersArrived = 0;
-	Order* no = unit->orders.at(unit->currentOrder);
+	currentOrder++;
+	nSoldiersArrived = 0;
+	Order* no = orders.at(currentOrder);
 	if(!no->target || no->target != o->target)
-		unit->enemyContact = false;
+		enemyContact = false;
 	std::cout << "Onwards to the next order!\n";
 }
 
-void DeleteObsoleteOrder(Unit* unit) {
-	if(unit->orders.size() > 1) {
-		unit->orders.erase(unit->orders.begin());
-		unit->currentOrder--;
-		std::vector<std::vector<Soldier*>> soldiers = unit->soldiers;
+void Unit::DeleteObsoleteOrder() {
+	if(orders.size() > 1) {
+		orders.erase(orders.begin());
+		currentOrder--;
+		std::vector<std::vector<Soldier*>> soldiers = this->soldiers;
 		for(auto row : soldiers) {
 			for(auto soldier: row) {
 				if(soldier->alive)
 					soldier->currentOrder--;
 				if(soldier->currentOrder == 0 && soldier->placed && soldier->alive) {
-					unit->nSoldiersOnFirstOrder++;
+					nSoldiersOnFirstOrder++;
 				}
 			}
 		}

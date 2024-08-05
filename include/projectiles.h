@@ -31,8 +31,8 @@ public:
 	bool longDead;
 	std::vector<Soldier*> targets;
 	//virtual int damage(Soldier* target) {return 100;}
-	int damage;
-	int armorPiercing;
+	double damage;
+	double armorPiercing;
 	double aoerad = 0.;
 
 	void advance() {
@@ -53,7 +53,7 @@ public:
 		return percentage;
 	}
 
-	Projectile(std::string soldierType, Eigen::Vector2d start, Eigen::Vector2d vel, int lifetime, double dt, int damage, int armorPiercing, double aoerad) : Point(start) {
+	Projectile(std::string soldierType, Eigen::Vector2d start, Eigen::Vector2d vel, int lifetime, double dt, double damage, int armorPiercing, double aoerad) : Point(start) {
 		this->soldierType = soldierType;
 		//pos = start;
 		this->vel = vel;

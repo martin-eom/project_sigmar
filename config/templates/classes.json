@@ -1,6 +1,6 @@
 [
 	{
-		"tag": "Infantryman",
+		"tag": "ShieldedSoldier",
 		"general_stats": {
 			"radius": 5.0,
 			"mass": 1.0,
@@ -31,7 +31,7 @@
 			"draw_timer": 10,
 			"reload_timer": 300,
 			"max_speed_for_firing": 10.0,
-			"defense": 0,
+			"defense": 40,
 			"projectile_speed": 120.0,
 			"armor_piercing": 0,
 			"ally_protection_aoe": 10.0,
@@ -41,6 +41,7 @@
 		"keywords": {
 			"infantry": true,
 			"large": false,
+			"shielded": true,
 			"anti_infantry": false,
 			"anti_large": false
 		},
@@ -92,7 +93,7 @@
 			"turn_speed": 0.33,
 			"on_target_dampening": 2.0,
 			"max_hp": 5,
-			"armor": 0
+			"armor": 20
 		},
 		"melee_stats": {
 			"melee": true,
@@ -102,7 +103,7 @@
 			"aoe": false,
 			"attack": 35,
 			"defense": 25,
-			"armor_piercing": 0,
+			"armor_piercing": 80,
 			"damage": 2
 		},
 		"ranged_stats": {
@@ -114,7 +115,7 @@
 			"draw_timer": 10,
 			"reload_timer": 300,
 			"max_speed_for_firing": 10.0,
-			"defense": 0,
+			"defense": 20,
 			"projectile_speed": 120.0,
 			"armor_piercing": 0,
 			"ally_protection_aoe": 10.0,
@@ -175,7 +176,7 @@
 			"turn_speed": 0.25,
 			"on_target_dampening": 3.2,
 			"max_hp": 50,
-			"armor": 0
+			"armor": 50
 		},
 		"melee_stats": {
 			"melee": true,
@@ -185,7 +186,7 @@
 			"aoe": true,
 			"attack": 55,
 			"defense": 40,
-			"armor_piercing": 0,
+			"armor_piercing": 70,
 			"damage": 4
 		},
 		"ranged_stats": {
@@ -197,7 +198,7 @@
 			"draw_timer": 10,
 			"reload_timer": 300,
 			"max_speed_for_firing": 10.0,
-			"defense": 0,
+			"defense": 30,
 			"projectile_speed": 120.0,
 			"armor_piercing": 0,
 			"ally_protection_aoe": 10.0,
@@ -274,16 +275,16 @@
 		"ranged_stats": {
 			"ranged": true,
 			"range": 400.0,
-			"min_range": 7.0,
-			"radius": 0.1,
+			"min_range": 20.0,
+			"radius": 0.06,
 			"heavy": false,
 			"draw_timer": 10,
-			"reload_timer": 300,
+			"reload_timer": 500,
 			"max_speed_for_firing": 10.0,
 			"defense": 0,
 			"projectile_speed": 50.0,
 			"armor_piercing": 0,
-			"ally_protection_aoe": 10.0,
+			"ally_protection_aoe": 30.0,
 			"aoe": 0.0,
 			"damage": 2
 		},
@@ -356,16 +357,16 @@
 		"ranged_stats": {
 			"ranged": true,
 			"range": 800.0,
-			"min_range": 15.0,
+			"min_range": 40.0,
 			"radius": 0.1,
 			"heavy": true,
 			"draw_timer": 10,
 			"reload_timer": 400,
 			"max_speed_for_firing": 5.0,
 			"defense": 0,
-			"projectile_speed": 50.0,
+			"projectile_speed": 150.0,
 			"armor_piercing": 0,
-			"ally_protection_aoe": 10.0,
+			"ally_protection_aoe": 40.0,
 			"aoe": 30.0,
 			"damage": 5
 		},

@@ -16,6 +16,8 @@
 #include <Dense>
 #include <cmath>
 #include <deque>
+#include <omp.h>
+
 
 
 void ReformUnit(Unit* unit) {
@@ -100,7 +102,8 @@ void ReformUnit(Unit* unit) {
 			}
 		}
 	}
-	PosInUnitByID(unit);
+	//PosInUnitByID(unit);
+	unit->PosInUnitByID();
 	debug("Reforming unit succeeded");
 }
 
@@ -319,6 +322,93 @@ void TimeStep(Soldier* soldier, double dt) {
 	}
 }
 
+void CollisionScrying(Map* map, Unit* unit) {
+	for(int i = 0; i < unit->nrows; i++) {
+		for(int j = 0; j < unit->ncols; j++) {
+			Soldier* soldier = (*unit).soldiers.at(i).at(j);
+			if(soldier->placed && soldier->alive) {
+				int m = (int) (soldier->pos.coeff(1) / map->tilesize);
+				if(m < 0) m=0;
+				else if(m > map->nrows - 1) m = map->nrows - 1;
+				int n = (int) (soldier->pos.coeff(0) / map->tilesize);
+				if(n < 0) n = 0;
+				else if(n > map->ncols - 1) n = map->ncols - 1;
+				map->Assign(soldier, m, n);
+				soldier->map_row = m;
+				soldier->map_column = n;
+			}
+		}
+	}
+}
+
+void ProjectileCollisionScrying(Map* map, std::vector<Projectile*> projectiles) {
+	for(auto projectile : projectiles) {
+		int m = (int) (projectile->get_pos().coeff(1) / map->tilesize);
+		if(m < 0) m=0;
+		else if(m > map->nrows - 1) m = map->nrows - 1;
+		int n = (int) (projectile->get_pos().coeff(0) / map->tilesize);
+		if(n < 0) n = 0;
+		else if(n > map->ncols - 1) n = map->ncols - 1;
+		map->ProjectileAssign(projectile, m, n);
+	}
+}
+
+void ProjectileCollisionHandling(Map* map) {
+	for(int i = 0; i < map->nrows; i++) {
+		for(int j = 0; j < map->ncols; j++) {
+			gridpiece* tile = map->tiles.at(i).at(j);
+			for(auto projectile : tile->projectiles) {
+				Point p(projectile->get_pos());
+				//map_objects
+				for(auto obj : tile->mapObjects) {
+					if(!projectile->dead) {
+						switch(obj->type) {
+						case MAP_RECTANGLE:
+						case MAP_BORDER:
+							if(PointRectangleCollision(&p, dynamic_cast<Rrectangle*>(obj))) {
+								projectile->dead = true;
+							}
+							break;
+						case MAP_CIRCLE:
+							Circle* circ = dynamic_cast<Circle*>(obj);
+							Eigen::Vector2d dist;
+							if((projectile->get_pos() - circ->pos).norm() < circ->rad) {
+								projectile->dead = true;
+							}
+							break;
+						}
+					}
+				}
+				//soldiers
+				if(!projectile->dead && projectile->get_progress() > 0.99) {
+					for(auto soldier : tile->soldiers) {
+						if((projectile->pos - soldier->pos).norm() < (soldier->rad + projectile->aoerad)) {
+							projectile->targets.push_back(soldier);
+						}
+					}
+					if(projectile->aoerad > 0.) {
+						for(auto ntile : tile->neighbours) {
+							for(auto soldier : ntile->soldiers) {
+								if((projectile->get_pos() - soldier->pos).norm() < soldier->rad + projectile->aoerad) {
+									projectile->targets.push_back(soldier);
+								}
+							}						
+						}
+						for(auto ntile : tile->redundantNeighbours) {
+							for(auto soldier : ntile->soldiers) {
+								if((projectile->get_pos() - soldier->pos).norm() < soldier->rad + projectile->aoerad) {
+									projectile->targets.push_back(soldier);
+								}
+							}						
+						}
+					}
+					projectile->dead = true;
+				}
+			}
+		}
+	}
+}
+
 void KnockKnock(Soldier* sold1, Soldier* sold2) {
 	double minDist = sold1->rad + sold2->rad;
 	if((sold1->unit->player == sold2->unit->player) && (sold1->unit != sold2->unit)) {
@@ -353,147 +443,81 @@ void KnockKnock(Soldier* sold1, Soldier* sold2) {
 	}
 }
 
-void CollisionScrying(Map* map, Unit* unit) {
-	for(int i = 0; i < unit->nrows; i++) {
-		for(int j = 0; j < unit->ncols; j++) {
-			Soldier* soldier = (*unit).soldiers.at(i).at(j);
-			if(soldier->placed && soldier->alive) {
-				int m = (int) (soldier->pos.coeff(1) / map->tilesize);
-				if(m < 0) m=0;
-				else if(m > map->nrows - 1) m = map->nrows - 1;
-				int n = (int) (soldier->pos.coeff(0) / map->tilesize);
-				if(n < 0) n = 0;
-				else if(n > map->ncols - 1) n = map->ncols - 1;
-				map->Assign(soldier, m, n);
-			}
-		}
-	}
-}
-
-void ProjectileCollisionScrying(Map* map, std::vector<Projectile*> projectiles) {
-	for(auto projectile : projectiles) {
-		int m = (int) (projectile->get_pos().coeff(1) / map->tilesize);
-		if(m < 0) m=0;
-		else if(m > map->nrows - 1) m = map->nrows - 1;
-		int n = (int) (projectile->get_pos().coeff(0) / map->tilesize);
-		if(n < 0) n = 0;
-		else if(n > map->ncols - 1) n = map->ncols - 1;
-		map->ProjectileAssign(projectile, m, n);
-	}
-}
-
-void ProjectileCollisionHandling(Map* map) {
-	for(int i = 0; i < map->nrows; i++) {
-		for(int j = 0; j < map->ncols; j++) {
-			gridpiece* tile = map->tiles.at(i).at(j);
-			for(auto projectile : tile->projectiles) {
-				Point p(projectile->get_pos());
-				//map_objects
-				for(auto obj : tile->mapObjects) {
-					if(!projectile->dead) {
-						switch(obj->type()) {
-						case MAP_RECTANGLE:
-						case MAP_BORDER:
-							if(PointRectangleCollision(&p, dynamic_cast<Rrectangle*>(obj))) {
-								projectile->dead = true;
-							}
-							break;
-						case MAP_CIRCLE:
-							Circle* circ = dynamic_cast<Circle*>(obj);
-							Eigen::Vector2d dist;
-							if((projectile->get_pos() - circ->pos).norm() < circ->rad) {
-								projectile->dead = true;
-							}
-							break;
-						}
-					}
-				}
-				//soldiers
-				if(!projectile->dead && projectile->get_progress() > 0.99) {
-					for(auto soldier : tile->soldiers) {
-						if((projectile->get_pos() - soldier->pos).norm() < (soldier->rad + projectile->aoerad)) {
-							projectile->targets.push_back(soldier);
-						}
-					}
-					if(projectile->aoerad > 0.) {
-						for(auto ntile : tile->neighbours) {
-							for(auto soldier : ntile->soldiers) {
-								if((projectile->get_pos() - soldier->pos).norm() < soldier->rad + projectile->aoerad) {
-									projectile->targets.push_back(soldier);
-								}
-							}						
-						}
-						for(auto ntile : tile->redundantNeighbours) {
-							for(auto soldier : ntile->soldiers) {
-								if((projectile->get_pos() - soldier->pos).norm() < soldier->rad + projectile->aoerad) {
-									projectile->targets.push_back(soldier);
-								}
-							}						
-						}
-					}
-					projectile->dead = true;
-				}
-			}
-		}
-	}
-}
-
-void EvaluateRange(Soldier* sold1, Soldier* sold2) {
+void EvaluateRange(Soldier* sold1, Soldier* sold2, std::vector<Soldier*>* soldiers, std::vector<omp_lock_t*>* locks) {
 	Eigen::Vector2d dx = sold2->pos - sold1->pos;
 	double dist = dx.norm();
-	double drad = sold1->rad + sold2->rad;
-	//if(dist < drad || true)
-		KnockKnock(sold1, sold2);
-	if(sold1->unit->player != sold2->unit->player) {
-		double meleeDist = dist - drad;
+	double minDist = sold1->rad + sold2->rad;
+	bool movingCloser = false;
+	Eigen::Vector2d prod; prod << 0, 0;
+	bool enemies = sold1->unit->player != sold2->unit->player;
+
+	if((!enemies) && (sold1->unit != sold2->unit)) {
+		minDist *= 0.7;
+	}
+	if(dist < minDist) {
+		Eigen::Vector2d dv = sold2->vel - sold1->vel;
+		double dxdv = dx.dot(dv);
+		movingCloser = dxdv < 0.;
+		if(movingCloser) {
+			double totalMass = sold1->mass + sold2->mass;
+			prod = 2. * dxdv * dx / (totalMass * pow(dist, 2));
+		}
+	}
+	double meleeDist = dist - minDist;
+
+	omp_set_lock(locks->at(sold1->model_index));
+	if(movingCloser) sold1->knockVel += sold2->mass * prod;
+	if(enemies) {
 		if(meleeDist < 5*sold1->meleeRange) {
 			if(meleeDist < sold1->meleeRange) 
 				sold1->enemiesInMeleeRange.push(SoldierNeighbourContainer(sold2, dx, dist, true));			
 			else if(sold1->unit->orders.at(sold1->currentOrder)->type != ORDER_ATTACK)
 					sold1->enemiesInMeleeRange.push(SoldierNeighbourContainer(sold2, dx, dist, false));
 		}
-		if(meleeDist < 4*sold2->meleeRange) {
+	}
+	omp_unset_lock(locks->at(sold1->model_index));
+	omp_set_lock(locks->at(sold2->model_index));
+	if(movingCloser) sold2->knockVel -= sold1->mass * prod;
+	if(enemies) {
+		if(meleeDist < 5*sold2->meleeRange) {
 			if(meleeDist < sold2->meleeRange) 
 				sold2->enemiesInMeleeRange.push(SoldierNeighbourContainer(sold1, dx, dist, true));			
 			else if(sold2->unit->orders.at(sold2->currentOrder)->type != ORDER_ATTACK)
 				sold2->enemiesInMeleeRange.push(SoldierNeighbourContainer(sold1, dx, dist, false));
 		}
-		/*if(dist - drad < sold1->meleeRange) {
-			sold1->enemiesInMeleeRange.push(SoldierNeighbourContainer(sold2, dx, dist, true));
-		}
-		if(dist - drad < sold2->meleeRange) {
-			sold2->enemiesInMeleeRange.push(SoldierNeighbourContainer(sold1, dx, dist, true));
-		}*/
 	}
+	omp_unset_lock(locks->at(sold2->model_index));
 }
 
-void CollisionResolution(Map* map) {
-	for(int i = 0; i < map->nrows; i++) {
-		for(int j = 0; j < map->ncols; j++) {
-			Soldier* sold1;
-			Soldier* sold2;
-			gridpiece* tile1 = map->tiles.at(i).at(j);
-			auto soldNode1 = tile1->soldiers.begin();
-			while(soldNode1 != tile1->soldiers.end()) {
-				sold1 = (*soldNode1);
-				auto soldNode2 = std::next(soldNode1);
+void CollisionResolution(Map* map, std::vector<Unit*>* units, std::vector<Soldier*>* soldiers, std::vector<omp_lock_t*>* locks) {
+	int n_units = units->size();
+	#pragma omp parallel for default(shared)
+	for(int n_unit = 0; n_unit < n_units; n_unit++) {
+	//for(auto unit : *units) {
+		Unit* unit = units->at(n_unit);
+		for(auto sold1 : unit->liveSoldiers) {
+			if(sold1->placed && sold1->alive) {
+				Soldier* sold2;
+				gridpiece* tile1 = map->tiles.at(sold1->map_row).at(sold1->map_column);
+				gridpiece* tile2;
+				//auto soldNode2 = std::find(tile1->soldiers.begin(), tile1->soldiers.end(), sold1);
+				auto soldNode2 = tile1->soldiers.begin() + sold1->tile_index;
 				while(soldNode2 != tile1->soldiers.end()) {
 					sold2 = (*soldNode2);
-					EvaluateRange(sold1, sold2);
+					EvaluateRange(sold1, sold2, soldiers, locks);
 					soldNode2 = std::next(soldNode2);
 				}
 				auto neighbour = tile1->neighbours.begin();
 				while(neighbour != tile1->neighbours.end()) {
-					gridpiece* tile2 = (*neighbour);
+					tile2 = (*neighbour);
 					soldNode2 = tile2->soldiers.begin();
 					while(soldNode2 != tile2->soldiers.end()) {
 						sold2 = (*soldNode2);
-						EvaluateRange(sold1, sold2);
+						EvaluateRange(sold1, sold2, soldiers, locks);
 						soldNode2 = std::next(soldNode2);
 					}
 					neighbour = std::next(neighbour);
 				}
-				soldNode1 = std::next(soldNode1);
 			}
 		}
 	}
@@ -506,7 +530,7 @@ void MapObjectCollisionHandling(Map* map) {
 			for(auto soldier : tile->soldiers) {
 				if(soldier) {
 					for(auto object : tile->mapObjects) {
-						switch(object->type()) {
+						switch(object->type) {
 						case MAP_RECTANGLE:
 						case MAP_BORDER:
 							SoldierRectangleCollision(soldier, dynamic_cast<Rrectangle*>(object));

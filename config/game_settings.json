@@ -6,7 +6,7 @@
 		"num_frames" : 7,
 		"ticks_per_frame": 3
 	},
-	"custom_background": false,
+	"custom_background": true,
 	"background_animation": {
 		"texture": "desert.bmp",
 		"size_x": 600,
@@ -14,5 +14,15 @@
 		"num_frames": 1,
 		"ticks_per_frame" : 1000
 	},
-	"show_map_object_outlines": true
+	"show_map_object_outlines": true,
+	"turn_duration": 300,
+	"simulation_mode": false,
+	"base_melee_attack": 0.35,
+	"ranged_base_attack": 0.9,
+	"max_hit_chance": 0.9,
+	"min_hit_chance": 0.05,
+	"anti_large_attack_bonus": 0.15,
+	"anti_large_damage_bonus": 0.3,
+	"anti_infantry_attack_bonus": 0.15,
+	"anti_infantry_damage_bonus": 0.3
 }

@@ -7,6 +7,7 @@
 
 #include <Dense>
 
+// Trigonometric functions
 double Angle(double sin, double cos) {
 	if(sin > 0) {
 		return acos(cos);
@@ -20,6 +21,15 @@ double Tans(double sin, double cos) {
 	return sin / cos;
 }
 
+Eigen::Matrix2d Rotation(double angle) {
+	double _cos = cos(angle);
+	double _sin = sin(angle);
+	Eigen::Matrix2d rot; rot << _cos, -_sin, _sin, _cos;
+	return rot;
+}
+
+
+//Geometric objects
 class Point {
 public:
 	virtual void ConversionEnabler() {}
@@ -33,38 +43,16 @@ public:
 	}
 };
 
-bool LineLineCollision(Point* p00, Point* p01, Point* p10, Point* p11) {
-	//Bezier parameters
-	double t_numerator = (p00->pos.coeff(0) - p10->pos.coeff(0))*(p10->pos.coeff(1) - p11->pos.coeff(1))
-						- (p00->pos.coeff(1) - p10->pos.coeff(1))*(p10->pos.coeff(0) - p11->pos.coeff(0));
-	double t_denominator = (p00->pos.coeff(0) - p01->pos.coeff(0))*(p10->pos.coeff(1) - p11->pos.coeff(1))
-						- (p00->pos.coeff(1) - p01->pos.coeff(1))*(p10->pos.coeff(0) - p11->pos.coeff(0));
-	double u_numerator = (p00->pos.coeff(0) - p10->pos.coeff(0))*(p00->pos.coeff(1) - p01->pos.coeff(1))
-						- (p00->pos.coeff(1) - p10->pos.coeff(1))*(p00->pos.coeff(0) - p01->pos.coeff(0));
-	double u_denominator = (p00->pos.coeff(0) - p01->pos.coeff(0))*(p10->pos.coeff(1) - p11->pos.coeff(1))
-						- (p00->pos.coeff(1) - p01->pos.coeff(1))*(p10->pos.coeff(0) - p11->pos.coeff(0));
-	bool t_intersect = false;
-	bool u_intersect = false;
-	if((t_numerator < 0 && t_denominator < 0) || (0 <= t_numerator && 0 <= t_denominator)) {
-		if(std::abs(t_denominator) >= std::abs(t_numerator)) t_intersect = true;
-	}
-	if((u_numerator < 0 && u_denominator < 0) || (0 <= u_numerator && 0 <= u_denominator)) {
-		if(std::abs(u_denominator) >= std::abs(u_numerator)) u_intersect = true;
-	}
-	return t_intersect && u_intersect;
-}
-
 class Circle : public Point {
 public:
 	double rad;
 
+	Circle () {}
 	Circle(Eigen::Vector2d pos, double rad) : Point(pos) {
-		this->pos =pos;
 		this->rad = rad;
 	}
 
 	void Reposition(Eigen::Vector2d pos) {
-		dynamic_cast<Point*>(this)->pos = pos;
 		this->pos = pos;
 	}
 };
@@ -89,52 +77,86 @@ public:
 	Eigen::Matrix2d rot;
 	std::vector<Corner*> corners;
 
-	Rrectangle(double hl, double hw, Eigen::Vector2d pos, Eigen::Matrix2d rot) {
-		this->hl = hl;
-		this->hw = hw;
-		this->pos = pos;
-		this->rot = rot;
-		Eigen::Vector2d cornerPos;
-		cornerPos << -hw, hl; cornerPos = rot*cornerPos + pos;
-		corners.push_back(new Corner(cornerPos, this));
-		cornerPos << hw, hl; cornerPos = rot*cornerPos + pos;
-		corners.push_back(new Corner(cornerPos, this));
-		cornerPos << hw, -hl; cornerPos = rot*cornerPos + pos;
-		corners.push_back(new Corner(cornerPos, this));
-		cornerPos << -hw, -hl; cornerPos = rot*cornerPos + pos;
-		corners.push_back(new Corner(cornerPos, this));
-	}
+	Rrectangle(double hl, double hw, Eigen::Vector2d pos, Eigen::Matrix2d rot);
 
-	void Reposition(Eigen::Vector2d pos) {
-		Eigen::Vector2d dist = pos - this->pos;
-		for(auto corner : corners) {
-			corner->pos += dist;
-		}
-		this->pos += dist;
-	}
-
-	void Rotate(Eigen::Matrix2d rot) {
-		Eigen::Matrix2d rotDiff = rot * this->rot.transpose();
-		for(auto corner : corners) {
-			corner->pos = rotDiff * (corner->pos - pos) + pos;
-		}
-		this->rot = rot;
-	}
-
-	void Reshape(double hl, double hw) {
-		Eigen::Vector2d cornerPos;
-		cornerPos << -hw, hl; cornerPos = rot*cornerPos + pos;
-		corners.at(0)->pos = cornerPos;
-		cornerPos << hw, hl; cornerPos = rot*cornerPos + pos;
-		corners.at(1)->pos = cornerPos;
-		cornerPos << hw, -hl; cornerPos = rot*cornerPos + pos;
-		corners.at(2)->pos = cornerPos;
-		cornerPos << -hw, -hl; cornerPos = rot*cornerPos + pos;
-		corners.at(3)->pos = cornerPos;
-		this->hl = hl;
-		this->hw = hw;
-	}
+	void Reposition(Eigen::Vector2d pos);
+	void Rotate(Eigen::Matrix2d rot);
+	void Reshape(double hl, double hw);
 };
+
+enum REC_AXIS {
+	REC_AXIS_WIDTH,
+	REC_AXIS_HEIGHT
+};
+
+Rrectangle::Rrectangle(double hl, double hw, Eigen::Vector2d pos, Eigen::Matrix2d rot) {
+	this->hl = hl;
+	this->hw = hw;
+	this->pos = pos;
+	this->rot = rot;
+	Eigen::Vector2d cornerPos;
+	cornerPos << -hw, hl; cornerPos = rot*cornerPos + pos;
+	corners.push_back(new Corner(cornerPos, this));
+	cornerPos << hw, hl; cornerPos = rot*cornerPos + pos;
+	corners.push_back(new Corner(cornerPos, this));
+	cornerPos << hw, -hl; cornerPos = rot*cornerPos + pos;
+	corners.push_back(new Corner(cornerPos, this));
+	cornerPos << -hw, -hl; cornerPos = rot*cornerPos + pos;
+	corners.push_back(new Corner(cornerPos, this));
+}
+
+void Rrectangle::Reposition(Eigen::Vector2d pos) {
+	Eigen::Vector2d dist = pos - this->pos;
+	for(auto corner : corners) {
+		corner->pos += dist;
+	}
+	this->pos += dist;
+}
+
+void Rrectangle::Rotate(Eigen::Matrix2d rot) {
+	Eigen::Matrix2d rotDiff = rot * this->rot.transpose();
+	for(auto corner : corners) {
+		corner->pos = rotDiff * (corner->pos - pos) + pos;
+	}
+	this->rot = rot;
+}
+
+void Rrectangle::Reshape(double hl, double hw) {
+	Eigen::Vector2d cornerPos;
+	cornerPos << -hw, hl; cornerPos = rot*cornerPos + pos;
+	corners.at(0)->pos = cornerPos;
+	cornerPos << hw, hl; cornerPos = rot*cornerPos + pos;
+	corners.at(1)->pos = cornerPos;
+	cornerPos << hw, -hl; cornerPos = rot*cornerPos + pos;
+	corners.at(2)->pos = cornerPos;
+	cornerPos << -hw, -hl; cornerPos = rot*cornerPos + pos;
+	corners.at(3)->pos = cornerPos;
+	this->hl = hl;
+	this->hw = hw;
+}
+
+
+// Collision detection functions
+bool LineLineCollision(Point* p00, Point* p01, Point* p10, Point* p11) {
+	//Bezier parameters
+	double t_numerator = (p00->pos.coeff(0) - p10->pos.coeff(0))*(p10->pos.coeff(1) - p11->pos.coeff(1))
+						- (p00->pos.coeff(1) - p10->pos.coeff(1))*(p10->pos.coeff(0) - p11->pos.coeff(0));
+	double t_denominator = (p00->pos.coeff(0) - p01->pos.coeff(0))*(p10->pos.coeff(1) - p11->pos.coeff(1))
+						- (p00->pos.coeff(1) - p01->pos.coeff(1))*(p10->pos.coeff(0) - p11->pos.coeff(0));
+	double u_numerator = (p00->pos.coeff(0) - p10->pos.coeff(0))*(p00->pos.coeff(1) - p01->pos.coeff(1))
+						- (p00->pos.coeff(1) - p10->pos.coeff(1))*(p00->pos.coeff(0) - p01->pos.coeff(0));
+	double u_denominator = (p00->pos.coeff(0) - p01->pos.coeff(0))*(p10->pos.coeff(1) - p11->pos.coeff(1))
+						- (p00->pos.coeff(1) - p01->pos.coeff(1))*(p10->pos.coeff(0) - p11->pos.coeff(0));
+	bool t_intersect = false;
+	bool u_intersect = false;
+	if((t_numerator < 0 && t_denominator < 0) || (0 <= t_numerator && 0 <= t_denominator)) {
+		if(std::abs(t_denominator) >= std::abs(t_numerator)) t_intersect = true;
+	}
+	if((u_numerator < 0 && u_denominator < 0) || (0 <= u_numerator && 0 <= u_denominator)) {
+		if(std::abs(u_denominator) >= std::abs(u_numerator)) u_intersect = true;
+	}
+	return t_intersect && u_intersect;
+}
 
 bool LineCircleCollision(Point* l1, Point* l2, Circle* circ) {
 	if(l1->pos == circ->pos) return true; // prevents division by 0
@@ -214,7 +236,6 @@ bool LenientToughCircleRectangleCollision(Circle* circ, Rrectangle* rec) {
 }
 
 bool ConeCircleCollision(Eigen::Vector2d conePos, Eigen::Matrix2d coneRot, Eigen::Matrix2d coneAngle, double coneRad, Circle* circ) {
-
 	Eigen::Vector2d base; base << 1, 0;
 	Eigen::Vector2d relPL = coneAngle*coneRot * base;
 	Eigen::Vector2d relPR = coneAngle.transpose()*coneRot * base;
@@ -230,14 +251,6 @@ bool ConeCircleCollision(Eigen::Vector2d conePos, Eigen::Matrix2d coneRot, Eigen
 	Point p2(conePos + coneRad*relPR);
 	return LineCircleCollision(&p0, &p1, circ) || LineCircleCollision(&p0, &p2, circ);
 	return false;
-
-}
-
-Eigen::Matrix2d Rotation(double angle) {
-	double _cos = cos(angle);
-	double _sin = sin(angle);
-	Eigen::Matrix2d rot; rot << _cos, -_sin, _sin, _cos;
-	return rot;
 }
 
 #endif

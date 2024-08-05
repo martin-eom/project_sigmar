@@ -109,6 +109,16 @@ public:
 	bool custom_background;
 	AnimationInformation backgroundInfo;
 	bool show_map_object_outlines;
+	int turn_duration;
+	bool simulation_mode;
+	double base_melee_attack;
+	double ranged_base_attack;
+	double max_hit_chance;
+	double min_hit_chance;
+	double anti_large_attack_bonus;
+	double anti_large_damage_bonus;
+	double anti_infantry_attack_bonus;
+	double anti_infantry_damage_bonus;
 
 	SettingsInformation() {}
 	SettingsInformation(json input);

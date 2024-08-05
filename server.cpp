@@ -55,8 +55,8 @@ void OpenWindow(Map* map) {
 	model->players.push_back(player2);
 	model->player2 = player2;
 	model->loadArmyLists("config/templates/armylist.json");
-	model->SetPlayer();
-	model->SetUnit();
+	//ctrl->SetPlayer();
+	//ctrl->SetUnit();
 	ctrl = new KeyboardAndMouseController(em, SCREEN_WIDTH, SCREEN_HEIGHT, map);
 	dynamic_cast<GameEventManager*>(em)->ctrl = ctrl;
 
@@ -114,8 +114,8 @@ int main(int argc, char* argv[1]) {
 	}
 	SDL_StopTextInput();
 
-	//map = new Map("maps/desert.json");
-	map = new Map("maps/testmap.json");
+	//map = new Map("maps/testmap.json");
+	map = new Map("maps/pillars2.json");
 	OpenWindow(map);
 
 	// Extra Debug section
