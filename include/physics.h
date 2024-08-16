@@ -300,7 +300,7 @@ void TimeStep(Soldier* soldier, double dt) {
 	if(o->type == ORDER_TARGET) {
 		TargetOrder* mo = dynamic_cast<TargetOrder*>(o);
 		if(!soldier->arrived && soldier->indivPath.empty()) {
-			if(newestOrder) {// && (mo->moveType != MOVE_PASSINGTHROUGH)) {
+			/*if(newestOrder) {// && (mo->moveType != MOVE_PASSINGTHROUGH)) {
 				if(closeToTarget) {
 					soldier->arrived = true;
 					soldier->unit->nSoldiersArrived++;
@@ -312,6 +312,9 @@ void TimeStep(Soldier* soldier, double dt) {
 				if(PointRectangleCollision(&p, &rec)) {
 					soldier->arrived = true;
 				}
+			}*/
+			if(dynamic_cast<TargetOrder*>(o)->target->nLiveSoldiers <= 0) {
+				soldier->arrived = true;
 			}
 		}
 	}
@@ -450,6 +453,7 @@ void EvaluateRange(Soldier* sold1, Soldier* sold2, std::vector<Soldier*>* soldie
 	bool movingCloser = false;
 	Eigen::Vector2d prod; prod << 0, 0;
 	bool enemies = sold1->unit->player != sold2->unit->player;
+	bool impact = false;
 
 	if((!enemies) && (sold1->unit != sold2->unit)) {
 		minDist *= 0.7;
@@ -461,66 +465,101 @@ void EvaluateRange(Soldier* sold1, Soldier* sold2, std::vector<Soldier*>* soldie
 		if(movingCloser) {
 			double totalMass = sold1->mass + sold2->mass;
 			prod = 2. * dxdv * dx / (totalMass * pow(dist, 2));
+			impact = prod.norm() > 0;
 		}
 	}
 	double meleeDist = dist - minDist;
+	bool sameUnit = false;
+	if(sold1->unit == sold2->unit) {
+		sameUnit = true;
+	}
 
-	omp_set_lock(locks->at(sold1->model_index));
-	if(movingCloser) sold1->knockVel += sold2->mass * prod;
-	if(enemies) {
-		if(meleeDist < 5*sold1->meleeRange) {
-			if(meleeDist < sold1->meleeRange) 
-				sold1->enemiesInMeleeRange.push(SoldierNeighbourContainer(sold2, dx, dist, true));			
-			else if(sold1->unit->orders.at(sold1->currentOrder)->type != ORDER_ATTACK)
-					sold1->enemiesInMeleeRange.push(SoldierNeighbourContainer(sold2, dx, dist, false));
+	if(movingCloser || enemies || sameUnit) {
+		omp_set_lock(locks->at(sold1->model_index));
+		if(movingCloser) sold1->knockVel += sold2->mass * prod;
+		if(enemies) {
+			if(meleeDist < 5*sold1->meleeRange) {
+				if(meleeDist < sold1->meleeRange) 
+					sold1->enemiesInMeleeRange.push(SoldierNeighbourContainer(sold2, dx, dist, true));			
+				else if(sold1->unit->orders.at(sold1->currentOrder)->type != ORDER_ATTACK)
+						sold1->enemiesInMeleeRange.push(SoldierNeighbourContainer(sold2, dx, dist, false));
+			}
 		}
-	}
-	omp_unset_lock(locks->at(sold1->model_index));
-	omp_set_lock(locks->at(sold2->model_index));
-	if(movingCloser) sold2->knockVel -= sold1->mass * prod;
-	if(enemies) {
-		if(meleeDist < 5*sold2->meleeRange) {
-			if(meleeDist < sold2->meleeRange) 
-				sold2->enemiesInMeleeRange.push(SoldierNeighbourContainer(sold1, dx, dist, true));			
-			else if(sold2->unit->orders.at(sold2->currentOrder)->type != ORDER_ATTACK)
-				sold2->enemiesInMeleeRange.push(SoldierNeighbourContainer(sold1, dx, dist, false));
+		if(sameUnit) {
+			if(sold1->currentOrder < sold2->currentOrder && impact) {
+				sold1->arrived = true;
+			}
 		}
+		omp_unset_lock(locks->at(sold1->model_index));
 	}
-	omp_unset_lock(locks->at(sold2->model_index));
+	if(movingCloser || enemies || sameUnit) {
+		omp_set_lock(locks->at(sold2->model_index));
+		if(movingCloser) sold2->knockVel -= sold1->mass * prod;
+		if(enemies) {
+			if(meleeDist < 5*sold2->meleeRange) {
+				if(meleeDist < sold2->meleeRange) 
+					sold2->enemiesInMeleeRange.push(SoldierNeighbourContainer(sold1, dx, dist, true));			
+				else if(sold2->unit->orders.at(sold2->currentOrder)->type != ORDER_ATTACK)
+					sold2->enemiesInMeleeRange.push(SoldierNeighbourContainer(sold1, dx, dist, false));
+			}
+		}
+		if(sameUnit) {
+			if(sold2->currentOrder < sold1->currentOrder && impact) {
+				sold2->arrived = true;
+			}
+		}
+		omp_unset_lock(locks->at(sold2->model_index));
+	}
 }
 
 void CollisionResolution(Map* map, std::vector<Unit*>* units, std::vector<Soldier*>* soldiers, std::vector<omp_lock_t*>* locks) {
-	int n_units = units->size();
-	#pragma omp parallel for default(shared)
-	for(int n_unit = 0; n_unit < n_units; n_unit++) {
-	//for(auto unit : *units) {
-		Unit* unit = units->at(n_unit);
-		for(auto sold1 : unit->liveSoldiers) {
-			if(sold1->placed && sold1->alive) {
-				Soldier* sold2;
-				gridpiece* tile1 = map->tiles.at(sold1->map_row).at(sold1->map_column);
-				gridpiece* tile2;
-				//auto soldNode2 = std::find(tile1->soldiers.begin(), tile1->soldiers.end(), sold1);
-				auto soldNode2 = tile1->soldiers.begin() + sold1->tile_index;
-				while(soldNode2 != tile1->soldiers.end()) {
-					sold2 = (*soldNode2);
-					EvaluateRange(sold1, sold2, soldiers, locks);
-					soldNode2 = std::next(soldNode2);
-				}
-				auto neighbour = tile1->neighbours.begin();
-				while(neighbour != tile1->neighbours.end()) {
-					tile2 = (*neighbour);
-					soldNode2 = tile2->soldiers.begin();
-					while(soldNode2 != tile2->soldiers.end()) {
+	//int n_units = units->size();
+	//std::cout << omp_get_max_threads() << "\n";
+	int n_threads = omp_get_max_threads();
+	int soldier_frac = std::ceil((double)soldiers->size() / (double)n_threads);
+	//std::cout << omp_get_num_threads() << "\n";
+	#pragma omp parallel default(shared)
+	{
+	//int n_threads = omp_get_num_threads();
+	int n_thread = omp_get_thread_num();
+	//for(int n_thread = 0; n_thread < n_threads; n_thread++) {
+		//for(int n_unit = 0; n_unit < n_units; n_unit++) {
+		int n_soldier_min = n_thread * soldier_frac;
+		int n_soldier_max = std::min(n_soldier_min + soldier_frac, (int)soldiers->size());
+		//std::cout << n_thread << ": " << n_threads << " " << soldiers->size() << " " << soldier_frac << " " << n_soldier_min << " " << n_soldier_max << "\n";
+		for(int n_soldier = n_soldier_min; n_soldier < n_soldier_max; n_soldier++) {
+	//#pragma omp parallel for default(shared)
+		//for(auto unit : *units) {
+			//Unit* unit = units->at(n_unit);
+			//for(auto sold1 : unit->liveSoldiers) {
+			Soldier* sold1 = soldiers->at(n_soldier);
+				if(sold1->placed && sold1->alive) {
+					Soldier* sold2;
+					gridpiece* tile1 = map->tiles.at(sold1->map_row).at(sold1->map_column);
+					gridpiece* tile2;
+					//auto soldNode2 = std::find(tile1->soldiers.begin(), tile1->soldiers.end(), sold1);
+					auto soldNode2 = tile1->soldiers.begin() + sold1->tile_index;
+					while(soldNode2 != tile1->soldiers.end()) {
 						sold2 = (*soldNode2);
 						EvaluateRange(sold1, sold2, soldiers, locks);
 						soldNode2 = std::next(soldNode2);
 					}
-					neighbour = std::next(neighbour);
+					auto neighbour = tile1->neighbours.begin();
+					while(neighbour != tile1->neighbours.end()) {
+						tile2 = (*neighbour);
+						soldNode2 = tile2->soldiers.begin();
+						while(soldNode2 != tile2->soldiers.end()) {
+							sold2 = (*soldNode2);
+							EvaluateRange(sold1, sold2, soldiers, locks);
+							soldNode2 = std::next(soldNode2);
+						}
+						neighbour = std::next(neighbour);
+					}
 				}
-			}
+			//}
 		}
 	}
+	//}
 }
 
 void MapObjectCollisionHandling(Map* map) {

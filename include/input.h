@@ -240,7 +240,8 @@ void KeyboardAndMouseController::handleMouseKeyUpEvent(SDL_Event e, GameEventMan
 				}
 			}
 			if(target) {
-				if(_shift) {
+				if(false) {}
+				/*if(selectedUnit->ranged) {
 					Eigen::Vector2d pos;
 					Eigen::Matrix2d rot;
 					if(orders.size() > 0) {
@@ -252,9 +253,9 @@ void KeyboardAndMouseController::handleMouseKeyUpEvent(SDL_Event e, GameEventMan
 						rot = selectedUnit->rot;
 					}
 					o = new TargetOrder(pos, rot, target);
-				}
+				}*/
 				else {
-					o = new AttackOrder(target);
+					o = new AttackOrder(target, target->pos);
 				}
 			}
 		}
@@ -273,7 +274,8 @@ void KeyboardAndMouseController::handleMouseKeyUpEvent(SDL_Event e, GameEventMan
 				dist = (unit->pos - mouse).norm();
 				if(dist < minDist) {
 					selectedUnit = unit;
-					em->Post(new RememberOrders(unit->orders));
+					RememberOrders ro = RememberOrders(unit->orders);
+					em->Post(&ro);
 					minDist = dist;
 				}
 			}
@@ -322,6 +324,7 @@ void KeyboardAndMouseController::handleKeyDownEvent(SDL_Event e, GameEventManage
 
 void KeyboardAndMouseController::handleKeyUpEvent(SDL_Event e, GameEventManager* gem, Model* model, GeneralView* view, Map* map) {
 	Event* nev = new Event();
+	//Event nev = Event();
 	switch(e.key.keysym.sym) {
 	case SDLK_RETURN:
 		debug(std::to_string(_state));
@@ -331,6 +334,22 @@ void KeyboardAndMouseController::handleKeyUpEvent(SDL_Event e, GameEventManager*
 		case CTRL_GIVING_ORDERS:
 			if(selectedUnit) {
 				if(orders.size() > 0) {
+					for(int i = 0; i < orders.size(); i++) {
+						Order* o = orders.at(i);
+						if(selectedUnit->primaryRanged && o->type == ORDER_ATTACK) {
+							Eigen::Vector2d newPos; Eigen::Matrix2d newRot;
+							if(i == 0) {
+								newPos = selectedUnit->orders.at(selectedUnit->currentOrder)->pos;
+								newRot = selectedUnit->orders.at(selectedUnit->currentOrder)->rot;
+								orders.at(i) = new TargetOrder(newPos, newRot, dynamic_cast<AttackOrder*>(o)->target);
+							}
+							else {
+								newPos = orders.at(i-1)->pos;
+								newRot = orders.at(i-1)->rot;
+								orders.at(i) = new TargetOrder(newPos, newRot, dynamic_cast<AttackOrder*>(o)->target);
+							}
+						}
+					}
 					switch(model->state) {
 					case MODEL_SIMULATION: {
 						if(queueingOrders) {
@@ -475,18 +494,21 @@ void KeyboardAndMouseController::handleKeyUpEvent(SDL_Event e, GameEventManager*
 		break;
 	case SDLK_a:
 		switch(_state) {
-		case CTRL_SELECTING_PLAYER:
-			em->Post(new PlayerAddEvent()); break;
+		case CTRL_SELECTING_PLAYER: {
+			PlayerAddEvent pae;
+			em->Post(&pae);} break;
 		case CTRL_SELECTING_UNIT:
 			_state = CTRL_ADDING_UNIT; break;
 		}
 		break;
 	case SDLK_d:
 		switch(_state) {
-		case CTRL_SELECTING_PLAYER:
-			em->Post(new PlayerDeleteEvent()); break;
-		case CTRL_SELECTING_UNIT:
-			em->Post(new UnitDeleteEvent()); break;
+		case CTRL_SELECTING_PLAYER: {
+			PlayerDeleteEvent pde;
+			em->Post(&pde);} break;
+		case CTRL_SELECTING_UNIT: {
+			UnitDeleteEvent ude;
+			em->Post(&ude);} break;
 		}
 		break;
 	case SDLK_h:
@@ -586,6 +608,7 @@ void KeyboardAndMouseController::handleKeyUpEvent(SDL_Event e, GameEventManager*
 	}
 	if(nev->type != GENERIC_EVENT) {
 		em->Post(nev);
+		delete(nev);
 	}
 }
 

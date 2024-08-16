@@ -65,10 +65,11 @@ public:
 	bool enemyContact;
 	void SetPos();
 
-	AttackOrder(Unit* unit, bool _auto = false, bool _transition = false) : Order(_auto, _transition, unit) {
+	AttackOrder(Unit* unit, Eigen::Vector2d pos, bool _auto = false, bool _transition = false) : Order(_auto, _transition, unit) {
 		type = ORDER_ATTACK;
 		this->target = unit;
 		enemyContact = false;
+		this->pos = pos;
 	}
 };
 

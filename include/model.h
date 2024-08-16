@@ -143,6 +143,7 @@ class Model : public Listener{
 		double time_hitscan = 0;
 		double time_indiv_pathing = 0;
 		//omp_lock_t time_lock_indiv;
+		bool displayedTime = false;
 
 		void loadSoldierTypes(std::string filename);
 		void loadUnitTypes(std::string filename);
@@ -291,7 +292,8 @@ class Model : public Listener{
 					Unit* unit = soldier->unit;
 					soldier->alive = false;
 					unit->nLiveSoldiers--;
-					if(!soldier->arrived && soldier->currentOrder == 0)
+					//if(!soldier->arrived && soldier->currentOrder == 0)
+					if(soldier->currentOrder == 0)
 						unit->nSoldiersOnFirstOrder--;
 					if(soldier->arrived && soldier->currentOrder == unit->currentOrder)
 						unit->nSoldiersArrived--;
@@ -308,7 +310,8 @@ class Model : public Listener{
 				}
 			}
 			else if (ev->type == TICK_EVENT) {
-				nticks++;
+				if(state != MODEL_GAME_PAUSED)
+					nticks++;
 				auto global_start = std::chrono::system_clock::now();
 				// determining if game over
 				auto start = std::chrono::system_clock::now();
@@ -341,7 +344,8 @@ class Model : public Listener{
 					break;
 				}
 				auto end = std::chrono::system_clock::now();
-				time_check_game_over += std::chrono::duration<double>(end - start).count();
+				if(state != MODEL_GAME_PAUSED)
+					time_check_game_over += std::chrono::duration<double>(end - start).count();
 
 				//placing units
 				start = std::chrono::system_clock::now();
@@ -360,7 +364,8 @@ class Model : public Listener{
 					}
 				}
 				end = std::chrono::system_clock::now();
-				time_placing_units += std::chrono::duration<double>(end - start).count();
+				if(state != MODEL_GAME_PAUSED)
+					time_placing_units += std::chrono::duration<double>(end - start).count();
 
 				switch(state) {
 				case MODEL_SIMULATION:
@@ -380,26 +385,31 @@ class Model : public Listener{
 					}
 
 					end = std::chrono::system_clock::now();
-					time_collision_scrying += std::chrono::duration<double>(end - start).count();
+					if(state != MODEL_GAME_PAUSED)
+						time_collision_scrying += std::chrono::duration<double>(end - start).count();
 					start = std::chrono::system_clock::now();
 					//resolving collisions between soldiers and creating enemy neighbourlists
 					CollisionResolution(map, &units, &soldiers, &soldier_locks);
 					end = std::chrono::system_clock::now();
-					time_collision_resolution += std::chrono::duration<double>(end - start).count();
+					if(state != MODEL_GAME_PAUSED)
+						time_collision_resolution += std::chrono::duration<double>(end - start).count();
 					//resolving collisions with map objects
 					start = std::chrono::system_clock::now();
 					MapObjectCollisionHandling(map);
 					end = std::chrono::system_clock::now();
-					time_map_object_collision_handling += std::chrono::duration<double>(end - start).count();
+					if(state != MODEL_GAME_PAUSED)
+						time_map_object_collision_handling += std::chrono::duration<double>(end - start).count();
 					start = std::chrono::system_clock::now();
 					ProjectileCollisionScrying(map, projectiles);
 					end = std::chrono::system_clock::now();
-					time_projectile_collision_scrying += std::chrono::duration<double>(end - start).count();
+					if(state != MODEL_GAME_PAUSED)
+						time_projectile_collision_scrying += std::chrono::duration<double>(end - start).count();
 					start = std::chrono::system_clock::now();
 					ProjectileCollisionHandling(map);
 
 					end = std::chrono::system_clock::now();
-					time_projectile_collision_resolution += std::chrono::duration<double>(end - start).count();
+					if(state != MODEL_GAME_PAUSED)
+						time_projectile_collision_resolution += std::chrono::duration<double>(end - start).count();
 
 					start = std::chrono::system_clock::now();
 					//for(auto player : players) {
@@ -446,7 +456,8 @@ class Model : public Listener{
 											o = attacker->orders.at(i);
 											if(!o->_auto) {
 												if(o->type == ORDER_ATTACK) {
-													o = new AttackOrder(dynamic_cast<AttackOrder*>(o)->target);
+													Unit* target = dynamic_cast<AttackOrder*>(o)->target;
+													o = new AttackOrder(target, target->pos);
 												}
 												newOrders.back().push_back(o);
 											}
@@ -565,20 +576,26 @@ class Model : public Listener{
 					}
 
 					end = std::chrono::system_clock::now();
-					time_physics_step += std::chrono::duration<double>(end - start).count();
+					if(state != MODEL_GAME_PAUSED)
+						time_physics_step += std::chrono::duration<double>(end - start).count();
 
 					//ranged target finding
 					for(auto player : players) {
 						for(auto unit : player->units) {
 							if(unit->placed && unit->ranged) {
 								if(unit->rangedTargetUpdateTimer.decrement()) {
+									std::cout << "?checking for new unit target\n";
 									unit->rangedTarget = NULL;	// may be bad flag
 									Order* current = unit->orders.at(unit->currentOrder);
 									// need to detect line of sight issues for unit targets
-									if(current->type == ORDER_TARGET && current->target->nLiveSoldiers > 0 && (current->target->pos - unit->pos).norm() < unit->range) {
-										unit->rangedTarget = current->target;
+									if(current->type == ORDER_TARGET && current->target->nLiveSoldiers > 0 && 
+										(current->target->pos - unit->pos).norm() < unit->range) {
+										Circle c1 = Circle(unit->pos, OnSpotUnitRectangle(unit).hw*0.7);
+										Circle c2 = Circle(current->target->pos, OnSpotUnitRectangle(current->target).hw*0.7);
+										if(FreePath(&c1, &c2, map))
+											unit->rangedTarget = current->target;
 									}
-									else {
+									if(!unit->rangedTarget) {
 										std::vector<UnitDistance> inRange;
 										Eigen::Matrix2d rangedCone;
 										rangedCone << std::cos(0.5*M_PI*unit->rangedAngle), -std::sin(0.5*M_PI*unit->rangedAngle), 
@@ -767,7 +784,8 @@ class Model : public Listener{
 					}
 
 					end = std::chrono::system_clock::now();
-					time_melee_combat += std::chrono::duration<double>(end - start).count();
+					if(state != MODEL_GAME_PAUSED)
+						time_melee_combat += std::chrono::duration<double>(end - start).count();
 
 					// do shooting after melee so that people with melee target cant shoot
 					// reset ranged target after every shot (so they dont have to find new target multiple times before shooting)
@@ -785,9 +803,13 @@ class Model : public Listener{
 												soldier->rangedTarget = NULL;
 												//soldier->debugFlag3 = true;
 											}
+											else if(soldier->rangedTarget && (soldier->rangedTarget->unit != unit->rangedTarget)) {
+												soldier->rangedTarget = NULL;
+											}
 											else if(!soldier->rangedTarget) {
 												if(unit->rangedTarget->nLiveSoldiers > 0) {
 													Soldier* target = unit->rangedTarget->liveSoldiers.at(rand()%unit->rangedTarget->liveSoldiers.size());
+													//here goes the hit detection
 													if(target->currentOrder == unit->rangedTarget->currentOrder) {
 														soldier->rangedTarget = target;
 													}
@@ -814,13 +836,19 @@ class Model : public Listener{
 													double t = projectile_flight_time(soldier->rangedTarget->pos - soldier->pos,
 														soldier->rangedTarget->vel, soldier->rangedSpeed);
 													//std::cout << t << "\n";
-													if(t > 0) {
+													if(t > 0 && soldier->projectileSpeed * t < soldier->rangedRange) {
 														Displacement dis = ShotAngle(soldier->rangedTarget->pos - soldier->pos,
 															soldier->rangedTarget->vel, soldier->rangedSpeed, t, soldier->tans);
 														Eigen::Vector2d vel;
 														vel << 1., 0.;
 														vel = dis.rot * vel * soldier->rangedSpeed;
-														if(soldier->rangedTarget->meleeTarget && !soldier->rangedTarget->meleeTarget->large) {
+														//los check
+														Eigen::Vector2d pointOfImpact = soldier->pos + vel * t;
+														Circle c1 = Circle(soldier->pos, soldier->rad);
+														Circle c2 = Circle(pointOfImpact, soldier->rad);
+														if(!FreePath(&c1, &c2, map))
+															canFire = false;
+														if(canFire && soldier->rangedTarget->meleeTarget && !soldier->rangedTarget->meleeTarget->large) {
 															Soldier* mtarget = soldier->rangedTarget->meleeTarget;
 															Eigen::Vector2d targetPos = soldier->pos + vel * t;
 															Eigen::Vector2d allyPos = mtarget->pos + mtarget->vel * t;
@@ -837,6 +865,8 @@ class Model : public Listener{
 															em->Post(&pev);
 															soldier->ReloadTimer.reset();
 														}
+														else
+															soldier->rangedTarget = NULL;
 													}
 													else
 														soldier->rangedTarget = NULL;
@@ -863,7 +893,8 @@ class Model : public Listener{
 					}
 
 					end = std::chrono::system_clock::now();
-					time_ranged_target_finding += std::chrono::duration<double>(end - start).count();
+					if(state != MODEL_GAME_PAUSED)
+						time_ranged_target_finding += std::chrono::duration<double>(end - start).count();
 
 					start = std::chrono::system_clock::now();
 
@@ -884,7 +915,8 @@ class Model : public Listener{
 					}
 
 					end = std::chrono::system_clock::now();
-					time_hitscan += std::chrono::duration<double>(end - start).count();
+					if(state != MODEL_GAME_PAUSED)
+						time_hitscan += std::chrono::duration<double>(end - start).count();
 
 					//resolving damage
 					while(!damages.empty()) {
@@ -917,24 +949,10 @@ class Model : public Listener{
 					break;}
 				}
 				auto global_end = std::chrono::system_clock::now();
-				time_total += std::chrono::duration<double>(global_end - global_start).count();
+				if(state != MODEL_GAME_PAUSED)
+					time_total += std::chrono::duration<double>(global_end - global_start).count();
 
-				if(nticks == 3600) {
-					time_total = 0;
-					time_collision_scrying = 0;
-					time_collision_resolution = 0;
-					time_map_object_collision_handling = 0;
-					time_projectile_collision_scrying = 0;
-					time_projectile_collision_resolution = 0;
-					time_check_game_over = 0;
-					time_placing_units = 0;
-					time_ranged_target_finding = 0;
-					time_melee_combat = 0;
-					time_physics_step = 0;
-					time_indiv_pathing = 0;
-					em->measureTime = true;
-				}
-				if(nticks == 4500) {
+				if(state == MODEL_GAME_OVER && !displayedTime) {
 					std::cout << "####### MODEL TIMING ##############\n";
 					std::cout << "total time:              " << time_total << "\n";
 					std::cout << "expected time:           " << (nticks - 3600.) / 30. << "\n";
@@ -951,6 +969,7 @@ class Model : public Listener{
 					std::cout << "individual path finding: " << time_indiv_pathing << "\n";
 					std::cout << "##################################\n";
 					em->showTimes = true;
+					displayedTime = true;
 				}
 			}
 		}

@@ -1,6 +1,10 @@
 #define NOMINMAX
 #include <Windows.h>	// this line is very dangerous, moving this statement to a different location causes all sorts of problems
 
+#ifndef EIGEN_DONT_PARALLELIZE
+#define EIGEN_DONT_PARALLELIZE
+#endif
+
 #include <server.h>
 #include <shapes.h>
 #include <view.h>
@@ -103,6 +107,7 @@ int main(int argc, char* argv[1]) {
 	freopen("CONOUT$", "w", stdout);
 	freopen("CONOUT$", "w", stderr);
 
+	omp_set_num_threads(std::max(1, omp_get_max_threads() - 1));
 	// Initializing SDL
 	if(SDL_Init(SDL_INIT_EVERYTHING) != 0) {
 		std::cout << "Failed to initialize SDL!\n";
@@ -160,19 +165,22 @@ int main(int argc, char* argv[1]) {
 			//debug("Tick");
 			TickEvent ev;
 			em->Post(&ev);
-			T_OF_NEXT_TICK = CURRENT_TICK + em->dt * 1000;
+			//T_OF_NEXT_TICK = CURRENT_TICK + em->dt * 1000;
+			T_OF_NEXT_TICK += em->dt * 1000;
 			TICKS_SINCE_LAST_FPS_UPDATE++;
 		}
 		if (CURRENT_TICK >= T_OF_NEXT_FPS_UPDATE) {
 			std::cout << 0.5 * TICKS_SINCE_LAST_FPS_UPDATE << " fps\n";
 			TICKS_SINCE_LAST_FPS_UPDATE = 0;
-			T_OF_NEXT_FPS_UPDATE = CURRENT_TICK + 2000;
+			//T_OF_NEXT_FPS_UPDATE = CURRENT_TICK + 2000;
+			T_OF_NEXT_FPS_UPDATE += 2000;
 		}
 		if (CURRENT_TICK >= T_OF_NEXT_REFORM) {
 			ReformEvent ev;
 			em->Post(&ev);
 			TICKS_SINCE_LAST_REFORM = 0;
-			T_OF_NEXT_REFORM = CURRENT_TICK + 5000;
+			//T_OF_NEXT_REFORM = CURRENT_TICK + 5000;
+			T_OF_NEXT_REFORM += 5003;
 		}
 		Event* ev = NULL;
 		switch(ctrl->state()) {

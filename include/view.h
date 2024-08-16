@@ -112,7 +112,8 @@ private:
 		void createAnimations();
 		void animateBackground(Animation* anime, ZoomableGUIController* ctrl);
 		void animateSelectionCircle(SoldierAnimation* anime, ZoomableGUIController* ctrl);
-		void animateSoldier(SoldierAnimation* anime, ZoomableGUIController* ctrl, bool hpAlpha = true);
+		void animateSoldier(SoldierAnimation* anime, ZoomableGUIController* ctrl, bool hpAlpha = true, 
+			bool customCoords = false, Eigen::Vector2d customPos = Eigen::Vector2d(), Eigen::Matrix2d customRot = Eigen::Matrix2d());
 		void animateProjectile(ProjectileAnimation* anime, ZoomableGUIController* ctrl);
 		void drawMapObjects(KeyboardAndMouseController* ctrl, Model* model);
 		void drawTileObjectCollision(KeyboardAndMouseController* ctrl);
@@ -122,6 +123,7 @@ private:
 		void drawOrders(KeyboardAndMouseController* ctrl, Model* model);
 		void drawGameObjects(KeyboardAndMouseController* ctrl);
 		void drawUI(KeyboardAndMouseController* ctrl, Model* model);
+		void drawDebugInfo(KeyboardAndMouseController* ctrl, Model* model);
 
 		View(EventManager* em, Map* map, SDL_Window* window, SDL_Renderer* renderer) : GeneralView(em, window, renderer) {
 			this->map = map;
@@ -162,6 +164,7 @@ private:
 			drawProposedOrders1(ctrl, model);	
 			drawOrders(ctrl, model);
 			drawGameObjects(ctrl);
+			drawDebugInfo(ctrl, model);
 			drawUI(ctrl, model);
 
 			SDL_RenderPresent(renderer);
@@ -322,6 +325,7 @@ void View::createAnimations() {
 					else
 						leg->texture = redLegTextures.at(soldier->tag);
 					legs.push_back(leg);
+					soldier->legs = leg;
 					if(soldier->melee) {
 						MeleeAnimation* mele = new MeleeAnimation(soldier, model->SoldierTypes.at(soldier->tag).anime_melee_information);
 						if(player->player1)
@@ -329,6 +333,7 @@ void View::createAnimations() {
 						else
 							mele->texture = redMeleeTextures.at(soldier->tag);
 						melee.push_back(mele);
+						soldier->arms = mele;
 					}
 					if(soldier->ranged) {
 						RangedAnimation* range = new RangedAnimation(soldier, model->SoldierTypes.at(soldier->tag).anime_ranged_information);
@@ -337,6 +342,7 @@ void View::createAnimations() {
 						else
 							range->texture = redRangedTextures.at(soldier->tag);
 						ranged.push_back(range);
+						soldier->armsRanged = range;
 					}
 					SoldierAnimation* body = new SoldierAnimation(soldier, model->SoldierTypes.at(soldier->tag).anime_body_information);
 					if(player->player1)
@@ -344,6 +350,7 @@ void View::createAnimations() {
 					else
 						body->texture = redBodyTextures.at(soldier->tag);
 					bodies.push_back(body);
+					soldier->body = body;
 					DamageAnimation* dmg = new DamageAnimation(soldier, model->settings.damageInfo);
 					dmg->texture = damage;
 					damages.push_back(dmg);
@@ -403,16 +410,14 @@ void View::drawProposedOrders1(KeyboardAndMouseController* ctrl, Model* model) {
 	auto drawOrderList = [&](std::vector<Order*> orders, Unit* unit, Color* drawColor) {
 		for(int n_order = 0; n_order < orders.size(); n_order++) {
 			Order* o = orders.at(n_order);
-			if(o->type == ORDER_MOVE) {
-				MoveOrder* mo = dynamic_cast<MoveOrder*>(o);
-				if(n_order > 0) {
-					Order* prevo = orders.at(n_order-1);
-					if(prevo->type == ORDER_MOVE) {
-						MoveOrder* prevmo = dynamic_cast<MoveOrder*>(prevo);
-						Point p1(mo->pos); Point p2(prevmo->pos);
-						DrawLine(&p1, &p2, renderer, drawColor, SCREEN_WIDTH, SCREEN_HEIGHT, ctrl->zoom, ctrl->center);
-					}
-				}
+			if(unit->placed && n_order == 0) {
+				Point p1(o->pos); Point p2(unit->pos);
+				DrawLine(&p1, &p2, renderer, drawColor, SCREEN_WIDTH, SCREEN_HEIGHT, ctrl->zoom, ctrl->center);
+			}
+			if(n_order > 0) {
+				Order* prevo = orders.at(n_order-1);
+				Point p1(o->pos); Point p2(prevo->pos);
+				DrawLine(&p1, &p2, renderer, drawColor, SCREEN_WIDTH, SCREEN_HEIGHT, ctrl->zoom, ctrl->center);
 			}
 			Color* recColor = drawColor;
 			Rrectangle rec = UnitRectangle(unit, n_order, orders);
@@ -441,7 +446,9 @@ void View::drawProposedOrders1(KeyboardAndMouseController* ctrl, Model* model) {
 			}
 			Unit* unit = ctrl->selectedPlayer->units.at(n_unit);
 			std::vector<Order*> orders = ctrl->orderList.at(n_unit);
-			drawOrderList(orders, unit, drawColor);
+			if(orders.size() == 0) orders = unit->orders;
+			if(unit->nLiveSoldiers > 0)
+				drawOrderList(orders, unit, drawColor);
 		}
 	}			
 	debug("view : drew orders when ordering");
@@ -460,8 +467,12 @@ void View::drawProposedOrders2(KeyboardAndMouseController* ctrl, Model* model, U
 						Soldier* soldier = soldiers->at(i).at(j);
 						if(soldier->alive) {
 							Eigen::Vector2d pos = ctrl->rot * posInUnit.at(i).at(j) + ctrl->p0;
-							DrawCircle(pos.coeff(0), pos.coeff(1), soldier->rad, renderer, colorGrey, SCREEN_WIDTH, SCREEN_HEIGHT, ctrl->zoom, ctrl->center);
-							DrawFacingArrowhead(pos, ctrl->rot, soldier->rad, renderer, colorWhite, SCREEN_WIDTH, SCREEN_HEIGHT, ctrl->zoom, ctrl->center);
+							animateSoldier(soldier->legs, ctrl, false, true, pos, ctrl->rot);
+							if(soldier->melee)
+								animateSoldier(soldier->arms, ctrl, false, true, pos, ctrl->rot);
+							if(soldier->ranged)
+								animateSoldier(soldier->armsRanged, ctrl, false, true, pos, ctrl->rot);
+							animateSoldier(soldier->body, ctrl, false, true, pos, ctrl->rot);
 						}
 					}
 				}
@@ -475,8 +486,8 @@ void View::drawProposedOrders2(KeyboardAndMouseController* ctrl, Model* model, U
 void View::drawCurrentOrders(KeyboardAndMouseController* ctrl, Model* model, Unit* unit) {
 	std::vector<std::vector<Soldier*>>* soldiers = &(unit->soldiers);
 	GameEventManager* gem = Gem();
-	if(unit->placed) {
-		if(ddebug::_showDebugGraphics || true) {
+	if(unit->placed && unit->nLiveSoldiers > 0) {
+		if(ddebug::_showDebugGraphics) {
 			Circle circ = Circle(unit->pos, 30);
 			//DrawCircle(&circ, renderer, colorGrey, SCREEN_WIDTH, SCREEN_HEIGHT, ctrl->zoom, ctrl->center);
 			if(unit->rangedTarget && unit == ctrl->selectedUnit) {
@@ -505,6 +516,10 @@ void View::drawCurrentOrders(KeyboardAndMouseController* ctrl, Model* model, Uni
 						TargetOrder* to = dynamic_cast<TargetOrder*>(o);
 						Rrectangle rec = UnitRectangle(to->target, to->target->currentOrder);
 						DrawRectangle(&rec, renderer, colorOrange, SCREEN_WIDTH, SCREEN_HEIGHT, ctrl->zoom, ctrl->center);
+					}
+					if(i == 0 && unit->placed) {
+						Point p1(o->pos); Point p2(unit->pos);
+						DrawLine(&p1, &p2, renderer, colorGreen, SCREEN_WIDTH, SCREEN_HEIGHT, ctrl->zoom, ctrl->center);
 					}
 					if(i > 0) {
 						Order* prevo = unit->orders.at(i-1);
@@ -777,24 +792,33 @@ void MapEditorView::animateBackground(Animation* anime, ZoomableGUIController* c
 	}
 }
 
-void View::animateSoldier(SoldierAnimation* anime, ZoomableGUIController* ctrl, bool hpAlpha) {
+void View::animateSoldier(SoldierAnimation* anime, ZoomableGUIController* ctrl, bool hpAlpha, 
+	bool customCoords, Eigen::Vector2d customPos, Eigen::Matrix2d customRot) {
 	Soldier* soldier = anime->soldier;
-	if((soldier->alive && soldier->placed) || !hpAlpha) {
+	if((soldier->alive && soldier->placed) || !hpAlpha || customCoords) {
 		double ang;
 		if(hpAlpha) ang = soldier->angle * 180 / M_PI + 90;
+		else if(customCoords) {
+			ang = Angle(customRot.coeff(0,1), customRot.coeff(0,0)) * 180 / M_PI + 90;
+		}
 		else ang = 0.;
 		SDL_Rect clip;
 		clip.x = 0 + anime->stage * anime->info.size_x;
 		clip.y = 0;
 		clip.w = anime->info.size_x;
 		clip.h = anime->info.size_y;
-		if(hpAlpha)
-			SDL_SetTextureAlphaMod(anime->texture->texture, 255*std::min(double(soldier->hp) / soldier->maxHP, 1.));		
-		anime->texture->renderZoomed(soldier->pos.coeff(0), soldier->pos.coeff(1), soldier->rad, 
+		if(hpAlpha || customCoords)
+			SDL_SetTextureAlphaMod(anime->texture->texture, 255*std::min(double(soldier->hp) / soldier->maxHP, 1.));
+		Eigen::Vector2d pos;
+		if(customCoords)
+			pos = customPos;
+		else
+			pos = soldier->pos;
+		anime->texture->renderZoomed(pos.coeff(0), pos.coeff(1), soldier->rad, 
 			anime->info.frame_size_x, anime->info.frame_size_y, anime->info.frame_origin_x, anime->info.frame_origin_y,
 			SCREEN_WIDTH, SCREEN_HEIGHT, ctrl->zoom, ctrl->center,
 			ang, NULL, &clip);
-		if(hpAlpha)
+		if(hpAlpha || customCoords)
 			SDL_SetTextureAlphaMod(anime->texture->texture, 255);
 		switch(model->state) {
 		case MODEL_SIMULATION:
@@ -944,5 +968,16 @@ void MapEditorView::drawPlacingObject(MapEditorController* ctrl) {
 	}
 }
 
+
+void View::drawDebugInfo(KeyboardAndMouseController* ctrl, Model* model) {
+	if(ddebug::_showDebugGraphics) {
+		for(auto soldier : model->soldiers) {
+			if(soldier->ranged && soldier->rangedTarget) {
+				Point p1(soldier->pos); Point p2(soldier->rangedTarget->pos);
+				DrawLine(&p1, &p2, renderer, colorPurple, SCREEN_WIDTH, SCREEN_HEIGHT, ctrl->zoom, ctrl->center);
+			}
+		}
+	}
+}
 
 #endif

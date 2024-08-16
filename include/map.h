@@ -422,7 +422,7 @@ void SoldierRectangleCollision(Soldier* soldier, Rrectangle* rec) {
 		break;
 	case 0:
 		for(int i = 0; i < 4; i++) {
-			Corner* corner = rec->corners.at(i);
+			Corner* corner = &(rec->corners.at(i));
 			Eigen::Vector2d dist = soldier->pos - corner->pos;
 			double d = dist.norm();
 			if(d <= soldier->rad) {

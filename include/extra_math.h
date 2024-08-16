@@ -75,7 +75,7 @@ public:
 	double hw;	//half width
 	Eigen::Vector2d pos;	//center
 	Eigen::Matrix2d rot;
-	std::vector<Corner*> corners;
+	std::vector<Corner> corners;
 
 	Rrectangle(double hl, double hw, Eigen::Vector2d pos, Eigen::Matrix2d rot);
 
@@ -96,19 +96,19 @@ Rrectangle::Rrectangle(double hl, double hw, Eigen::Vector2d pos, Eigen::Matrix2
 	this->rot = rot;
 	Eigen::Vector2d cornerPos;
 	cornerPos << -hw, hl; cornerPos = rot*cornerPos + pos;
-	corners.push_back(new Corner(cornerPos, this));
+	corners.push_back(Corner(cornerPos, this));
 	cornerPos << hw, hl; cornerPos = rot*cornerPos + pos;
-	corners.push_back(new Corner(cornerPos, this));
+	corners.push_back(Corner(cornerPos, this));
 	cornerPos << hw, -hl; cornerPos = rot*cornerPos + pos;
-	corners.push_back(new Corner(cornerPos, this));
+	corners.push_back(Corner(cornerPos, this));
 	cornerPos << -hw, -hl; cornerPos = rot*cornerPos + pos;
-	corners.push_back(new Corner(cornerPos, this));
+	corners.push_back(Corner(cornerPos, this));
 }
 
 void Rrectangle::Reposition(Eigen::Vector2d pos) {
 	Eigen::Vector2d dist = pos - this->pos;
 	for(auto corner : corners) {
-		corner->pos += dist;
+		corner.pos += dist;
 	}
 	this->pos += dist;
 }
@@ -116,7 +116,7 @@ void Rrectangle::Reposition(Eigen::Vector2d pos) {
 void Rrectangle::Rotate(Eigen::Matrix2d rot) {
 	Eigen::Matrix2d rotDiff = rot * this->rot.transpose();
 	for(auto corner : corners) {
-		corner->pos = rotDiff * (corner->pos - pos) + pos;
+		corner.pos = rotDiff * (corner.pos - pos) + pos;
 	}
 	this->rot = rot;
 }
@@ -124,13 +124,13 @@ void Rrectangle::Rotate(Eigen::Matrix2d rot) {
 void Rrectangle::Reshape(double hl, double hw) {
 	Eigen::Vector2d cornerPos;
 	cornerPos << -hw, hl; cornerPos = rot*cornerPos + pos;
-	corners.at(0)->pos = cornerPos;
+	corners.at(0).pos = cornerPos;
 	cornerPos << hw, hl; cornerPos = rot*cornerPos + pos;
-	corners.at(1)->pos = cornerPos;
+	corners.at(1).pos = cornerPos;
 	cornerPos << hw, -hl; cornerPos = rot*cornerPos + pos;
-	corners.at(2)->pos = cornerPos;
+	corners.at(2).pos = cornerPos;
 	cornerPos << -hw, -hl; cornerPos = rot*cornerPos + pos;
-	corners.at(3)->pos = cornerPos;
+	corners.at(3).pos = cornerPos;
 	this->hl = hl;
 	this->hw = hw;
 }
@@ -173,8 +173,8 @@ bool LineCircleCollision(Point* l1, Point* l2, Circle* circ) {
 }
 
 bool LineRectangleCollison(Point* l1, Point* l2, Rrectangle* rec) {
-	if(LineLineCollision(l1, l2, rec->corners.at(0), rec->corners.at(2))) return true;
-	if(LineLineCollision(l1, l2, rec->corners.at(1), rec->corners.at(3))) return true;
+	if(LineLineCollision(l1, l2, &(rec->corners.at(0)), &(rec->corners.at(2)))) return true;
+	if(LineLineCollision(l1, l2, &(rec->corners.at(1)), &(rec->corners.at(3)))) return true;
 	return false;
 }
 
@@ -195,7 +195,7 @@ bool CircleRectangleCollision(Circle* circle, Rrectangle* rec) {
 		return true;
 	}
 	for(auto corner : rec->corners) {
-		if((circle->pos - corner->pos).norm() <= (circle->rad)) {
+		if((circle->pos - corner.pos).norm() <= (circle->rad)) {
 			return true;
 		}
 	}
@@ -204,12 +204,12 @@ bool CircleRectangleCollision(Circle* circle, Rrectangle* rec) {
 
 bool RectangleRectangleCollision(Rrectangle* rec1, Rrectangle* rec2) {
 	for(auto corner : rec1->corners) {
-		if(PointRectangleCollision(corner, rec2)) {return true;}
+		if(PointRectangleCollision(&corner, rec2)) {return true;}
 	}
 	for(auto corner : rec2->corners) {
-		if(PointRectangleCollision(corner, rec1)) {return true;}
+		if(PointRectangleCollision(&corner, rec1)) {return true;}
 	}
-	if(LineLineCollision(rec1->corners.at(3), rec1->corners.at(1), rec2->corners.at(3), rec2->corners.at(1))) {
+	if(LineLineCollision(&(rec1->corners.at(3)), &(rec1->corners.at(1)), &(rec2->corners.at(3)), &(rec2->corners.at(1)))) {
 		return true;
 	}
 	return false;
@@ -229,7 +229,7 @@ bool LenientToughCircleRectangleCollision(Circle* circ, Rrectangle* rec) {
 	else {
 		double diag = std::sqrt(2 * circ->rad * circ->rad);
 		for(auto corner : rec->corners) {
-			if((circ->pos - corner->pos).norm() < diag * 0.95) return true;
+			if((circ->pos - corner.pos).norm() < diag * 0.95) return true;
 		}
 		return false;
 	}

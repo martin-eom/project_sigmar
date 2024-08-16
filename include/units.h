@@ -34,6 +34,7 @@ public:
 	double yspacing = 0.;
 	std::string soldierType;
 	bool ranged = false;
+	bool primaryRanged = false;
 	double range = 0.;
 	double rangedAngle = 0.;
 	// generated members
@@ -93,6 +94,7 @@ public:
 		ranged = info.ranged_ranged;
 		range = info.ranged_range;
 		rangedAngle = info.ranged_angle;
+		primaryRanged = info.primary_ranged;
 
 		this->player = player;
 
@@ -128,8 +130,8 @@ void Unit::Place(Eigen::Vector2d pos, Eigen::Matrix2d rot) {
 	std::vector<std::vector<Soldier*>>* soldiers = &(this->soldiers);
 	std::vector<std::vector<Eigen::Vector2d>>* posInUnit = &(this->posInUnit);
 	for(int i = 0; i < nrows; i++) {
-		for (int j = 0; j < ncols; j++) {
-			if (nSoldiers < maxSoldiers) {
+		for(int j = 0; j < ncols; j++) {
+			if(nSoldiers < maxSoldiers) {
 				Soldier* soldier = (*soldiers)[i][j];
 				soldier->pos = pos + rot * (*posInUnit)[i][j];
 				soldier->posTarget = soldier->pos;
@@ -271,16 +273,16 @@ bool Unit::CurrentOrderCompleted() {
 
 void Unit::NextOrder() {
 	Order* o = orders.at(currentOrder);
-	if(o->type == ORDER_ATTACK) {
-		std::erase(dynamic_cast<AttackOrder*>(o)->target->targetedBy, this);
-		enemyContact = false;
-	}
 	currentOrder++;
 	nSoldiersArrived = 0;
 	Order* no = orders.at(currentOrder);
-	if(!no->target || no->target != o->target)
-		enemyContact = false;
-	std::cout << "Onwards to the next order!\n";
+	if(o->type == ORDER_ATTACK) {
+		std::erase(dynamic_cast<AttackOrder*>(o)->target->targetedBy, this);
+		if(!no->target || (no->type == ORDER_ATTACK && no->target != o->target))
+			enemyContact = false;
+	}
+	//if(!no->target || no->target != o->target)
+	//	enemyContact = false;
 }
 
 void Unit::DeleteObsoleteOrder() {
@@ -319,42 +321,75 @@ void SoldierNextOrder(Soldier* soldier, Eigen::Vector2d posInUnit) {
 
 Rrectangle SoldierRectangle(Soldier* soldier) {
 	Unit* unit = soldier->unit;
-	double halfWidth = (unit->ncols - 1) * unit->yspacing * 0.5 + 1.*soldier->rad;
-	double halfDepth = (unit->nrows - 1) * unit->xspacing * 0.5 + 1.*soldier->rad;
 	Order* o = unit->orders.at(soldier->currentOrder);
+	switch(o->type) {
+	case ORDER_ATTACK:
+		unit = dynamic_cast<AttackOrder*>(o)->target;
+		break;
+	case ORDER_TARGET:
+		unit = dynamic_cast<TargetOrder*>(o)->target;
+		break;
+	}
+	double halfWidth, halfDepth;
+	halfWidth = (unit->ncols - 1) * unit->yspacing * 0.5 + 1.*soldier->rad;
+	halfDepth = (unit->nrows - 1) * unit->xspacing * 0.5 + 1.*soldier->rad;
 	Eigen::Vector2d pos;
 	Eigen::Matrix2d rot;
-	if(o->type == ORDER_MOVE || true) {
-		MoveOrder* mo = dynamic_cast<MoveOrder*>(o);
+	//if(o->type == ORDER_MOVE || true) {
+	//	MoveOrder* mo = dynamic_cast<MoveOrder*>(o);
 		pos = o->pos;
 		rot = o->rot;
-	}
+	//}
 	return Rrectangle(halfWidth, halfDepth, pos, rot);
 }
 
 Rrectangle UnitRectangle(Unit* unit, int orderID) {
-	double halfWidth = (unit->ncols - 1) * unit->yspacing * 0.5;
-	double halfDepth = (unit->nrows - 1) * unit->xspacing * 0.5;
 	Order* o = unit->orders.at(orderID);
+	switch(o->type) {
+	case ORDER_ATTACK:
+		unit = dynamic_cast<AttackOrder*>(o)->target;
+		break;
+	case ORDER_TARGET:
+		unit = dynamic_cast<TargetOrder*>(o)->target;
+		break;
+	}
+	double halfWidth, halfDepth;
+	if(unit->maxSoldiers == 1) {
+		halfWidth = halfDepth = unit->soldiers.at(0).at(0)->rad;
+	}
+	else {
+		halfWidth = (unit->ncols - 1) * unit->yspacing * 0.5;
+		halfDepth = (unit->nrows - 1) * unit->xspacing * 0.5;
+	}
 	Eigen::Vector2d pos;
 	Eigen::Matrix2d rot;
-	if(o->type == ORDER_MOVE) {
-		MoveOrder* mo = dynamic_cast<MoveOrder*>(o);
-		pos = mo->pos;
-		rot = mo->rot;
-	}
+	//if(o->type == ORDER_MOVE) {
+		//MoveOrder* mo = dynamic_cast<MoveOrder*>(o);
+		pos = o->pos;
+		rot = o->rot;
+	//}
 	return Rrectangle(halfWidth, halfDepth, pos, rot);
 }
 
 Rrectangle OnSpotUnitRectangle(Unit* unit) {
-	double halfWidth = (unit->ncols - 1) * unit->yspacing * 0.5;
-	double halfDepth = (unit->nrows - 1) * unit->xspacing * 0.5;
+	double halfWidth, halfDepth;
+	if(unit->maxSoldiers == 1)
+		halfWidth = halfDepth = unit->soldiers.at(0).at(0)->rad;
+	else {
+		halfWidth = (unit->ncols - 1) * unit->yspacing * 0.5;
+		halfDepth = (unit->nrows - 1) * unit->xspacing * 0.5;
+	}
 	return Rrectangle(halfWidth, halfDepth, unit->pos, unit->rot);
 };
 
 Rrectangle UnitRectangle(Unit* unit, int orderID, std::vector<Order*> orders) {
-	double halfWidth = (unit->ncols - 1) * unit->yspacing * 0.5;
-	double halfDepth = (unit->nrows - 1) * unit->xspacing * 0.5;
+	double halfWidth, halfDepth;
+	if(unit->maxSoldiers == 1)
+		halfWidth = halfDepth = unit->soldiers.at(0).at(0)->rad;
+	else {
+		halfWidth = (unit->ncols - 1) * unit->yspacing * 0.5;
+		halfDepth = (unit->nrows - 1) * unit->xspacing * 0.5;
+	}
 	Order* o = orders.at(orderID);
 	Eigen::Vector2d pos;
 	Eigen::Matrix2d rot;

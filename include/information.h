@@ -98,6 +98,7 @@ public:
 	bool ranged_ranged;
 	double ranged_range;
 	double ranged_angle;
+	bool primary_ranged;
 
 	UnitInformation(json input);
 };

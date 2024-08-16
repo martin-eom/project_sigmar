@@ -336,10 +336,10 @@
 		"general_stats": {
 			"radius": 15.0,
 			"mass": 100.0,
-			"max_speed": 7.0,
+			"max_speed": 14.0,
 			"acceleration": 1.0,
 			"turn_speed": 0.2,
-			"on_target_dampening": 3.0,
+			"on_target_dampening": 2.0,
 			"max_hp": 20,
 			"armor": 0
 		},

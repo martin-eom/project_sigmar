@@ -278,6 +278,7 @@ UnitInformation::UnitInformation(json input) {
 	ranged_ranged = input["ranged_stats"]["ranged"];
 	ranged_range = input["ranged_stats"]["range"];
 	ranged_angle = input["ranged_stats"]["angle"];
+	primary_ranged = input["ranged_stats"]["primary_ranged"];
 }
 
 SettingsInformation::SettingsInformation(json input) {

@@ -46,6 +46,8 @@ struct compareContainers {
 };
 
 
+class SoldierAnimation;
+
 class Soldier : public Circle{
 	public:
 		// general stats
@@ -132,6 +134,11 @@ class Soldier : public Circle{
 		std::vector<Eigen::Vector2d> indivPath;	// individual pathfinding when los to original next target is lost
 		Timer indivPathTimer = Timer(60);
 		double tans;
+
+		SoldierAnimation* legs;
+		SoldierAnimation* arms;
+		SoldierAnimation* armsRanged;
+		SoldierAnimation* body;
 
 		bool debugFlag1;
 		bool debugFlag2;
