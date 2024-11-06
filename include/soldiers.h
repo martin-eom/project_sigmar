@@ -109,13 +109,13 @@ class Soldier : public Circle{
 		//Eigen::Vector2d pos; // handled by inheriting from Point
 		Eigen::Vector2d posTarget;
 		Eigen::Vector2d oldPosTarget;
+		//int map_row;
 		int map_row;
-		int map_row2;
+		//int map_column;
 		int map_column;
-		int map_column2;
 		int model_index;
+		//int tile_index;
 		int tile_index;
-		int tile_index2;
 		Eigen::Vector2d vel;
 		double speed;
 		double forwardSpeed;

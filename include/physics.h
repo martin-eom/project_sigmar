@@ -359,9 +359,9 @@ void CollisionScrying(Map* map, Unit* unit) {
 				int n = (int) (soldier->pos.coeff(0) / grid->tilesize);
 				if(n < 0) n = 0;
 				else if(n > grid->ncols - 1) n = grid->ncols - 1;
-				map->Assign2(soldier, m, n, grid);
-				soldier->map_row2 = m;
-				soldier->map_column2 = n;
+				map->Assign(soldier, m, n, grid);
+				soldier->map_row = m;
+				soldier->map_column = n;
 			}
 		}
 	}
@@ -383,7 +383,7 @@ void ProjectileCollisionScrying(Map* map, std::vector<Projectile*> projectiles) 
 		int n = (int) (projectile->get_pos().coeff(0) / grid->tilesize);
 		if(n < 0) n = 0;
 		else if(n > grid->ncols - 1) n = grid->ncols - 1;
-		map->ProjectileAssign2(projectile, m, n, grid);
+		map->ProjectileAssign(projectile, m, n, grid);
 	}
 }
 
@@ -473,7 +473,7 @@ void ProjectileCollisionHandling(Map* map) {
 								projectile->targets.push_back(soldier);
 							}
 						}
-						for(auto sublist: tile->neighbours2) {
+						for(auto sublist: tile->neighbours) {
 							//std::cout << sublist.size() << "-\n";
 							for(auto ntile : sublist) {
 								//std::cout << ntile->soldiers.size() << " ";
@@ -485,7 +485,7 @@ void ProjectileCollisionHandling(Map* map) {
 							}
 							//std::cout << "\n";
 						}
-						for(auto sublist: tile->redundantNeighbours2) {
+						for(auto sublist: tile->redundantNeighbours) {
 							//std::cout << sublist.size() << "|\n";
 							for(auto ntile : sublist) {
 								//std::cout << ntile->soldiers.size() << " ";
@@ -633,10 +633,10 @@ void CollisionResolution(Map* map, std::vector<Unit*>* units, std::vector<Soldie
 					grid_container* grid = map->getGrid(sold1->tilesize);
 					Soldier* sold2;
 					//gridpiece* tile1 = map->tiles.at(sold1->map_row).at(sold1->map_column);
-					gridpiece* tile1 = grid->grid.at(sold1->map_row2).at(sold1->map_column2);
+					gridpiece* tile1 = grid->grid.at(sold1->map_row).at(sold1->map_column);
 					//gridpiece* tile2;
 					//auto soldNode2 = std::find(tile1->soldiers.begin(), tile1->soldiers.end(), sold1);
-					auto soldNode2 = tile1->soldiers.begin() + sold1->tile_index2;
+					auto soldNode2 = tile1->soldiers.begin() + sold1->tile_index;
 					while(soldNode2 != tile1->soldiers.end()) {
 						sold2 = (*soldNode2);
 						EvaluateRange(sold1, sold2, soldiers, locks);
@@ -644,7 +644,7 @@ void CollisionResolution(Map* map, std::vector<Unit*>* units, std::vector<Soldie
 					}
 					//gridpiece* neighbour;
 					//auto neighbour = tile1->neighbours.begin();
-					for(auto neighbour_list: tile1->neighbours2) {
+					for(auto neighbour_list: tile1->neighbours) {
 						for(auto tile2: neighbour_list) {
 							soldNode2 = tile2->soldiers.begin();
 							while(soldNode2 != tile2->soldiers.end()) {

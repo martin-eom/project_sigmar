@@ -395,17 +395,17 @@ void Map::writeNeighbourFile(std::string filename) {
 			for(int ncol = 0; ncol < grids.at(ngrid)->ncols; ncol++) {
 				auto tile = grids.at(ngrid)->grid.at(nrow).at(ncol);
 				for(int ngrid2 = 0; ngrid2 < grids.size(); ngrid2++) {
-					int nneighbours = tile->neighbours2.at(ngrid2).size();
+					int nneighbours = tile->neighbours.at(ngrid2).size();
 					out << nneighbours << "\n";
 					for(int nn = 0; nn < nneighbours; nn++) {
-						out << tile->neighbours2.at(ngrid2).at(nn)->nrow * grids.at(ngrid2)->ncols 
-							+ tile->neighbours2.at(ngrid2).at(nn)->ncol << "\n";
+						out << tile->neighbours.at(ngrid2).at(nn)->nrow * grids.at(ngrid2)->ncols 
+							+ tile->neighbours.at(ngrid2).at(nn)->ncol << "\n";
 					}
-					int nRedNeighbours = tile->redundantNeighbours2.at(ngrid2).size();
+					int nRedNeighbours = tile->redundantNeighbours.at(ngrid2).size();
 					out << nRedNeighbours << "\n";
 					for(int nrn = 0; nrn < nRedNeighbours; nrn++) {
-						out << tile->redundantNeighbours2.at(ngrid2).at(nrn)->nrow * grids.at(ngrid2)->nrows
-							+ tile->redundantNeighbours2.at(ngrid2).at(nrn)->ncol << "\n";
+						out << tile->redundantNeighbours.at(ngrid2).at(nrn)->nrow * grids.at(ngrid2)->nrows
+							+ tile->redundantNeighbours.at(ngrid2).at(nrn)->ncol << "\n";
 					}
 				}
 			}
@@ -438,7 +438,7 @@ void Map::readNeighbourFile(std::string filename) {
 						nrow2 = val / grids.at(ngrid2)->ncols;
 						ncol2 = val % grids.at(ngrid2)->ncols;
 						//std::cout << "n: nrow2 = " << nrow2 << ", ncol2 = " << ncol2 << "\n";
-						tile->neighbours2.at(ngrid2).push_back(grids.at(ngrid2)->grid.at(nrow2).at(ncol2));
+						tile->neighbours.at(ngrid2).push_back(grids.at(ngrid2)->grid.at(nrow2).at(ncol2));
 					}
 					std::getline(in, line);
 					nentries = atoi(line.c_str());
@@ -450,7 +450,7 @@ void Map::readNeighbourFile(std::string filename) {
 						nrow2 = val / grids.at(ngrid2)->ncols;
 						ncol2 = val % grids.at(ngrid2)->ncols;
 						//std::cout << "rn: nrow2 = " << nrow2 << ", ncol2 = " << ncol2 << "\n";
-						tile->redundantNeighbours2.at(ngrid2).push_back(grids.at(ngrid2)->grid.at(nrow2).at(ncol2));
+						tile->redundantNeighbours.at(ngrid2).push_back(grids.at(ngrid2)->grid.at(nrow2).at(ncol2));
 					}
 				}
 			}

@@ -70,10 +70,10 @@ public:
 	std::vector<Soldier*> p2Soldiers;
 	std::vector<MapObject*> mapObjects;
 	std::vector<Projectile*> projectiles;
-	std::vector<gridpiece*> neighbours;
-	std::vector<gridpiece*> redundantNeighbours;
-	std::vector<std::vector<gridpiece*>> neighbours2;
-	std::vector<std::vector<gridpiece*>> redundantNeighbours2;
+	//std::vector<gridpiece*> neighbours;
+	//std::vector<gridpiece*> redundantNeighbours;
+	std::vector<std::vector<gridpiece*>> neighbours;
+	std::vector<std::vector<gridpiece*>> redundantNeighbours;
 	Rrectangle* rec;
 	int nrow;
 	int ncol;
@@ -105,10 +105,10 @@ public:
 	std::vector<std::vector<int>> wp_path_next;
 		
 	void Cleangrid();
-	void Assign(Soldier* soldier, int i, int j);
-	void Assign2(Soldier* soldier, int i, int j, grid_container* grid);
-	void ProjectileAssign(Projectile* projectile, int i, int j);
-	void ProjectileAssign2(Projectile* projectile, int i, int j, grid_container* grid);
+	//void Assign(Soldier* soldier, int i, int j);
+	void Assign(Soldier* soldier, int i, int j, grid_container* grid);
+	//void ProjectileAssign(Projectile* projectile, int i, int j);
+	void ProjectileAssign(Projectile* projectile, int i, int j, grid_container* grid);
 	void AddMapObject(MapObject* obj, bool update = false);
 	void UpdateGridsWithMapObjects();
 	void RemoveMapObject(MapObject* obj);
@@ -126,9 +126,9 @@ public:
 private:
 	//void initGridPieces();
 	//void setNeighbours();
-	void setNeighbours2(grid_container* grid, int n_grid);
+	void setNeighbours(grid_container* grid, int n_grid);
 	//void setRedundantNeighbours();
-	void setRedundantNeighbours2(grid_container* grid, int n_grid);
+	void setRedundantNeighbours(grid_container* grid, int n_grid);
 	void createBorders();
 	void init();
 		
@@ -188,8 +188,8 @@ void Map::initGrids(std::vector<int> tilesizes) {
 				rot << 1., 0., 0., 1.;
 				container->grid.at(i).at(j)->rec = new Rrectangle(size / 2., size / 2., center, rot);
 				for(auto size: tilesizes) {
-					container->grid.at(i).at(j)->neighbours2.push_back(std::vector<gridpiece*>());
-					container->grid.at(i).at(j)->redundantNeighbours2.push_back(std::vector<gridpiece*>());
+					container->grid.at(i).at(j)->neighbours.push_back(std::vector<gridpiece*>());
+					container->grid.at(i).at(j)->redundantNeighbours.push_back(std::vector<gridpiece*>());
 				}
 			}
 		}
@@ -220,20 +220,20 @@ grid_container* Map::getGrid(int tilesize) {
 	}
 }*/
 
-void Map::setNeighbours2(grid_container* grid, int n_grid) {
+void Map::setNeighbours(grid_container* grid, int n_grid) {
 	for(int i = 0; i < grid->nrows - 1; i++) {
 		for(int j = 0; j < grid->ncols - 1; j++) {
-			grid->grid.at(i).at(j)->neighbours2[n_grid].push_back(grid->grid.at(i+1).at(j));
-			grid->grid.at(i).at(j)->neighbours2[n_grid].push_back(grid->grid.at(i).at(j+1));
-			grid->grid.at(i).at(j)->neighbours2[n_grid].push_back(grid->grid.at(i+1).at(j+1));
+			grid->grid.at(i).at(j)->neighbours[n_grid].push_back(grid->grid.at(i+1).at(j));
+			grid->grid.at(i).at(j)->neighbours[n_grid].push_back(grid->grid.at(i).at(j+1));
+			grid->grid.at(i).at(j)->neighbours[n_grid].push_back(grid->grid.at(i+1).at(j+1));
 			if(i == 0) {
-				grid->grid.at(grid->nrows-1).at(j)->neighbours2[n_grid].push_back(grid->grid.at(grid->nrows-1).at(j+1));
+				grid->grid.at(grid->nrows-1).at(j)->neighbours[n_grid].push_back(grid->grid.at(grid->nrows-1).at(j+1));
 			}
 			if(j > 0) {
-				grid->grid.at(i).at(j)->neighbours2[n_grid].push_back(grid->grid.at(i+1).at(j-1));
+				grid->grid.at(i).at(j)->neighbours[n_grid].push_back(grid->grid.at(i+1).at(j-1));
 			}
 		}
-		grid->grid.at(i).at(grid->ncols-1)->neighbours2[n_grid].push_back(grid->grid.at(i+1).at(grid->ncols-1));
+		grid->grid.at(i).at(grid->ncols-1)->neighbours[n_grid].push_back(grid->grid.at(i+1).at(grid->ncols-1));
 	}	
 }
 
@@ -254,19 +254,19 @@ void Map::setNeighbours2(grid_container* grid, int n_grid) {
 	}
 }*/
 
-void Map::setRedundantNeighbours2(grid_container* grid, int n_grid) {
+void Map::setRedundantNeighbours(grid_container* grid, int n_grid) {
 	for(int i = 1; i < grid->nrows; i++) {
 		for(int j = 1; j < grid->ncols; j++) {
 			if(i+1 < grid->nrows && j-1 > 0)
-				grid->grid.at(i).at(j)->redundantNeighbours2[n_grid].push_back(grid->grid.at(i+1).at(j-1));
+				grid->grid.at(i).at(j)->redundantNeighbours[n_grid].push_back(grid->grid.at(i+1).at(j-1));
 			//if(j-1 > 0)
 			//	grid->grid.at(i).at(j)->redundantNeighbours2[n_grid].push_back(grid->grid.at(i).at(j-1));
 			if(i-1 > 0 && j-1 > 0)
-				grid->grid.at(i).at(j)->redundantNeighbours2[n_grid].push_back(grid->grid.at(i-1).at(j-1));
+				grid->grid.at(i).at(j)->redundantNeighbours[n_grid].push_back(grid->grid.at(i-1).at(j-1));
 			if(i-1 > 0)
-				grid->grid.at(i).at(j)->redundantNeighbours2[n_grid].push_back(grid->grid.at(i-1).at(j));
+				grid->grid.at(i).at(j)->redundantNeighbours[n_grid].push_back(grid->grid.at(i-1).at(j));
 			if(i-1 > 0 && j+1 < grid->ncols)
-				grid->grid.at(i).at(j)->redundantNeighbours2[n_grid].push_back(grid->grid.at(i-1).at(j+1));
+				grid->grid.at(i).at(j)->redundantNeighbours[n_grid].push_back(grid->grid.at(i-1).at(j+1));
 		}
 	}
 }
@@ -279,8 +279,8 @@ void Map::setAllNeighbours() {
 		for(it2 = it; it2 < grids.end(); it2++) {
 			std::cout << "grid sizes: " << (*it)->tilesize << " " << (*it2)->tilesize << "\n";
 			if(it == it2) {
-				setNeighbours2(*it, it - grids.begin());
-				setRedundantNeighbours2(*it, it - grids.begin());
+				setNeighbours(*it, it - grids.begin());
+				setRedundantNeighbours(*it, it - grids.begin());
 			}
 			else {
 				double hw = ((*it2)->tilesize + 2*(*it)->tilesize) * 0.5;
@@ -326,8 +326,8 @@ void Map::setAllNeighbours() {
 								gridpiece* largerTile = (*it2)->grid.at(m).at(n);
 								if((tile->rec->pos - largerTile->rec->pos).norm() <= exclusion_dist) {
 									if(RectangleRectangleCollision(&collisionBox, largerTile->rec)) {
-										tile->neighbours2.at(it2 - grids.begin()).push_back(largerTile);
-										largerTile->redundantNeighbours2.at(it - grids.begin()).push_back(tile);
+										tile->neighbours.at(it2 - grids.begin()).push_back(largerTile);
+										largerTile->redundantNeighbours.at(it - grids.begin()).push_back(tile);
 									}
 								}
 							}
@@ -412,9 +412,9 @@ void Map::Cleangrid() {
 	//	grid->at(i).at(j)->p2Soldiers.push_back(soldier);
 }*/
 
-void Map::Assign2(Soldier* soldier, int i, int j, grid_container* grid) {
+void Map::Assign(Soldier* soldier, int i, int j, grid_container* grid) {
 	grid->grid.at(i).at(j)->soldiers.push_back(soldier);
-	soldier->tile_index2 = grid->grid.at(i).at(j)->soldiers.size() - 1;
+	soldier->tile_index = grid->grid.at(i).at(j)->soldiers.size() - 1;
 	if(soldier->unit->player->player1)
 		grid->grid.at(i).at(j)->p1Soldiers.push_back(soldier);
 	else
@@ -427,7 +427,7 @@ void Map::Assign2(Soldier* soldier, int i, int j, grid_container* grid) {
 	//grid->at(i).at(j)->projectiles.push_back(projectile);
 }*/
 
-void Map::ProjectileAssign2(Projectile* projectile, int i, int j, grid_container* grid) {
+void Map::ProjectileAssign(Projectile* projectile, int i, int j, grid_container* grid) {
 	grid->grid.at(i).at(j)->projectiles.push_back(projectile);
 }
 
