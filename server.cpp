@@ -107,7 +107,8 @@ int main(int argc, char* argv[1]) {
 	freopen("CONOUT$", "w", stdout);
 	freopen("CONOUT$", "w", stderr);
 
-	omp_set_num_threads(std::max(1, omp_get_max_threads() - 1));
+	//omp_set_num_threads(std::max(1, omp_get_max_threads() - 1));
+	//omp_set_num_threads(8);
 	// Initializing SDL
 	if(SDL_Init(SDL_INIT_EVERYTHING) != 0) {
 		std::cout << "Failed to initialize SDL!\n";

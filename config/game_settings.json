@@ -24,5 +24,9 @@
 	"anti_large_attack_bonus": 0.15,
 	"anti_large_damage_bonus": 0.3,
 	"anti_infantry_attack_bonus": 0.15,
-	"anti_infantry_damage_bonus": 0.3
+	"anti_infantry_damage_bonus": 0.3,
+	"auto_generate_map_grids": false,
+	"map_grids": [16,32],
+	"set_custom_omp_num_threads": true,
+	"custom_omp_num_threads": 8
 }

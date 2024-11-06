@@ -77,7 +77,7 @@ void EventManager::Post(Event* ev) {
 		auto start = std::chrono::system_clock::now();
 		listener->Notify(ev);
 		auto end = std::chrono::system_clock::now();
-		times.at(std::distance(listeners.begin(), std::find(listeners.begin(), listeners.end(), listener))) += std::chrono::duration<double>(end - start).count();		
+			times.at(std::distance(listeners.begin(), std::find(listeners.begin(), listeners.end(), listener))) += std::chrono::duration<double>(end - start).count();		
 
 		if(showTimes) {
 			std::cout << "######### EM TIMING ###########\n";

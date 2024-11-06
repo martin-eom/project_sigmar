@@ -172,7 +172,24 @@ class Model : public Listener{
 						if(unit->placed) {
 							// deleting all future orders as well as the current one
 							debug("Beginning order deletion");
+							if(unit->orders.at(unit->currentOrder)->type == ORDER_ATTACK) {
+								for(auto row: unit->soldiers) {
+									for(auto soldier: row) {
+										if(soldier->currentOrder == unit->currentOrder) {
+											soldier->charging = true;
+											soldier->chargeTimer.reset();
+										}
+									}
+								}
+								unit->enemyContact = false;
+							}
 							while(unit->orders.size() > unit->currentOrder) unit->orders.pop_back();
+							//unit->enemyContact = false;
+							/*for(auto row: unit->soldiers) {
+								for(auto soldier: row) {
+									soldier->charging = true;
+								}
+							}*/
 							debug("Finished order deletion");
 							// setting a new current order to the current unit position as starting point for the pathfinding calculation
 							if(!oev->orders.empty() && oev->orders.at(0)->type == ORDER_ATTACK)
@@ -310,6 +327,7 @@ class Model : public Listener{
 				}
 			}
 			else if (ev->type == TICK_EVENT) {
+				//std::cout << omp_get_num_threads() << "\n";
 				if(state != MODEL_GAME_PAUSED)
 					nticks++;
 				auto global_start = std::chrono::system_clock::now();
@@ -322,7 +340,7 @@ class Model : public Listener{
 						int sumLife2 = 0;
 						for(auto unit : player1->units) sumLife1 += unit->nLiveSoldiers;
 						for(auto unit : player2->units) sumLife2 += unit->nLiveSoldiers;
-						std::cout << sumLife1 << " " << sumLife2 << "\n";
+						//std::cout << sumLife1 << " " << sumLife2 << "\n";
 						if(sumLife1 == 0 || sumLife2 == 0) {
 							state = MODEL_GAME_OVER;
 							if(sumLife1 == 0) {
@@ -406,6 +424,18 @@ class Model : public Listener{
 						time_projectile_collision_scrying += std::chrono::duration<double>(end - start).count();
 					start = std::chrono::system_clock::now();
 					ProjectileCollisionHandling(map);
+					/*std::cout << ":: ";
+					for(auto grid: map->grids) {
+						for(auto row: grid->grid) {
+							for(auto tile: row) {
+								if(tile->soldiers.size()>0)
+									std::cout << "|" << tile->soldiers.size() << " ";
+								if(tile->projectiles.size()>0)
+									std::cout << "-" << tile->projectiles.size() << " ";
+							}
+						}
+					}
+					std::cout << "\n-----------------------------------------------------------\n";*/
 
 					end = std::chrono::system_clock::now();
 					if(state != MODEL_GAME_PAUSED)
@@ -584,7 +614,7 @@ class Model : public Listener{
 						for(auto unit : player->units) {
 							if(unit->placed && unit->ranged) {
 								if(unit->rangedTargetUpdateTimer.decrement()) {
-									std::cout << "?checking for new unit target\n";
+									//std::cout << "?checking for new unit target\n";
 									unit->rangedTarget = NULL;	// may be bad flag
 									Order* current = unit->orders.at(unit->currentOrder);
 									// need to detect line of sight issues for unit targets
@@ -861,7 +891,7 @@ class Model : public Listener{
 														}
 														// create projectile spawn event
 														if(canFire) {
-															ProjectileSpawnEvent pev = SpawnProjectile(soldier->tag, soldier->pos, vel, static_cast<int>(t/em->dt), em->dt, soldier->rangedDamage, soldier->rangedArmorPiercing, soldier->projectileAOE);
+															ProjectileSpawnEvent pev = SpawnProjectile(soldier->tag, soldier->pos, vel, static_cast<int>(t/em->dt), em->dt, soldier->rangedDamage, soldier->rangedArmorPiercing, soldier->projectileAOE, soldier->projectileTilesize);
 															em->Post(&pev);
 															soldier->ReloadTimer.reset();
 														}
@@ -943,6 +973,7 @@ class Model : public Listener{
 							projectile->advance();
 						}
 					}
+
 					//cleanup
 					map->Cleangrid();	// do it later and use it for target detection? yes
 					debug("TickEvent: map - end");
@@ -955,7 +986,8 @@ class Model : public Listener{
 				if(state == MODEL_GAME_OVER && !displayedTime) {
 					std::cout << "####### MODEL TIMING ##############\n";
 					std::cout << "total time:              " << time_total << "\n";
-					std::cout << "expected time:           " << (nticks - 3600.) / 30. << "\n";
+					//std::cout << "expected time:           " << (nticks - 3600.) / 30. << "\n";
+					std::cout << "expected time:           " << (nticks/1.) / 30. << "\n";
 					std::cout << "placing units:           " << time_placing_units << "\n";
 					std::cout << "collision scrying:       " << time_collision_scrying << "\n";
 					std::cout << "collision resolution:    " << time_collision_resolution << "\n";
@@ -993,6 +1025,80 @@ void Model::init() {
 	loadUnitTypes("config/templates/units.json");
 	//loadDamageInfo();
 	loadSettings("config/game_settings.json");
+	if(settings.auto_generate_map_grids) {
+		settings.map_grids.clear();
+		for(auto it: SoldierTypes) {
+			auto info = it.second;
+			int size = std::max(int(std::ceil(info.radius * 2)), 5);
+			if(std::find(settings.map_grids.begin(), settings.map_grids.end(), size) == settings.map_grids.end())
+				settings.map_grids.push_back(size);
+		}
+		for(auto it: SoldierTypes) {
+			auto info = it.second;
+			if(info.ranged_ranged) {
+				int size = std::max(int(std::ceil(info.ranged_aoe * 2)), *std::min_element(settings.map_grids.begin(), settings.map_grids.end()));
+				if(std::find(settings.map_grids.begin(), settings.map_grids.end(), size) == settings.map_grids.end())
+					settings.map_grids.push_back(size);
+			}
+		}
+	}
+	std::sort(settings.map_grids.begin(), settings.map_grids.end());
+	if(settings.map_grids.empty())
+		settings.map_grids.push_back(map->optimalTileSize);
+	for(auto it: SoldierTypes) {
+		auto key = it.first;
+		//auto info = &(it.second);
+		SoldierTypes[key].tilesize = settings.map_grids.at(0);
+		for(int size: settings.map_grids) {
+			if(size >= SoldierTypes[key].tilesize) {
+				SoldierTypes[key].tilesize = size;
+				if(size >= std::ceil(SoldierTypes[key].radius * 2))
+					break;
+			}
+		}
+		std::cout << SoldierTypes[key].tag << " " << SoldierTypes[key].tilesize << "\n";
+		SoldierTypes[key].projectile_tilesize = settings.map_grids.at(0);
+		for(int size: settings.map_grids) {
+			if(size >= SoldierTypes[key].projectile_tilesize) {
+				SoldierTypes[key].projectile_tilesize = size;
+				if(size >= std::ceil(SoldierTypes[key].ranged_aoe * 2))
+					break;
+			}
+		}
+	}
+	std::cout << "map grid sizes:\n";
+	for(auto entry: settings.map_grids) {
+		std::cout << entry << " ";
+	}
+	std::cout << "\n--------------\n";
+	map->initGrids(settings.map_grids);
+	std::cout << "map grid sizes:\n";
+	for(auto container: map->grids) {
+		std::cout << container->tilesize << " " << container->grid.size() << " " << container->grid.at(0).size() << "\n";
+	}
+	std::cout << "\n--------------\n";
+	map->UpdateGridsWithMapObjects();
+	std::string neighbourFileString = map->neighbourFileStr();
+	if(map->searchNeighbourFile(neighbourFileString)) {
+		std::cout << "Found neighbour-mapping file for this configuration of map size and grid sizes.\n";
+		std::cout << "Reading neighbour map from " << neighbourFileString << "\n";
+		map->readNeighbourFile(neighbourFileString);
+		std::cout << "Done.\n";
+	}
+	else {
+		std::cout << "No neighbour-mapping file found for this configuration of map size and grid sizes.\n";
+		std::cout << "Creating neighbour map...\n";
+		map->setAllNeighbours();
+		std::cout << "Writing neighbour map to file " << neighbourFileString << "\n";
+		map->writeNeighbourFile(neighbourFileString);
+		std::cout << "Done.\n";
+		//map->readNeighbourFile(neighbourFileString);
+	}
+	if(settings.set_custom_omp_num_threads)
+		omp_set_num_threads(std::min(settings.custom_omp_num_threads, omp_get_max_threads() - 1));
+	else
+		omp_set_num_threads(std::max(1, omp_get_max_threads() - 1));
+
 }
 
 

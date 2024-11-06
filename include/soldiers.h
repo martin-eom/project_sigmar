@@ -97,6 +97,8 @@ class Soldier : public Circle{
 		bool shielded = false;
 
 		// computed members
+		int tilesize;
+		int projectileTilesize;
 		double linearDamp;	//coefficient for linear dampening (with regard to velocity)
 		double squareDamp;	//coefficient for square dampening
 		double Force, damp, defaultDamp;
@@ -108,9 +110,12 @@ class Soldier : public Circle{
 		Eigen::Vector2d posTarget;
 		Eigen::Vector2d oldPosTarget;
 		int map_row;
+		int map_row2;
 		int map_column;
+		int map_column2;
 		int model_index;
 		int tile_index;
+		int tile_index2;
 		Eigen::Vector2d vel;
 		double speed;
 		double forwardSpeed;
@@ -176,6 +181,8 @@ class Soldier : public Circle{
 		Soldier(SoldierInformation info, Unit* unit) : Soldier(){
 			tag = info.tag;
 			rad = info.radius;
+			tilesize = info.tilesize;
+			projectileTilesize = info.projectile_tilesize;
 			mass = info.mass;
 			defaultMaxSpeed = info.max_speed;
 			maxSpeed = defaultMaxSpeed;

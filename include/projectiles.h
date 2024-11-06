@@ -25,6 +25,7 @@ class Projectile : public Point{
 	double dt;
 
 public:
+	int tilesize;
 	double angle;
 	std::string soldierType;
 	bool dead;
@@ -53,7 +54,7 @@ public:
 		return percentage;
 	}
 
-	Projectile(std::string soldierType, Eigen::Vector2d start, Eigen::Vector2d vel, int lifetime, double dt, double damage, int armorPiercing, double aoerad) : Point(start) {
+	Projectile(std::string soldierType, Eigen::Vector2d start, Eigen::Vector2d vel, int lifetime, double dt, double damage, int armorPiercing, double aoerad, int tilesize) : Point(start) {
 		this->soldierType = soldierType;
 		//pos = start;
 		this->vel = vel;
@@ -67,11 +68,12 @@ public:
 		this->damage = damage;
 		this->armorPiercing = armorPiercing;
 		this->aoerad = aoerad;
+		this->tilesize = tilesize;
 	}
 };
 
 
-ProjectileSpawnEvent SpawnProjectile(std::string soldierType, Eigen::Vector2d pos, Eigen::Vector2d vel, int lifetime, double dt, int damage, int armorPiercing, double aoerad) {
+ProjectileSpawnEvent SpawnProjectile(std::string soldierType, Eigen::Vector2d pos, Eigen::Vector2d vel, int lifetime, double dt, int damage, int armorPiercing, double aoerad, int tilesize) {
 	Projectile* p;
 	/*switch(type) {
 	case PROJECTILE_ARROW:
@@ -86,7 +88,7 @@ ProjectileSpawnEvent SpawnProjectile(std::string soldierType, Eigen::Vector2d po
 	default:
 		p = new Arrow(pos, vel, lifetime, dt);
 	}*/
-	p = new Projectile(soldierType, pos, vel, lifetime, dt, damage, armorPiercing, aoerad);
+	p = new Projectile(soldierType, pos, vel, lifetime, dt, damage, armorPiercing, aoerad, tilesize);
 	return ProjectileSpawnEvent(p);
 }
 

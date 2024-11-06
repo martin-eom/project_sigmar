@@ -27,7 +27,7 @@ json MapToJson(Map* map) {
 	json j;
 	j["width"] = map->width;
 	j["height"] = map->height;
-	j["tilesize"] = map->tilesize;
+	//j["tilesize"] = map->optimalTileSize;
 	getMapObjects(&j, map);
 	getPathInfo(&j, map);
 	return j;
@@ -40,7 +40,7 @@ Map::Map(std::string filename) {
 	json j = fromFile(filename);
 	width = j["width"];
 	height = j["height"];
-	tilesize = j["tilesize"];
+	//optimalTileSize = j["tilesize"];
 	init();
 	readMapObjectsFromJSON(&j, this);
 	readPathInfoFromJSON(&j, this);
@@ -297,6 +297,11 @@ SettingsInformation::SettingsInformation(json input) {
 	anti_large_damage_bonus = input["anti_large_damage_bonus"];
 	anti_infantry_attack_bonus = input["anti_infantry_attack_bonus"];
 	anti_infantry_damage_bonus = input["anti_infantry_damage_bonus"];
+	auto_generate_map_grids = input["auto_generate_map_grids"];
+	for(auto size: input["map_grids"])
+		map_grids.push_back(size);
+	set_custom_omp_num_threads = input["set_custom_omp_num_threads"];
+	custom_omp_num_threads = input["custom_omp_num_threads"];
 }
 
 MapEditorSettingsInformation::MapEditorSettingsInformation(json input) {
@@ -343,9 +348,9 @@ void Model::loadArmyLists(std::string filename) {
 	}
 	std::sort(units.begin(), units.end(), UnitSorter());
 	std::reverse(units.begin(), units.end());
-	for(auto unit : units) {
+	/*for(auto unit : units) {
 		std::cout << unit->nLiveSoldiers << "\n";
-	}
+	}*/
 }
 
 void Model::loadDamageInfo() {
@@ -364,6 +369,94 @@ void Model::loadSettings(std::string filename) {
 void MapEditorModel::loadSettings(std::string filename) {
 	json input = fromFile(filename);
 	settings = MapEditorSettingsInformation(input);
+}
+
+std::string Map::neighbourFileStr() {
+	std::string filename = "temp/";
+	filename += std::to_string(width) + "_" + std::to_string(height) + "-";
+	if(grids.size() > 0) {
+		filename += std::to_string(grids.at(0)->tilesize);
+		for(int n_grid = 1; n_grid < grids.size(); n_grid++) {
+			filename += "_" + std::to_string(grids.at(n_grid)->tilesize);
+		}
+	}
+	filename += ".nm";
+	return filename;
+}
+
+bool Map::searchNeighbourFile(std::string filename) {
+	return std::filesystem::exists(filename);
+}
+
+void Map::writeNeighbourFile(std::string filename) {
+	std::ofstream out(filename);
+	for(int ngrid = 0; ngrid < grids.size(); ngrid++) {
+		for(int nrow = 0; nrow < grids.at(ngrid)->nrows; nrow++) {
+			for(int ncol = 0; ncol < grids.at(ngrid)->ncols; ncol++) {
+				auto tile = grids.at(ngrid)->grid.at(nrow).at(ncol);
+				for(int ngrid2 = 0; ngrid2 < grids.size(); ngrid2++) {
+					int nneighbours = tile->neighbours2.at(ngrid2).size();
+					out << nneighbours << "\n";
+					for(int nn = 0; nn < nneighbours; nn++) {
+						out << tile->neighbours2.at(ngrid2).at(nn)->nrow * grids.at(ngrid2)->ncols 
+							+ tile->neighbours2.at(ngrid2).at(nn)->ncol << "\n";
+					}
+					int nRedNeighbours = tile->redundantNeighbours2.at(ngrid2).size();
+					out << nRedNeighbours << "\n";
+					for(int nrn = 0; nrn < nRedNeighbours; nrn++) {
+						out << tile->redundantNeighbours2.at(ngrid2).at(nrn)->nrow * grids.at(ngrid2)->nrows
+							+ tile->redundantNeighbours2.at(ngrid2).at(nrn)->ncol << "\n";
+					}
+				}
+			}
+		}
+	}
+	out.close();
+}
+
+void Map::readNeighbourFile(std::string filename) {
+	std::string line;
+	int nentries, val;
+	std::ifstream in(filename);
+	for(int ngrid = 0; ngrid < grids.size(); ngrid++) {
+		//std::cout << "ngrid = " << ngrid << "\n";
+		for(int nrow = 0; nrow < grids.at(ngrid)->nrows; nrow++) {
+			//std::cout << "nrow = " << nrow << "\n";
+			for(int ncol = 0; ncol < grids.at(ngrid)->ncols; ncol++) {
+				//std::cout << "ncol = " << ncol << "\n";
+				auto tile = grids.at(ngrid)->grid.at(nrow).at(ncol);
+				for(int ngrid2 = 0; ngrid2 < grids.size(); ngrid2++) {
+					//std::cout << "ngrid2 = " << ngrid2 << "\n";
+					std::getline(in, line);
+					nentries = atoi(line.c_str());
+					//std::cout << "n: nentries = " << nentries << "\n";
+					int nrow2, ncol2;
+					for(int nentry = 0; nentry < nentries; nentry++) {
+						std::getline(in, line);
+						val = atoi(line.c_str());
+						//std::cout << "n: val = " << val << "\n";
+						nrow2 = val / grids.at(ngrid2)->ncols;
+						ncol2 = val % grids.at(ngrid2)->ncols;
+						//std::cout << "n: nrow2 = " << nrow2 << ", ncol2 = " << ncol2 << "\n";
+						tile->neighbours2.at(ngrid2).push_back(grids.at(ngrid2)->grid.at(nrow2).at(ncol2));
+					}
+					std::getline(in, line);
+					nentries = atoi(line.c_str());
+					//std::cout << "rn: nentries = " << nentries << "\n";
+					for(int nentry = 0; nentry < nentries; nentry++) {
+						std::getline(in, line);
+						val = atoi(line.c_str());
+						//std::cout << "rn: val = " << val << "\n";
+						nrow2 = val / grids.at(ngrid2)->ncols;
+						ncol2 = val % grids.at(ngrid2)->ncols;
+						//std::cout << "rn: nrow2 = " << nrow2 << ", ncol2 = " << ncol2 << "\n";
+						tile->redundantNeighbours2.at(ngrid2).push_back(grids.at(ngrid2)->grid.at(nrow2).at(ncol2));
+					}
+				}
+			}
+		}
+	}
+	in.close();
 }
 
 #endif

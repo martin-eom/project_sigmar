@@ -35,6 +35,7 @@ public:
 	// #### GENERAL STATS
 	std::string tag;
 	double radius;
+	int tilesize;
 	double mass;
 	double max_speed;
 	double acceleration;
@@ -66,6 +67,7 @@ public:
 	int ranged_armor_piercing;
 	double ranged_ally_protection_aoe;
 	double ranged_aoe;
+	int projectile_tilesize;
 	int ranged_damage;
 	// #### KEYWORDS
 	bool kw_infantry;
@@ -79,6 +81,7 @@ public:
 	AnimationInformation anime_body_information;
 	AnimationInformation anime_projectile_information;
 
+	SoldierInformation(){}
 	SoldierInformation(json input);
 };
 
@@ -120,6 +123,10 @@ public:
 	double anti_large_damage_bonus;
 	double anti_infantry_attack_bonus;
 	double anti_infantry_damage_bonus;
+	bool auto_generate_map_grids;
+	std::vector<int> map_grids;
+	bool set_custom_omp_num_threads;
+	int custom_omp_num_threads;
 
 	SettingsInformation() {}
 	SettingsInformation(json input);
