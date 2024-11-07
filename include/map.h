@@ -70,8 +70,6 @@ public:
 	std::vector<Soldier*> p2Soldiers;
 	std::vector<MapObject*> mapObjects;
 	std::vector<Projectile*> projectiles;
-	//std::vector<gridpiece*> neighbours;
-	//std::vector<gridpiece*> redundantNeighbours;
 	std::vector<std::vector<gridpiece*>> neighbours;
 	std::vector<std::vector<gridpiece*>> redundantNeighbours;
 	Rrectangle* rec;
@@ -90,12 +88,8 @@ public:
 class Map {
 public:
 	const static int optimalTileSize = 31;
-	//int tilesize;
 	int width;
 	int height;
-	//int nrows;
-	//int ncols;
-	//std::vector<std::vector<gridpiece*>> tiles;
 	std::vector<grid_container*> grids;
 	std::vector<MapObject*> mapObjects;
 	std::vector<MapWaypoint*> waypoints;
@@ -105,9 +99,7 @@ public:
 	std::vector<std::vector<int>> wp_path_next;
 		
 	void Cleangrid();
-	//void Assign(Soldier* soldier, int i, int j);
 	void Assign(Soldier* soldier, int i, int j, grid_container* grid);
-	//void ProjectileAssign(Projectile* projectile, int i, int j);
 	void ProjectileAssign(Projectile* projectile, int i, int j, grid_container* grid);
 	void AddMapObject(MapObject* obj, bool update = false);
 	void UpdateGridsWithMapObjects();
@@ -120,14 +112,10 @@ public:
 	void readNeighbourFile(std::string filename);
 	void writeNeighbourFile(std::string filename);
 	void setAllNeighbours();
-	//std::vector<std::vector<gridpiece*>>* getGrid(int tilesize);
 	grid_container* getGrid(int tilesize);
 
 private:
-	//void initGridPieces();
-	//void setNeighbours();
 	void setNeighbours(grid_container* grid, int n_grid);
-	//void setRedundantNeighbours();
 	void setRedundantNeighbours(grid_container* grid, int n_grid);
 	void createBorders();
 	void init();
@@ -136,7 +124,6 @@ public:
 	Map(int width, int height, int tilesize) {
 		this->width = width;
 		this->height = height;
-		//this->tilesize = tilesize;
 		init();
 	}
 
@@ -145,30 +132,9 @@ public:
 };
 
 void Map::init() {
-	//nrows = height / tilesize + bool(height % tilesize);
-	//ncols = width / tilesize + bool(width % tilesize);
-	//tiles = std::vector<std::vector<gridpiece*>>(nrows, std::vector<gridpiece*>(ncols, NULL));
-	//initGridPieces();
-	//setNeighbours();
-	//setRedundantNeighbours();
 	//creating map borders, but not adding them to objects yet
 	createBorders();
 }
-
-/*void Map::initGridPieces() {
-	for(int i = 0; i < nrows; i++) {
-		for(int j = 0; j < ncols; j++) {
-			tiles.at(i).at(j) = new gridpiece();
-			tiles.at(i).at(j)->nrow = i;
-			tiles.at(i).at(j)->ncol = j;
-			Eigen::Vector2d center;
-			center << tilesize/2. + j*tilesize, tilesize/2. + i*tilesize;
-			Eigen::Matrix2d rot;
-			rot << 1., 0., 0., 1.;
-			tiles.at(i).at(j)->rec = new Rrectangle(tilesize / 2., tilesize / 2., center, rot);		
-		}
-	}
-}*/
 
 void Map::initGrids(std::vector<int> tilesizes) {
 	for(int size: tilesizes) {
@@ -197,7 +163,6 @@ void Map::initGrids(std::vector<int> tilesizes) {
 	}
 }
 
-//std::vector<std::vector<gridpiece*>>* Map::getGrid(int tilesize) {
 grid_container* Map::getGrid(int tilesize) {
 	for(auto container: grids) {
 		if(tilesize == container->tilesize) {
@@ -205,20 +170,6 @@ grid_container* Map::getGrid(int tilesize) {
 		}
 	}
 }
-
-/*void Map::setNeighbours() {
-	for(int i = 0; i < nrows - 1; i++) {
-		for(int j = 0; j < ncols - 1; j++) {
-			tiles.at(i).at(j)->neighbours.push_back(tiles.at(i+1).at(j));
-			tiles.at(i).at(j)->neighbours.push_back(tiles.at(i).at(j+1));
-			tiles.at(i).at(j)->neighbours.push_back(tiles.at(i+1).at(j+1));
-			if(i == 0) {
-				tiles.at(nrows-1).at(j)->neighbours.push_back(tiles.at(nrows-1).at(j+1));
-			}
-		}
-		tiles.at(i).at(ncols-1)->neighbours.push_back(tiles.at(i+1).at(ncols-1));
-	}
-}*/
 
 void Map::setNeighbours(grid_container* grid, int n_grid) {
 	for(int i = 0; i < grid->nrows - 1; i++) {
@@ -236,23 +187,6 @@ void Map::setNeighbours(grid_container* grid, int n_grid) {
 		grid->grid.at(i).at(grid->ncols-1)->neighbours[n_grid].push_back(grid->grid.at(i+1).at(grid->ncols-1));
 	}	
 }
-
-/*void Map::setRedundantNeighbours() {
-	for(int i = 1; i < nrows; i++) {
-		for(int j = 1; j < ncols; j++) {
-			if(i+1 < nrows && j-1 > 0)
-				tiles.at(i).at(j)->redundantNeighbours.push_back(tiles.at(i+1).at(j-1));
-			if(j-1 > 0)
-				tiles.at(i).at(j)->redundantNeighbours.push_back(tiles.at(i).at(j-1));
-			if(i-1 > 0 && j-1 > 0)
-				tiles.at(i).at(j)->redundantNeighbours.push_back(tiles.at(i-1).at(j-1));
-			if(i-1 > 0)
-				tiles.at(i).at(j)->redundantNeighbours.push_back(tiles.at(i-1).at(j));
-			if(i-1 > 0 && j+1 < ncols)
-				tiles.at(i).at(j)->redundantNeighbours.push_back(tiles.at(i-1).at(j+1));
-		}
-	}
-}*/
 
 void Map::setRedundantNeighbours(grid_container* grid, int n_grid) {
 	for(int i = 1; i < grid->nrows; i++) {
@@ -332,17 +266,6 @@ void Map::setAllNeighbours() {
 								}
 							}
 						}
-						/*for(auto row2: (*it2)->grid) {
-							for(auto largerTile: row2) {
-								if((tile->rec->pos - largerTile->rec->pos).norm() < exclusion_dist) {
-									cntct++;
-									if(RectangleRectangleCollision(&collisionBox, largerTile->rec)) {
-										tile->neighbours2.at(it2 - grids.begin()).push_back(largerTile);
-										largerTile->redundantNeighbours2.at(it - grids.begin()).push_back(tile);
-									}
-								}
-							}
-						}*/
 					}
 				}
 			}
@@ -353,7 +276,6 @@ void Map::setAllNeighbours() {
 void Map::createBorders() {
 	double hw = 0.5*width;
 	double hl = 0.5*height;
-	//double ht = 0.5*tilesize;
 	double ht = 0.5*optimalTileSize;
 	Eigen::Vector2d pos;
 	Eigen::Matrix2d rot; rot << 1, 0, 0, 1;
@@ -368,23 +290,7 @@ void Map::createBorders() {
 }
 
 void Map::Cleangrid() {
-	/*for(int i = 0; i < nrows; i++) {
-		for(int j = 0; j < ncols; j++) {
-			tiles.at(i).at(j)->soldiers.clear();
-			tiles.at(i).at(j)->p1Soldiers.clear();
-			tiles.at(i).at(j)->p2Soldiers.clear();
-			tiles.at(i).at(j)->projectiles.clear();
-		}
-	}*/
 	for(auto grid: grids) {
-		/*for(int i = 0; i < grid->nrows; i++) {
-			for(int j = 0; j < grid->ncols; j++) {
-				grid->grid.at(i).at(j)->soldiers.clear();
-				grid->grid.at(i).at(j)->p1Soldiers.clear();
-				grid->grid.at(i).at(j)->p2Soldiers.clear();
-				grid->grid.at(i).at(j)->projectiles.clear();
-			}
-		}*/
 		for(auto row: grid->grid) {
 			for(auto tile: row) {
 				tile->soldiers.clear();
@@ -396,22 +302,6 @@ void Map::Cleangrid() {
 	}
 }
 
-/*void Map::Assign(Soldier* soldier, int i, int j) {
-	tiles.at(i).at(j)->soldiers.push_back(soldier);
-	soldier->tile_index = tiles.at(i).at(j)->soldiers.size() - 1;
-	if(soldier->unit->player->player1)
-		tiles.at(i).at(j)->p1Soldiers.push_back(soldier);
-	else
-		tiles.at(i).at(j)->p2Soldiers.push_back(soldier);
-	//std::vector<std::vector<gridpiece*>>* grid = &getGrid(soldier->tilesize)->grid;
-	//grid->at(i).at(j)->soldiers.push_back(soldier);
-	//soldier->tile_index2 = grid->at(i).at(j)->soldiers.size() - 1;
-	//if(soldier->unit->player->player1)
-	//	grid->at(i).at(j)->p1Soldiers.push_back(soldier);
-	//else
-	//	grid->at(i).at(j)->p2Soldiers.push_back(soldier);
-}*/
-
 void Map::Assign(Soldier* soldier, int i, int j, grid_container* grid) {
 	grid->grid.at(i).at(j)->soldiers.push_back(soldier);
 	soldier->tile_index = grid->grid.at(i).at(j)->soldiers.size() - 1;
@@ -421,12 +311,6 @@ void Map::Assign(Soldier* soldier, int i, int j, grid_container* grid) {
 		grid->grid.at(i).at(j)->p2Soldiers.push_back(soldier);
 }
 
-/*void Map::ProjectileAssign(Projectile* projectile, int i, int j) {
-	tiles.at(i).at(j)->projectiles.push_back(projectile);
-	//std::vector<std::vector<gridpiece*>>* grid = &getGrid(projectile->tilesize)->grid;
-	//grid->at(i).at(j)->projectiles.push_back(projectile);
-}*/
-
 void Map::ProjectileAssign(Projectile* projectile, int i, int j, grid_container* grid) {
 	grid->grid.at(i).at(j)->projectiles.push_back(projectile);
 }
@@ -435,13 +319,6 @@ void Map::AddMapObject(MapObject* obj, bool update) {
 	switch(obj->type) {
 	case MAP_CIRCLE: {
 		Circle* circ = dynamic_cast<Circle*>(obj);
-		/*for(auto row : tiles) {
-			for(auto tile : row) {
-				if(CircleRectangleCollision(&extended, tile->rec)) {
-					tile->mapObjects.push_back(obj);
-				}
-			}
-		}*/
 		for(auto grid: grids) {
 			Circle extended = Circle(circ->pos, circ->rad + 0.5*grid->tilesize);
 			for(auto row: grid->grid) {
@@ -456,14 +333,6 @@ void Map::AddMapObject(MapObject* obj, bool update) {
 	case MAP_BORDER:
 	case MAP_RECTANGLE: {
 		Rrectangle* rec = dynamic_cast<Rrectangle*>(obj);
-		//Rrectangle extended = Rrectangle(rec->hl + 0.5*tilesize, rec->hw + 0.5*tilesize, rec->pos, rec->rot);
-		/*for(auto row : tiles) {
-			for(auto tile : row) {
-				if(RectangleRectangleCollision(&extended, tile->rec)) {
-					tile->mapObjects.push_back(obj);
-				}
-			}
-		}*/
 		for(auto grid: grids) {
 			Rrectangle extended = Rrectangle(rec->hl + 0.5*grid->tilesize, rec->hw + 0.5*grid->tilesize, rec->pos, rec->rot);
 			for(auto row: grid->grid) {
@@ -499,11 +368,6 @@ void Map::RemoveMapObject(MapObject* obj) {
 	switch(obj->type) {
 	case MAP_CIRCLE:
 	case MAP_RECTANGLE:
-		/*for(auto row : tiles) {
-			for(auto tile : row) {
-				std::erase(tile->mapObjects, obj);
-			}
-		}*/
 		for(auto grid: grids) {
 			for(auto row: grid->grid) {
 				for(auto tile: row) {
@@ -534,11 +398,6 @@ void Map::toggelBorders() {
 		for(auto obj : reference) {
 			if(obj->type == MAP_BORDER) {
 				std::erase(mapObjects, obj);
-				/*for(auto row : tiles) {
-					for(auto tile : row) {
-						std::erase(tile->mapObjects, obj);
-					}
-				}*/
 				for(auto grid: grids) {
 					for(auto row: grid->grid) {
 						for(auto tile: row) {

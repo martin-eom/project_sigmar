@@ -27,7 +27,6 @@ json MapToJson(Map* map) {
 	json j;
 	j["width"] = map->width;
 	j["height"] = map->height;
-	//j["tilesize"] = map->optimalTileSize;
 	getMapObjects(&j, map);
 	getPathInfo(&j, map);
 	return j;
@@ -40,7 +39,6 @@ Map::Map(std::string filename) {
 	json j = fromFile(filename);
 	width = j["width"];
 	height = j["height"];
-	//optimalTileSize = j["tilesize"];
 	init();
 	readMapObjectsFromJSON(&j, this);
 	readPathInfoFromJSON(&j, this);
@@ -348,9 +346,6 @@ void Model::loadArmyLists(std::string filename) {
 	}
 	std::sort(units.begin(), units.end(), UnitSorter());
 	std::reverse(units.begin(), units.end());
-	/*for(auto unit : units) {
-		std::cout << unit->nLiveSoldiers << "\n";
-	}*/
 }
 
 void Model::loadDamageInfo() {
@@ -419,37 +414,27 @@ void Map::readNeighbourFile(std::string filename) {
 	int nentries, val;
 	std::ifstream in(filename);
 	for(int ngrid = 0; ngrid < grids.size(); ngrid++) {
-		//std::cout << "ngrid = " << ngrid << "\n";
 		for(int nrow = 0; nrow < grids.at(ngrid)->nrows; nrow++) {
-			//std::cout << "nrow = " << nrow << "\n";
 			for(int ncol = 0; ncol < grids.at(ngrid)->ncols; ncol++) {
-				//std::cout << "ncol = " << ncol << "\n";
 				auto tile = grids.at(ngrid)->grid.at(nrow).at(ncol);
 				for(int ngrid2 = 0; ngrid2 < grids.size(); ngrid2++) {
-					//std::cout << "ngrid2 = " << ngrid2 << "\n";
 					std::getline(in, line);
 					nentries = atoi(line.c_str());
-					//std::cout << "n: nentries = " << nentries << "\n";
 					int nrow2, ncol2;
 					for(int nentry = 0; nentry < nentries; nentry++) {
 						std::getline(in, line);
 						val = atoi(line.c_str());
-						//std::cout << "n: val = " << val << "\n";
 						nrow2 = val / grids.at(ngrid2)->ncols;
 						ncol2 = val % grids.at(ngrid2)->ncols;
-						//std::cout << "n: nrow2 = " << nrow2 << ", ncol2 = " << ncol2 << "\n";
 						tile->neighbours.at(ngrid2).push_back(grids.at(ngrid2)->grid.at(nrow2).at(ncol2));
 					}
 					std::getline(in, line);
 					nentries = atoi(line.c_str());
-					//std::cout << "rn: nentries = " << nentries << "\n";
 					for(int nentry = 0; nentry < nentries; nentry++) {
 						std::getline(in, line);
 						val = atoi(line.c_str());
-						//std::cout << "rn: val = " << val << "\n";
 						nrow2 = val / grids.at(ngrid2)->ncols;
 						ncol2 = val % grids.at(ngrid2)->ncols;
-						//std::cout << "rn: nrow2 = " << nrow2 << ", ncol2 = " << ncol2 << "\n";
 						tile->redundantNeighbours.at(ngrid2).push_back(grids.at(ngrid2)->grid.at(nrow2).at(ncol2));
 					}
 				}

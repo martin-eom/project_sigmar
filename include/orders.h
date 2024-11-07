@@ -61,7 +61,6 @@ class MoveOrder : public Order {
 
 class AttackOrder : public Order {
 public:
-	//Unit* unit;
 	bool enemyContact;
 	void SetPos();
 

@@ -50,7 +50,6 @@ void OrderPathfinding(Unit* unit, Map* map) {
 						if(unit->enemyContact)
 							movetype = MOVE_PASSINGTHROUGH;
 						newOrders.push_back(new MoveOrder(positions.at(k-1), Rot, movetype, true, true, mo->target));
-						//newOrders.push_back(new MoveOrder(positions.at(k-1), Rot, MOVE_PASSINGTHROUGH, true, true));
 						mo->rot = Rot;
 					}
 					else if(mo->type == ORDER_ATTACK)
@@ -59,7 +58,6 @@ void OrderPathfinding(Unit* unit, Map* map) {
 						newOrders.push_back(new MoveOrder(positions.at(k-1), Rot, MOVE_PASSINGTHROUGH, true, false));
 				}
 
-				//}
 			}
 			else if(mo->type == ORDER_ATTACK) {
 				Eigen::Vector2d diff = w1.pos - w2.pos;
@@ -119,8 +117,6 @@ class Model : public Listener{
 		std::vector<omp_lock_t*> unit_locks;
 		Map* map;
 		double* dt;
-		//Player* selectedPlayer;
-		//Unit* selectedUnit;
 		std::queue<DamageTick> damages;
 		std::vector<Projectile*> projectiles;
 		int state;
@@ -139,10 +135,8 @@ class Model : public Listener{
 		double time_ranged_target_finding = 0;
 		double time_melee_combat = 0;
 		double time_physics_step = 0;
-		//omp_lock_t time_lock_physics;
 		double time_hitscan = 0;
 		double time_indiv_pathing = 0;
-		//omp_lock_t time_lock_indiv;
 		bool displayedTime = false;
 
 		void loadSoldierTypes(std::string filename);
@@ -156,8 +150,6 @@ class Model : public Listener{
 			this->map = map;
 			dt = &(em->dt);
 			state = MODEL_SIMULATION;
-			//omp_init_lock(&time_lock_physics);
-			//omp_init_lock(&time_lock_indiv);
 		}
 	
 	private:
@@ -184,12 +176,6 @@ class Model : public Listener{
 								unit->enemyContact = false;
 							}
 							while(unit->orders.size() > unit->currentOrder) unit->orders.pop_back();
-							//unit->enemyContact = false;
-							/*for(auto row: unit->soldiers) {
-								for(auto soldier: row) {
-									soldier->charging = true;
-								}
-							}*/
 							debug("Finished order deletion");
 							// setting a new current order to the current unit position as starting point for the pathfinding calculation
 							if(!oev->orders.empty() && oev->orders.at(0)->type == ORDER_ATTACK)
@@ -274,7 +260,6 @@ class Model : public Listener{
 				UnitPlaceRequest* pev = dynamic_cast<UnitPlaceRequest*>(ev);
 				if(pev->unit) {
 					if(!(pev->unit->placed)) {
-						//Place(pev->unit, pev->pos, pev->rot);
 						pev->unit->Place(pev->pos, pev->rot);
 					}
 					else {
@@ -294,7 +279,6 @@ class Model : public Listener{
 						for(auto unit : player->units) {
 							if(unit->placed) {
 								ReformUnit(unit);
-								//MoveTarget(unit);
 								unit->MoveTarget();
 							}
 						}
@@ -309,7 +293,6 @@ class Model : public Listener{
 					Unit* unit = soldier->unit;
 					soldier->alive = false;
 					unit->nLiveSoldiers--;
-					//if(!soldier->arrived && soldier->currentOrder == 0)
 					if(soldier->currentOrder == 0)
 						unit->nSoldiersOnFirstOrder--;
 					if(soldier->arrived && soldier->currentOrder == unit->currentOrder)
@@ -327,7 +310,6 @@ class Model : public Listener{
 				}
 			}
 			else if (ev->type == TICK_EVENT) {
-				//std::cout << omp_get_num_threads() << "\n";
 				if(state != MODEL_GAME_PAUSED)
 					nticks++;
 				auto global_start = std::chrono::system_clock::now();
@@ -340,7 +322,6 @@ class Model : public Listener{
 						int sumLife2 = 0;
 						for(auto unit : player1->units) sumLife1 += unit->nLiveSoldiers;
 						for(auto unit : player2->units) sumLife2 += unit->nLiveSoldiers;
-						//std::cout << sumLife1 << " " << sumLife2 << "\n";
 						if(sumLife1 == 0 || sumLife2 == 0) {
 							state = MODEL_GAME_OVER;
 							if(sumLife1 == 0) {
@@ -424,18 +405,6 @@ class Model : public Listener{
 						time_projectile_collision_scrying += std::chrono::duration<double>(end - start).count();
 					start = std::chrono::system_clock::now();
 					ProjectileCollisionHandling(map);
-					/*std::cout << ":: ";
-					for(auto grid: map->grids) {
-						for(auto row: grid->grid) {
-							for(auto tile: row) {
-								if(tile->soldiers.size()>0)
-									std::cout << "|" << tile->soldiers.size() << " ";
-								if(tile->projectiles.size()>0)
-									std::cout << "-" << tile->projectiles.size() << " ";
-							}
-						}
-					}
-					std::cout << "\n-----------------------------------------------------------\n";*/
 
 					end = std::chrono::system_clock::now();
 					if(state != MODEL_GAME_PAUSED)
@@ -452,25 +421,19 @@ class Model : public Listener{
 							//moving unit target if combat has already started every so often to keep up with moving units
 							if(unit->enemyContact && unit->orders.at(unit->currentOrder)->type == ORDER_ATTACK) {
 								unit->targetUpdateTimer.decrement();
-								//unit->targetUpdateCounter--;
 								if(unit->targetUpdateTimer.done()) {
-								//if(!unit->targetUpdateCounter) {
 									unit->posTarget = unit->orders.at(unit->currentOrder)->target->pos;
-									//MoveTarget(unit);
 									unit->MoveTarget();
 									unit->targetUpdateTimer.reset();
-									//unit->targetUpdateCounter = 60;
 								}
 							}
 							//advancing order
 							if(unit->orders.size() > (unit->currentOrder +1) && unit->CurrentOrderCompleted()) {
 								bool transitionOrder = unit->orders.at(unit->currentOrder)->_transition;
-								//UnitNextOrder(unit);
 								unit->NextOrder();
 								Order* o = unit->orders.at(unit->currentOrder);
 								if(o->type == ORDER_MOVE || true) {
 									ReformUnit(unit);
-									//MoveTarget(unit);
 									unit->MoveTarget();
 								}
 								//telling other units that this one is moving on if they are targeting it
@@ -522,7 +485,6 @@ class Model : public Listener{
 												Eigen::Vector2d nextPos = no->pos + no->rot * unit->posInUnit.at(i).at(j);
 												Circle c2(nextPos, soldier->rad);
 												if(!soldier->arrived && FreePath(&c1, &c2, map)) {
-													//SoldierNextOrder(soldier, posInUnit->at(i).at(j));
 													soldier->arrived = true;
 													if(soldier->currentOrder == unit->currentOrder)
 														unit->nSoldiersArrived++;
@@ -534,9 +496,7 @@ class Model : public Listener{
 
 										//check if need to do indiv pathfinding, but only do this every second or so!
 										soldier->indivPathTimer.decrement();
-										//soldier->indivPathCooldown--;
 										if(soldier->indivPathTimer.done()) {
-										//if(soldier->indivPathCooldown < 1) {
 											Circle c1(soldier->pos, soldier->rad);
 											Circle c2(NoIPFPosTarget(soldier), soldier->rad);
 											if(soldier->indivPath.empty()) {
@@ -569,25 +529,13 @@ class Model : public Listener{
 												}
 											}
 											soldier->indivPathTimer.reset();
-											//soldier->indivPathCooldown = soldier->indivPathCDMax;
 										}
 
-										//end = std::chrono::system_clock::now();
-										//omp_set_lock(&time_lock_indiv);
-										//time_indiv_pathing += std::chrono::duration<double>(end - start).count();
-										//omp_unset_lock(&time_lock_indiv);
-
-										//start = std::chrono::system_clock::now();
 
 										//physics step
 										if(soldier->placed && soldier->alive) {
 											TimeStep(soldier, *dt);
 										}
-
-										//end = std::chrono::system_clock::now();
-										//omp_set_lock(&time_lock_physics);
-										//time_physics_step += std::chrono::duration<double>(end - start).count();
-										//omp_unset_lock(&time_lock_physics);
 
 										//advancing soldier order
 										if(soldier->alive && soldier->arrived) {
@@ -598,9 +546,7 @@ class Model : public Listener{
 									}
 								}
 							}
-							//UpdatePos(unit);
 							unit->UpdatePos();
-							//UpdateVel(unit);
 							unit->UpdateVel();
 						}
 					}
@@ -614,7 +560,6 @@ class Model : public Listener{
 						for(auto unit : player->units) {
 							if(unit->placed && unit->ranged) {
 								if(unit->rangedTargetUpdateTimer.decrement()) {
-									//std::cout << "?checking for new unit target\n";
 									unit->rangedTarget = NULL;	// may be bad flag
 									Order* current = unit->orders.at(unit->currentOrder);
 									// need to detect line of sight issues for unit targets
@@ -636,7 +581,6 @@ class Model : public Listener{
 												std::cout << "Selected a different player.\n";
 												// go through all units and list those that are in the cone
 												for(auto unit2 : player2->units) {
-													//if unit in cone: inRange.push_back(unit)
 													if(unit2->placed) {
 														Circle circ(unit2->pos, 0);
 														if(ConeCircleCollision(unit->pos, unit->rot, rangedCone, unit->range, &circ)
@@ -708,20 +652,16 @@ class Model : public Listener{
 												//handling "charging" status
 												//	while charging soldiers will push into the enemy position
 												//  if they have no target in front of them for 1 second they will stop charging and seek out enemies close to them
-												//if(unit->orders.at(soldier->currentOrder)->type == ORDER_ATTACK) {
 												Order* o = unit->orders.at(soldier->currentOrder);
 												if(o->target) {
 													if(soldier->charging) {
 														if(unit->enemyContact) {
 															if(!targets.empty() && (!soldier->meleeAOE && soldier->unit->maxSoldiers == 1) && o->type == ORDER_ATTACK)	{//lone monsters stop charging after impact
 																soldier->chargeTimer.reset();
-																//soldier->chargeGapTicks = 30;
 															}
 															else {
 																if(!soldier->chargeTimer.done())
-																//if(soldier->chargeGapTicks > 0)
 																	soldier->chargeTimer.decrement();
-																	//soldier->chargeGapTicks--;
 																else
 																	soldier->charging = false;
 															}
@@ -735,7 +675,6 @@ class Model : public Listener{
 													else {
 														debug("SEEK AND DESTROY!");
 														//target finding
-														//AttackOrder* ao = dynamic_cast<AttackOrder*>(o);
 														if((!soldier->meleeTarget || !soldier->meleeTarget->alive) && !o->target->liveSoldiers.empty()) {
 															Soldier* target = NULL;
 															if(soldier->meleeAOE && soldier->unit->maxSoldiers == 1) {
@@ -767,9 +706,7 @@ class Model : public Listener{
 												if(soldier->unit->orders.at(soldier->currentOrder)->target
 												&& soldier->meleeTarget && !soldier->charging) {//soldier->unit->enemyContact) {
 													if(!soldier->noTargetTimer.done()) {
-													//if(soldier->cantSeeTargetTimer > 0) {
 														soldier->noTargetTimer.decrement();
-														//soldier->cantSeeTargetTimer--;
 													}
 													else {
 														Circle c1(soldier->pos, soldier->rad);
@@ -778,15 +715,11 @@ class Model : public Listener{
 															soldier->meleeTarget = NULL;
 														}
 														soldier->noTargetTimer.reset();
-														//soldier->cantSeeTargetTimer = 60;
-
 													}
 												}
 												// resolving attacks
 												if(!targets.empty() && soldier->MeleeTimer.done()) {
-												//if(!targets.empty() && soldier->meleeCooldownTicks == 0) {
 													soldier->MeleeTimer.reset();
-													//soldier->meleeCooldownTicks = 31;
 													for(auto targetContainer : targets) {
 														Soldier* target = targetContainer.soldier;
 														double hitChance = settings.base_melee_attack + 0.01*(soldier->meleeAttack - target->meleeDefense) 
@@ -803,8 +736,6 @@ class Model : public Listener{
 													}
 												}
 												soldier->MeleeTimer.decrement();
-												//if(soldier->meleeCooldownTicks > 0)
-												//	soldier->meleeCooldownTicks--;
 											}
 										}
 									}
@@ -848,11 +779,6 @@ class Model : public Listener{
 											if(soldier->rangedTarget && !soldier->rangedTarget->alive) {
 												soldier->rangedTarget = NULL;
 											}
-											/*std::cout << static_cast<bool>(soldier->rangedTarget) 
-												<< (soldier->currentOrder == unit->currentOrder) 
-												<< (soldier->vel.norm() < soldier->maxSpeedForFiring) 
-												<< static_cast<bool>(soldier->meleeTarget)
-												<< "\n";*/
 											if(soldier->rangedTarget
 												&& soldier->currentOrder == unit->currentOrder
 												&& soldier->vel.norm() < soldier->maxSpeedForFiring
@@ -865,7 +791,6 @@ class Model : public Listener{
 												if(soldier->ReloadTimer.done() && canFire) {
 													double t = projectile_flight_time(soldier->rangedTarget->pos - soldier->pos,
 														soldier->rangedTarget->vel, soldier->rangedSpeed);
-													//std::cout << t << "\n";
 													if(t > 0 && soldier->projectileSpeed * t < soldier->rangedRange) {
 														Displacement dis = ShotAngle(soldier->rangedTarget->pos - soldier->pos,
 															soldier->rangedTarget->vel, soldier->rangedSpeed, t, soldier->tans);
@@ -907,7 +832,6 @@ class Model : public Listener{
 											}
 											else {
 												if(soldier->vel.norm() < soldier->maxSpeedForFiring && !swinging) {
-												//&& (!soldier->meleeTarget || (soldier->rangedTarget->pos - soldier->pos).norm() > soldier->rangedMinRange)) {
 													soldier->ReloadTimer.decrement();
 												}
 											}
@@ -958,7 +882,6 @@ class Model : public Listener{
 						}
 						damages.pop();
 					}
-					//damages = std::queue<DamageTick>();
 					// projectile movement and obsolescence
 					for(auto projectile : projectiles) {
 						if(projectile->longDead) {
@@ -1092,7 +1015,6 @@ void Model::init() {
 		std::cout << "Writing neighbour map to file " << neighbourFileString << "\n";
 		map->writeNeighbourFile(neighbourFileString);
 		std::cout << "Done.\n";
-		//map->readNeighbourFile(neighbourFileString);
 	}
 	if(settings.set_custom_omp_num_threads)
 		omp_set_num_threads(std::min(settings.custom_omp_num_threads, omp_get_max_threads() - 1));

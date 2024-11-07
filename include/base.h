@@ -86,7 +86,6 @@ void EventManager::Post(Event* ev) {
 			}
 			std::cout << "###############################\n";
 			showTimes = false;
-			//while(true) {}
 		}
 	}
 }

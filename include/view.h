@@ -394,14 +394,7 @@ void View::drawMapObjects(KeyboardAndMouseController* ctrl, Model* model) {
 
 void View::drawTileObjectCollision(KeyboardAndMouseController* ctrl) {
 	if(ddebug::_showDebugGraphics) {
-		/*for(auto row : map->tiles) {
-			for(auto tile : row) {
-				if(!tile->mapObjects.empty()) {
-					Rrectangle* rec = tile->rec;
-					DrawRectangle(rec, renderer, colorGreen, SCREEN_WIDTH, SCREEN_HEIGHT, ctrl->zoom, ctrl->center);
-				}
-			}
-		}*/
+
 	}
 }
 
@@ -689,7 +682,6 @@ void View::loadBackground() {
 		backgroundTexture = new ImgTexture(renderer);
 		backgroundTexture->loadFromImage(("textures/" + model->settings.backgroundInfo.texture).c_str());
 		background->texture = backgroundTexture;
-		//std::cout << "################ " << ("textures/" + model->settings.backgroundInfo.texture).c_str();
 	}
 }
 

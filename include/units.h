@@ -12,17 +12,6 @@
 #include <cstdlib>
 #include <map>
 
-class Unit;
-//class Player;
-
-//void Populate(Unit* unit, std::map<std::string, SoldierInformation> classMap);
-//void Place(Unit* unit, Eigen::Vector2d pos, Eigen::Matrix2d rot);
-//void MoveTarget(Unit* unit, Eigen::Vector2d pos, Eigen::Matrix2d rot);
-//void UpdatePos(Unit* unit);
-//void UpdateVel(Unit* unit);
-//void PosInUnitByID(Unit* unit);
-
-
 class Unit {
 public:
 	// loaded stats
@@ -75,9 +64,7 @@ public:
 		soldiers = std::vector<std::vector<Soldier*>>(nrows, std::vector<Soldier*>(ncols, NULL));
 		posInUnit = std::vector<std::vector<Eigen::Vector2d>>(nrows, std::vector<Eigen::Vector2d>(ncols, Eigen::Vector2d()));
 		nLiveSoldiers = 0;
-		//Populate(this, classMap);
 		Populate(classMap);
-		//PosInUnitByID(this);
 		PosInUnitByID();
 		enemyContact = false;
 	}
@@ -113,7 +100,6 @@ struct UnitSorter {
 };
 
 void Unit::Populate(std::map<std::string, SoldierInformation> classMap) {
-	//std::vector<std::vector<Soldier*>>* soldiers = &(this->soldiers);
 	std::vector<std::vector<Soldier*>>* soldiers = &(this->soldiers);
 	for(int i = 0; i < nrows; i++) {
 		for(int j = 0; j < ncols; j++) {
@@ -232,7 +218,6 @@ void Unit::UpdateVel() {
 }
 
 void Unit::PosInUnitByID() {
-	//std::vector<std::vector<Soldier*>>* soldiers = unit->soldiers();
 	std::vector<std::vector<Eigen::Vector2d>>* posInUnit = &(this->posInUnit);
 	double x0 = xspacing*(nrows - 1)/2.;
 	double y0 = yspacing*(ncols - 1)/2.;
@@ -255,13 +240,9 @@ bool Unit::CurrentOrderCompleted() {
 			debug("Checking order completion...");
 			MoveOrder* mo = dynamic_cast<MoveOrder*>(currentOrder);
 			if(mo->moveType == MOVE_FORMUP) {
-				//debug("Form up:");
-				//std::cout << (unit->nSoldiersArrived >= 0.9*unit->nLiveSoldiers) << "\n";
 				return nSoldiersArrived >= 0.9*nLiveSoldiers; break;
 			}
 			else {
-				//debug("Passing through:");
-				//std::cout << (unit->nSoldiersArrived > 0) << "\n";
 				return nSoldiersArrived > 0; break;
 			}
 		}
@@ -281,8 +262,6 @@ void Unit::NextOrder() {
 		if(!no->target || (no->type == ORDER_ATTACK && no->target != o->target))
 			enemyContact = false;
 	}
-	//if(!no->target || no->target != o->target)
-	//	enemyContact = false;
 }
 
 void Unit::DeleteObsoleteOrder() {
@@ -315,7 +294,6 @@ void SoldierNextOrder(Soldier* soldier, Eigen::Vector2d posInUnit) {
 	if(!o->target || (o->target != po->target)) {
 		soldier->charging = true;
 		soldier->chargeTimer.reset();
-		//soldier->chargeGapTicks = 30;
 	}
 }
 

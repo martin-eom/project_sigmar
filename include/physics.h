@@ -123,45 +123,28 @@ void DampenedHarmonicOscillator(Soldier* soldier, double dt) {	//deprecated / on
 }
 
 Eigen::Vector2d NoIPFPosTarget(Soldier* soldier) {	// NoIPF = No Individual Pathfinding
-	//std::cout << "FUCKING VOODOO!\n";
 	if(soldier->meleeTarget) {
 		if(!soldier->charging) {
-			//std::cout << "not charging!\n";
 			return soldier->meleeTarget->pos;
 		}
 		if(soldier->unit->enemyContact && soldier->unit->orders.at(soldier->currentOrder)->target && 
 			soldier->unit->orders.at(soldier->currentOrder)->target == soldier->meleeTarget->unit) {
-			//std::cout << "attacking target unit!\n";
 			return soldier->meleeTarget->pos;
 		}
 	}
-	//if(!soldier->unit->player->player1)
-		//std::cout << "this line SHOULD be called!\n";
-	//std::cout << "wtf\n";
 	return soldier->posTarget;
 }
 
 Eigen::Vector2d PosTarget(Soldier* soldier) {
-	//std::cout << "PosTarget is being called for this soldier!\n";
 	if(soldier->indivPath.empty()) {
-		//std::cout << "This soldier has no IPF!\n";
 		return NoIPFPosTarget(soldier);
-		/*if(soldier->meleeTarget) {
-			if(!soldier->charging)
-				return soldier->meleeTarget->pos;
-			if(soldier->unit->enemyContact && soldier->unit->orders.at(soldier->currentOrder)->target)
-				return soldier->meleeTarget->pos;
-		}
-		return soldier->posTarget;	*/
 	}
 	else {
-		//std::cout << "this line shoule NOT be called!\n";
 		return soldier->indivPath.at(0);
 	}
 }
 
 void TimeStep(Soldier* soldier, double dt) {
-	//std::cout << "The timestep is being computed for this soldier!\n";
 	Eigen::Vector2d posTarget = PosTarget(soldier);
 	Eigen::Vector2d newPos, newVel;
 	Eigen::Matrix2d newRot;
@@ -343,15 +326,6 @@ void CollisionScrying(Map* map, Unit* unit) {
 		for(int j = 0; j < unit->ncols; j++) {
 			Soldier* soldier = (*unit).soldiers.at(i).at(j);
 			if(soldier->placed && soldier->alive) {
-				//int m = (int) (soldier->pos.coeff(1) / map->tilesize);
-				//if(m < 0) m=0;
-				//else if(m > map->nrows - 1) m = map->nrows - 1;
-				//int n = (int) (soldier->pos.coeff(0) / map->tilesize);
-				//if(n < 0) n = 0;
-				//else if(n > map->ncols - 1) n = map->ncols - 1;
-				//map->Assign(soldier, m, n);
-				//soldier->map_row = m;
-				//soldier->map_column = n;
 				grid_container* grid = map->getGrid(soldier->tilesize);
 				int m = (int) (soldier->pos.coeff(1) / grid->tilesize);
 				if(m < 0) m=0;
@@ -369,13 +343,6 @@ void CollisionScrying(Map* map, Unit* unit) {
 
 void ProjectileCollisionScrying(Map* map, std::vector<Projectile*> projectiles) {
 	for(auto projectile : projectiles) {
-		//int m = (int) (projectile->get_pos().coeff(1) / map->tilesize);
-		//if(m < 0) m=0;
-		//else if(m > map->nrows - 1) m = map->nrows - 1;
-		//int n = (int) (projectile->get_pos().coeff(0) / map->tilesize);
-		//if(n < 0) n = 0;
-		//else if(n > map->ncols - 1) n = map->ncols - 1;
-		//map->ProjectileAssign(projectile, m, n);
 		grid_container* grid = map->getGrid(projectile->tilesize);
 		int m = (int) (projectile->get_pos().coeff(1) / grid->tilesize);
 		if(m < 0) m = 0;
@@ -388,59 +355,6 @@ void ProjectileCollisionScrying(Map* map, std::vector<Projectile*> projectiles) 
 }
 
 void ProjectileCollisionHandling(Map* map) {
-	/*for(int i = 0; i < map->nrows; i++) {
-		for(int j = 0; j < map->ncols; j++) {
-			gridpiece* tile = map->tiles.at(i).at(j);
-			for(auto projectile : tile->projectiles) {
-				Point p(projectile->get_pos());
-				//map_objects
-				for(auto obj : tile->mapObjects) {
-					if(!projectile->dead) {
-						switch(obj->type) {
-						case MAP_RECTANGLE:
-						case MAP_BORDER:
-							if(PointRectangleCollision(&p, dynamic_cast<Rrectangle*>(obj))) {
-								projectile->dead = true;
-							}
-							break;
-						case MAP_CIRCLE:
-							Circle* circ = dynamic_cast<Circle*>(obj);
-							Eigen::Vector2d dist;
-							if((projectile->get_pos() - circ->pos).norm() < circ->rad) {
-								projectile->dead = true;
-							}
-							break;
-						}
-					}
-				}
-				//soldiers
-				if(!projectile->dead && projectile->get_progress() > 0.99) {
-					for(auto soldier : tile->soldiers) {
-						if((projectile->pos - soldier->pos).norm() < (soldier->rad + projectile->aoerad)) {
-							projectile->targets.push_back(soldier);
-						}
-					}
-					if(projectile->aoerad > 0.) {
-						for(auto ntile : tile->neighbours) {
-							for(auto soldier : ntile->soldiers) {
-								if((projectile->get_pos() - soldier->pos).norm() < soldier->rad + projectile->aoerad) {
-									projectile->targets.push_back(soldier);
-								}
-							}						
-						}
-						for(auto ntile : tile->redundantNeighbours) {
-							for(auto soldier : ntile->soldiers) {
-								if((projectile->get_pos() - soldier->pos).norm() < soldier->rad + projectile->aoerad) {
-									projectile->targets.push_back(soldier);
-								}
-							}						
-						}
-					}
-					projectile->dead = true;
-				}
-			}
-		}
-	}*/
 	for(auto grid: map->grids) {
 		for(int i = 0; i < grid->nrows; i++) {
 			for(int j = 0; j < grid->ncols; j++) {
@@ -467,37 +381,29 @@ void ProjectileCollisionHandling(Map* map) {
 						}
 					}
 					if(!projectile->dead && projectile->get_progress() > 0.99) {
-						//std::cout << "******* " << tile->soldiers.size() << "\n";
 						for(auto soldier : tile->soldiers) {
 							if((projectile->pos - soldier->pos).norm() < (soldier->rad + projectile->aoerad)) {
 								projectile->targets.push_back(soldier);
 							}
 						}
 						for(auto sublist: tile->neighbours) {
-							//std::cout << sublist.size() << "-\n";
 							for(auto ntile : sublist) {
-								//std::cout << ntile->soldiers.size() << " ";
 								for(auto soldier : ntile->soldiers) {
 									if((projectile->get_pos() - soldier->pos).norm() < soldier->rad + projectile->aoerad) {
 										projectile->targets.push_back(soldier);
 									}
 								}						
 							}
-							//std::cout << "\n";
 						}
 						for(auto sublist: tile->redundantNeighbours) {
-							//std::cout << sublist.size() << "|\n";
 							for(auto ntile : sublist) {
-								//std::cout << ntile->soldiers.size() << " ";
 								for(auto soldier : ntile->soldiers) {
 									if((projectile->get_pos() - soldier->pos).norm() < soldier->rad + projectile->aoerad) {
 										projectile->targets.push_back(soldier);
 									}
 								}						
 							}
-							//std::cout << "\n";
 						}
-						//std::cout << projectile->tilesize << " " << projectile->targets.size() << "\n";
 						projectile->dead = true;
 					}
 				}
@@ -607,17 +513,13 @@ void EvaluateRange(Soldier* sold1, Soldier* sold2, std::vector<Soldier*>* soldie
 }
 
 void CollisionResolution(Map* map, std::vector<Unit*>* units, std::vector<Soldier*>* soldiers, std::vector<omp_lock_t*>* locks) {
-	//int n_units = units->size();
-	//std::cout << omp_get_max_threads() << "\n";
 	int n_threads = omp_get_max_threads();
 	int soldier_frac = std::ceil((double)soldiers->size() / (double)n_threads);
-	//std::cout << omp_get_num_threads() << "\n";
 	#pragma omp parallel default(shared)
 	{
 	//int n_threads = omp_get_num_threads();
 	//double wtime = omp_get_wtime();
 	int n_thread = omp_get_thread_num();
-	//std::cout << n_thread << "\n";
 	//for(int n_thread = 0; n_thread < n_threads; n_thread++) {
 		//for(int n_unit = 0; n_unit < n_units; n_unit++) {
 		int n_soldier_min = n_thread * soldier_frac;
@@ -667,38 +569,15 @@ void CollisionResolution(Map* map, std::vector<Unit*>* units, std::vector<Soldie
 				}
 			//}
 		}
-		//wtime = omp_get_wtime() - wtime;
-		//std::cout << wtime << "\n";
 	}
 	//}
 }
 
 void MapObjectCollisionHandling(Map* map) {
-	/*for(int i = 0; i < map->nrows; i++) {
-		for(int j = 0; j < map->ncols; j++) {
-			gridpiece* tile = map->tiles.at(i).at(j);
-			for(auto soldier : tile->soldiers) {
-				if(soldier) {
-					for(auto object : tile->mapObjects) {
-						switch(object->type) {
-						case MAP_RECTANGLE:
-						case MAP_BORDER:
-							SoldierRectangleCollision(soldier, dynamic_cast<Rrectangle*>(object));
-							break;
-						case MAP_CIRCLE:
-							SoldierCircleCollision(soldier, dynamic_cast<Circle*>(object));
-							break;
-						}
-					}
-				}
-			}
-		}
-	}*/
 	for(auto grid: map->grids) {
 		for(int i = 0; i < grid->nrows; i++) {
 			for(int j = 0; j < grid->ncols; j++) {
 				gridpiece* tile = grid->grid.at(i).at(j);
-				//std::cout << "gridpiece " << i << " " << j << "(size " << grid->tilesize << ") has " << tile->mapObjects.size() << " map objects\n";
 				for(auto soldier : tile->soldiers) {
 					if(soldier) {
 						for(auto object : tile->mapObjects) {

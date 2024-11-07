@@ -56,7 +56,6 @@ class LegAnimation : public SoldierAnimation {
 public:
 	bool upwards = true;
 	int nextStage = 0;
-	//Timer toNextStage = Timer(5);
 
 	LegAnimation(Point* object, AnimationInformation info) : SoldierAnimation(object, info) {}
 
@@ -136,7 +135,6 @@ public:
 
 class MeleeAnimation : public SoldierAnimation {
 public:
-	//Timer toNextStage = Timer(6);
 	bool running = false;
 	bool onCooldown = true;
 
@@ -205,7 +203,6 @@ class DamageAnimation : public SoldierAnimation {
 public:
 	bool running = false;
 	double last_hp;
-	//Timer ticksToNextStage;
 
 	DamageAnimation(Soldier* soldier, AnimationInformation info) : SoldierAnimation(soldier, info) {
 		last_hp = soldier->hp;

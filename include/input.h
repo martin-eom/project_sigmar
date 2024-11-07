@@ -378,16 +378,6 @@ void KeyboardAndMouseController::handleKeyUpEvent(SDL_Event e, GameEventManager*
 			break;
 		case CTRL_ADDING_UNIT:
 			debug("unit type:" + std::to_string(newUnitType));
-			/*switch(newUnitType) {
-			case 0:
-				em->Post(new UnitAddEvent(UNIT_INFANTRY)); break;
-			case 1: case 1-4:
-				em->Post(new UnitAddEvent(UNIT_CAVALRY)); break;
-			case 2: case 2-4:
-				em->Post(new UnitAddEvent(UNIT_MONSTER)); break;
-			case 3: case 3-4:
-				em->Post(new UnitAddEvent(UNIT_LONE_RIDER)); break;
-			}*/
 			_state = CTRL_SELECTING_UNIT;
 			debug("New Unit Type: " + std::to_string(newUnitType));
 			break;
@@ -759,7 +749,6 @@ private:
 			if(y > ymax) y = ymax;
 			newCenter << x, y;
 			center = newCenter;
-			//std::cout << state << "\n";
 			debug("ctrl : end TickEvent"); }
 			break;
 		}

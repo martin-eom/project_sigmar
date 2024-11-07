@@ -56,7 +56,6 @@ public:
 
 	Projectile(std::string soldierType, Eigen::Vector2d start, Eigen::Vector2d vel, int lifetime, double dt, double damage, int armorPiercing, double aoerad, int tilesize) : Point(start) {
 		this->soldierType = soldierType;
-		//pos = start;
 		this->vel = vel;
 		Eigen::Vector2d normVel = vel / vel.norm();
 		angle = Angle(-normVel.coeff(1), normVel.coeff(0));
@@ -75,19 +74,6 @@ public:
 
 ProjectileSpawnEvent SpawnProjectile(std::string soldierType, Eigen::Vector2d pos, Eigen::Vector2d vel, int lifetime, double dt, int damage, int armorPiercing, double aoerad, int tilesize) {
 	Projectile* p;
-	/*switch(type) {
-	case PROJECTILE_ARROW:
-		p = new Arrow(pos, vel, lifetime, dt);
-		break;
-	case PROJECTILE_DUMMY_ARROW:
-		p = new DummyArrow(pos, vel, lifetime, dt);
-		break;
-	case PROJECTILE_GRENADE:
-		p = new Grenade(pos, vel, lifetime, dt);
-		break;
-	default:
-		p = new Arrow(pos, vel, lifetime, dt);
-	}*/
 	p = new Projectile(soldierType, pos, vel, lifetime, dt, damage, armorPiercing, aoerad, tilesize);
 	return ProjectileSpawnEvent(p);
 }
