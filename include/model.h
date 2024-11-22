@@ -17,14 +17,59 @@
 #include <map>
 #include <chrono>
 
-void OrderPathfinding(Unit* unit, Map* map) {
+void Unit::PostCombatFormup() {
+	orders.push_back(new MoveOrder(pos, rot, MOVE_FORMUP, true));
+	std::cout << "This should not be called if nobody has finished a combat!\n";
+}
+
+void Unit::NextOrderPathfinding(Order* oldOrder, Order* newOrder, Map* map) {
+	std::cout << "Next Order Pathfinding activated!\n";
+	std::vector<Order*> newOrders;
+	double rad = ncols*(yspacing - 1);
+	MapWaypoint w1(newOrder->pos, rad);
+	MapWaypoint w2(oldOrder->pos, rad);
+	Eigen::Matrix2d Rot;
+	if(!FreePath(&w1, &w2, map)) {
+		std::vector<Eigen::Vector2d> positions = findPath(&w1, &w2, map);
+		for(int npos = 1; npos < positions.size(); npos++) {
+			Eigen::Vector2d diff = positions.at(npos) - positions.at(npos - 1);
+					double d = diff.norm();
+					double cos = diff.coeff(0)/d;
+					double sin = diff.coeff(1)/d;
+					if(d > 0)
+						Rot << cos, -sin, sin, cos;
+					else
+						Rot << 1, 0, 0, 1;
+					if(newOrder->type == ORDER_ATTACK && npos == positions.size() - 1) {
+						int movetype = MOVE_FORMUP;
+						if(enemyContact || true)
+							movetype = MOVE_PASSINGTHROUGH;
+						newOrders.push_back(new MoveOrder(positions.at(npos-1), Rot, movetype, true, true, newOrder->target));
+						newOrder->rot = Rot;
+					}
+					else if(newOrder->type == ORDER_ATTACK)
+						newOrders.push_back(new MoveOrder(positions.at(npos-1), Rot, MOVE_PASSINGTHROUGH, true, true, newOrder->target));
+					else
+						newOrders.push_back(new MoveOrder(positions.at(npos-1), Rot, MOVE_PASSINGTHROUGH, true, true));
+		}
+	}
+	std::cout << "number of pathfinding orders: " << newOrders.size() << " " << orders.size();
+	orders.insert(orders.begin() + currentOrder + 1, newOrders.begin(), newOrders.end());
+	std::cout << " " << orders.size() << "\n";
+	// how do units get their formup order after defeating their target?
+}
+
+void OrderPathfinding(Unit* unit, Map* map, std::vector<Order*> nos = std::vector<Order*>(), int start_order = 0) {
 	std::vector<Order*> newOrders = std::vector<Order*>();
-	for(int i = unit->currentOrder + 1; i < unit->orders.size(); i++) {
+	if(start_order == 0)
+		start_order = unit->currentOrder + 1;
+		nos = unit->orders;
+	for(int i = start_order; i < nos.size(); i++) {
 		debug("Pathfinding for an order started");
-		Order* mo = unit->orders.at(i);
-		if((unit->orders.at(i)->type == ORDER_MOVE && unit->orders.at(i-1)->type == ORDER_MOVE) || true) {
-			Order* mo = unit->orders.at(i);
-			Order* pmo = unit->orders.at(i-1);
+		Order* mo = nos.at(i);
+		if((nos.at(i)->type == ORDER_MOVE && nos.at(i-1)->type == ORDER_MOVE) || true) {
+			Order* mo = nos.at(i);
+			Order* pmo = nos.at(i-1);
 			// checking if line of sight between orders
 			double rad = unit->ncols*(unit->yspacing - 1);
 			MapWaypoint w1 = MapWaypoint(mo->pos, rad);
@@ -79,7 +124,7 @@ void OrderPathfinding(Unit* unit, Map* map) {
 			newOrders.push_back(new MoveOrder(mo->pos, mo->rot, MOVE_FORMUP, true, true));
 		}
 	}
-	while(unit->orders.size() > unit->currentOrder + 1) unit->orders.pop_back();
+	while(nos.size() > start_order) unit->orders.pop_back(); // I cant use nos here, damnit
 	unit->orders.insert(unit->orders.end(), newOrders.begin(), newOrders.end());
 	debug("Pathfinding done");
 }
@@ -179,9 +224,9 @@ class Model : public Listener{
 							debug("Finished order deletion");
 							// setting a new current order to the current unit position as starting point for the pathfinding calculation
 							if(!oev->orders.empty() && oev->orders.at(0)->type == ORDER_ATTACK)
-								unit->orders.push_back(new MoveOrder(unit->pos, unit->rot, MOVE_PASSINGTHROUGH, true, true, oev->orders.at(0)->target));
+								unit->orders.push_back(new MoveOrder(unit->pos, unit->rot, MOVE_PASSINGTHROUGH, true, false, oev->orders.at(0)->target));
 							else
-								unit->orders.push_back(new MoveOrder(unit->pos, unit->rot, MOVE_PASSINGTHROUGH, true, true));
+								unit->orders.push_back(new MoveOrder(unit->pos, unit->rot, MOVE_PASSINGTHROUGH, true, false));
 						}
 						// appending the new orders
 						for(auto order : oev->orders) {
@@ -191,7 +236,7 @@ class Model : public Listener{
 									order->pos = target->pos;
 								else
 									order->pos = target->posTarget;
-								target->targetedBy.push_back(unit);
+								//target->targetedBy.push_back(unit);
 							}
 							unit->orders.push_back(order);
 						}
@@ -210,7 +255,8 @@ class Model : public Listener{
 						}
 						unit->nSoldiersArrived = 0;
 						// doing pathfinding on all orders
-						OrderPathfinding(unit, map);
+						// Pathfinding belongs in nextOrder
+						//OrderPathfinding(unit, map);
 						// debug
 						// end debug
 						// reforming so that the new position targets are set
@@ -247,11 +293,11 @@ class Model : public Listener{
 									order->pos = target->pos;
 								else
 									order->pos = target->posTarget;
-								target->targetedBy.push_back(unit);
+								//target->targetedBy.push_back(unit);
 							}
 							unit->orders.push_back(order);
 						}
-						OrderPathfinding(unit, map);
+						//OrderPathfinding(unit, map);
 					}
 					break;}
 				}
@@ -419,6 +465,19 @@ class Model : public Listener{
 						Unit* unit = units.at(n_unit);
 						if(unit->placed) {
 							//moving unit target if combat has already started every so often to keep up with moving units
+							if(unit->orders.at(unit->currentOrder)->type == ORDER_ATTACK) {
+								unit->targetUpdateTimer.decrement();							
+								if(unit->targetUpdateTimer.done()) {
+									if(unit->enemyContact) {
+										unit->posTarget = unit->orders.at(unit->currentOrder)->target->pos;
+										unit->MoveTarget();
+										unit->targetUpdateTimer.reset();
+									}
+									else {
+										//redo pathfinding to target here!
+									}
+								}
+							}
 							if(unit->enemyContact && unit->orders.at(unit->currentOrder)->type == ORDER_ATTACK) {
 								unit->targetUpdateTimer.decrement();
 								if(unit->targetUpdateTimer.done()) {
@@ -428,41 +487,47 @@ class Model : public Listener{
 								}
 							}
 							//advancing order
-							if(unit->orders.size() > (unit->currentOrder +1) && unit->CurrentOrderCompleted()) {
-								bool transitionOrder = unit->orders.at(unit->currentOrder)->_transition;
-								unit->NextOrder();
-								Order* o = unit->orders.at(unit->currentOrder);
-								if(o->type == ORDER_MOVE || true) {
-									ReformUnit(unit);
-									unit->MoveTarget();
-								}
-								//telling other units that this one is moving on if they are targeting it
-								if(!unit->enemyContact && !transitionOrder) {
-									debug(std::to_string(unit->targetedBy.size()));
-									std::vector<std::vector<Order*>> newOrders;
-									std::vector<Unit*> targetedByTemp;
-									for(auto attacker : unit->targetedBy) {
-										//redo pathfinding
-										newOrders.push_back(std::vector<Order*>());
-										targetedByTemp.push_back(attacker);
-										for(int i = attacker->currentOrder; i < attacker->orders.size(); i++) {
-											o = attacker->orders.at(i);
-											if(!o->_auto) {
-												if(o->type == ORDER_ATTACK) {
-													Unit* target = dynamic_cast<AttackOrder*>(o)->target;
-													o = new AttackOrder(target, target->pos);
-												}
-												newOrders.back().push_back(o);
-											}
-										}
-
+							if(unit->CurrentOrderCompleted()) {
+								if(unit->currentOrder == (unit->orders.size() - 1) 
+									&& (unit->orders.at(unit->currentOrder)->type == ORDER_ATTACK
+										|| unit->orders.at(unit->currentOrder)->type == ORDER_TARGET))
+									unit->PostCombatFormup();
+								if(unit->orders.size() > (unit->currentOrder +1)) {
+									bool transitionOrder = unit->orders.at(unit->currentOrder)->_transition;
+									unit->NextOrder(map);
+									Order* o = unit->orders.at(unit->currentOrder);
+									if(o->type == ORDER_MOVE || true) {
+										ReformUnit(unit);
+										unit->MoveTarget();
 									}
-									for(int i = 0; i < newOrders.size(); i++) {
-										std::erase(unit->targetedBy, targetedByTemp.at(i));
-										GiveOrdersRequest gev(targetedByTemp.at(i), newOrders.at(i));
-										omp_set_lock(unit_locks.at(targetedByTemp.at(i)->model_index));
-										em->Post(&gev);
-										omp_unset_lock(unit_locks.at(targetedByTemp.at(i)->model_index));
+									//telling other units that this one is moving on if they are targeting it
+									if(!unit->enemyContact && !transitionOrder) {
+										//debug(std::to_string(unit->targetedBy.size()));
+										std::vector<std::vector<Order*>> newOrders;
+										//std::vector<Unit*> targetedByTemp;
+										/*for(auto attacker : unit->targetedBy) {
+											//redo pathfinding
+											newOrders.push_back(std::vector<Order*>());
+											targetedByTemp.push_back(attacker);
+											for(int i = attacker->currentOrder; i < attacker->orders.size(); i++) {
+												o = attacker->orders.at(i);
+												if(!o->_auto) {
+													if(o->type == ORDER_ATTACK) {
+														Unit* target = dynamic_cast<AttackOrder*>(o)->target;
+														o = new AttackOrder(target, target->pos);
+													}
+													newOrders.back().push_back(o);
+												}
+											}
+
+										}*/
+										/*for(int i = 0; i < newOrders.size(); i++) {
+											std::erase(unit->targetedBy, targetedByTemp.at(i));
+											GiveOrdersRequest gev(targetedByTemp.at(i), newOrders.at(i));
+											omp_set_lock(unit_locks.at(targetedByTemp.at(i)->model_index));
+											em->Post(&gev);
+											omp_unset_lock(unit_locks.at(targetedByTemp.at(i)->model_index));
+										}*/
 									}
 								}
 							}

@@ -48,7 +48,7 @@ public:
 	Timer targetUpdateTimer = Timer(60);
 	Timer rangedTargetUpdateTimer = Timer(int(80 + (rand()/RAND_MAX)*20));
 	Unit* rangedTarget = NULL;
-	std::vector<Unit*> targetedBy;
+	//std::vector<Unit*> targetedBy;
 	
 	void Populate(std::map<std::string, SoldierInformation> classMap);
 	void Place(Eigen::Vector2d pos, Eigen::Matrix2d rot);
@@ -57,7 +57,9 @@ public:
 	void UpdateVel();
 	void PosInUnitByID();
 	bool CurrentOrderCompleted();
-	void NextOrder();
+	void NextOrderPathfinding(Order* oldOrder, Order* newOrder, Map* map);
+	void PostCombatFormup();
+	void NextOrder(Map* map);
 	void DeleteObsoleteOrder();
 
 	void init(std::map<std::string, SoldierInformation> classMap) {
@@ -252,13 +254,19 @@ bool Unit::CurrentOrderCompleted() {
 	}
 }
 
-void Unit::NextOrder() {
+void Unit::NextOrder(Map* map) {
 	Order* o = orders.at(currentOrder);
+	Order* no = orders.at(currentOrder + 1);
+	//bool needsPathFinding = false;
+	if(!(o->_transition) && !(no->_transition))
+		NextOrderPathfinding(o, no, map);
+
 	currentOrder++;
 	nSoldiersArrived = 0;
-	Order* no = orders.at(currentOrder);
+
+	//Order* no = orders.at(currentOrder);
 	if(o->type == ORDER_ATTACK) {
-		std::erase(dynamic_cast<AttackOrder*>(o)->target->targetedBy, this);
+		//std::erase(dynamic_cast<AttackOrder*>(o)->target->targetedBy, this);
 		if(!no->target || (no->type == ORDER_ATTACK && no->target != o->target))
 			enemyContact = false;
 	}
