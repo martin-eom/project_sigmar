@@ -29,7 +29,12 @@ class Order{
 		int type;
 		bool _auto;
 		bool _transition;
+		bool _combat = false;
 		Unit* target;
+
+		void setCombat() {
+			_combat = true;
+		}
 
 		Order() {
 			type = ORDER_ORDER;

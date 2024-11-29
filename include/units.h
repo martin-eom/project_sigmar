@@ -45,8 +45,8 @@ public:
 	std::vector<Order*> orders;
 	Eigen::Vector2d vel;
 	bool enemyContact;
-	Timer targetUpdateTimer = Timer(60);
-	Timer rangedTargetUpdateTimer = Timer(int(80 + (rand()/RAND_MAX)*20));
+	Timer targetUpdateTimer = Timer(int(120 + (rand()/RAND_MAX)*20));
+	Timer rangedTargetUpdateTimer = Timer(int(120 + (rand()/RAND_MAX)*20));
 	Unit* rangedTarget = NULL;
 	//std::vector<Unit*> targetedBy;
 	
