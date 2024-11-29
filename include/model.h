@@ -57,6 +57,20 @@ void Unit::NextOrderPathfinding(Order* oldOrder, Order* newOrder, Map* map) {
 	}
 	orders.insert(orders.begin() + currentOrder + 1, newOrders.begin(), newOrders.end());
 	std::cout << " " << orders.size() << "\n";
+	// THE FOLLOWING IS IN THE WRONG PLACE
+	// let soldiers on currentOrder instant-complete the first new order if they have los on the second
+	for(auto row: soldiers) {
+		for(auto soldier: row) {
+			if(soldier->currentOrder == currentOrder && currentOrder < orders.size() - 1) {
+				MapWaypoint w1(soldier->pos, soldier->rad);
+				MapWaypoint w2(orders.at(currentOrder+1)->pos, soldier->rad);
+				if(FreePath(&w1, &w2, map)) {
+					soldier->arrived = true;
+					nSoldiersArrived++;
+				}
+			}
+		}
+	}
 }
 
 void Unit::ResetCharging() {

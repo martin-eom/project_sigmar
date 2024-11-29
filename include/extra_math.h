@@ -73,6 +73,7 @@ class Rrectangle {
 public:
 	double hl;	//half length
 	double hw;	//half width
+	double hdiag;
 	Eigen::Vector2d pos;	//center
 	Eigen::Matrix2d rot;
 	std::vector<Corner> corners;
@@ -92,6 +93,7 @@ enum REC_AXIS {
 Rrectangle::Rrectangle(double hl, double hw, Eigen::Vector2d pos, Eigen::Matrix2d rot) {
 	this->hl = hl;
 	this->hw = hw;
+	this->hdiag = pow(hw*hw + hl*hl, 0.5);
 	this->pos = pos;
 	this->rot = rot;
 	Eigen::Vector2d cornerPos;

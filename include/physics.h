@@ -286,10 +286,13 @@ void TimeStep(Soldier* soldier, double dt) {
 			}
 			else {
 				Rrectangle rec = SoldierRectangle(soldier);
+				Circle circ(mo->pos, rec.hdiag);
 				Point p(soldier->pos);
-				if(PointRectangleCollision(&p, &rec)) {
+				/*if(PointRectangleCollision(&p, &rec)) {
 					soldier->arrived = true;
-				}
+				}*/
+				if((soldier->pos - mo->pos).norm() < rec.hdiag)
+					soldier->arrived = true;
 			}
 		}
 	}
