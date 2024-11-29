@@ -59,6 +59,18 @@ void Unit::NextOrderPathfinding(Order* oldOrder, Order* newOrder, Map* map) {
 	std::cout << " " << orders.size() << "\n";
 }
 
+void Unit::ResetCharging() {
+	for(auto row: soldiers) {
+		for(auto soldier: row) {
+			if(soldier->currentOrder == currentOrder) {
+				soldier->charging = true;
+				soldier->chargeTimer.reset();
+			}
+		}
+	}
+	enemyContact = false;
+}
+
 void OrderPathfinding(Unit* unit, Map* map, std::vector<Order*> nos = std::vector<Order*>(), int start_order = 0) {
 	std::vector<Order*> newOrders = std::vector<Order*>();
 	if(start_order == 0)
@@ -210,7 +222,7 @@ class Model : public Listener{
 							// deleting all future orders as well as the current one
 							debug("Beginning order deletion");
 							if(unit->orders.at(unit->currentOrder)->type == ORDER_ATTACK) {
-								for(auto row: unit->soldiers) {
+								/*for(auto row: unit->soldiers) {
 									for(auto soldier: row) {
 										if(soldier->currentOrder == unit->currentOrder) {
 											soldier->charging = true;
@@ -218,7 +230,8 @@ class Model : public Listener{
 										}
 									}
 								}
-								unit->enemyContact = false;
+								unit->enemyContact = false;*/
+								unit->ResetCharging();
 							}
 							while(unit->orders.size() > unit->currentOrder) unit->orders.pop_back();
 							debug("Finished order deletion");
@@ -470,6 +483,36 @@ class Model : public Listener{
 								unit->targetUpdateTimer.decrement();
 								if(unit->targetUpdateTimer.done()) {
 									if(unit->orders.at(unit->currentOrder)->type == ORDER_ATTACK && unit->enemyContact) {
+										// check if target unit has "ran away"
+										bool ranAway = true;
+										for(auto row: unit->soldiers) {
+											for(auto soldier: row) {
+												if(soldier->currentOrder == unit->currentOrder) {
+													// getting delete-copy of pripority queue
+													std::vector<SoldierNeighbourContainer> enemiesCopy;
+													while(!soldier->enemiesInMeleeRange.empty()) {
+														enemiesCopy.push_back(soldier->enemiesInMeleeRange.top());
+														soldier->enemiesInMeleeRange.pop();
+													}
+													// searching through copy to find target in range
+													for(auto enemy: enemiesCopy) {
+														if(enemy.soldier->unit == unit->orders.at(unit->currentOrder)->target) {
+															ranAway = false;
+															break;
+														}
+													}
+													// restoring priority queue
+													for(auto enemy: enemiesCopy) {
+														soldier->enemiesInMeleeRange.push(enemy);
+													}
+												}
+											}
+										}
+										// if so reset charging
+										
+										if(ranAway)
+											unit->ResetCharging();
+										// do rest
 										unit->posTarget = unit->orders.at(unit->currentOrder)->target->pos;
 										unit->MoveTarget();
 									}
@@ -484,11 +527,14 @@ class Model : public Listener{
 										Unit* target = unit->orders.at(attackOrder)->target;
 										MapWaypoint w1(unit->pos, rad);
 										MapWaypoint w2(target->pos, rad);
+										bool break_alternative = false;
 										if(attackOrder == unit->currentOrder && FreePath(&w1, &w2, map)) {
 											unit->posTarget = target->pos;
 											unit->MoveTarget();
-											break;
+											//break;
+											break_alternative = true;
 										}
+										if(!break_alternative) {
 										unit->orders.erase(std::remove_if(unit->orders.begin() + unit->currentOrder, 
 											unit->orders.end(),
 											[](const Order* o) {
@@ -497,6 +543,7 @@ class Model : public Listener{
 										);
 										std::vector<Order*> newOrders(unit->orders.begin() + unit->currentOrder, unit->orders.end());
 										em->Post(new GiveOrdersRequest(unit, newOrders));
+										}
 
 										// if they are on the attack order and DO NOT HAVE LINE OF SIGHT they need to get a temporary waypoint and a give orders event
 										// remove all transition orders between current order and attack order

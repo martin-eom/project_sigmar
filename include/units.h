@@ -45,7 +45,7 @@ public:
 	std::vector<Order*> orders;
 	Eigen::Vector2d vel;
 	bool enemyContact;
-	Timer targetUpdateTimer = Timer(int(120 + (rand()/RAND_MAX)*20));
+	Timer targetUpdateTimer = Timer(int(240 + (rand()/RAND_MAX)*20));
 	Timer rangedTargetUpdateTimer = Timer(int(120 + (rand()/RAND_MAX)*20));
 	Unit* rangedTarget = NULL;
 	//std::vector<Unit*> targetedBy;
@@ -61,6 +61,7 @@ public:
 	void PostCombatFormup();
 	void NextOrder(Map* map);
 	void DeleteObsoleteOrder();
+	void ResetCharging();
 
 	void init(std::map<std::string, SoldierInformation> classMap) {
 		soldiers = std::vector<std::vector<Soldier*>>(nrows, std::vector<Soldier*>(ncols, NULL));
