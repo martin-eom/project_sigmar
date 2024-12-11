@@ -30,7 +30,6 @@ void Unit::NextOrderPathfinding(Order* oldOrder, Order* newOrder, Map* map) {
 	if(!FreePath(&w1, &w2, map)) {
 		std::vector<Eigen::Vector2d> positions = findPath(&w1, &w2, map);
 		for(int npos = 1; npos < positions.size(); npos++) {
-			std::cout << npos << "\n";
 			Eigen::Vector2d diff = positions.at(npos) - positions.at(npos - 1);
 			double d = diff.norm();
 			double cos = diff.coeff(0)/d;
@@ -56,7 +55,6 @@ void Unit::NextOrderPathfinding(Order* oldOrder, Order* newOrder, Map* map) {
 		}
 	}
 	orders.insert(orders.begin() + currentOrder + 1, newOrders.begin(), newOrders.end());
-	std::cout << " " << orders.size() << "\n";
 	// THE FOLLOWING IS IN THE WRONG PLACE
 	// let soldiers on currentOrder instant-complete the first new order if they have los on the second
 	for(auto row: soldiers) {
@@ -722,7 +720,7 @@ class Model : public Listener{
 										(current->target->pos - unit->pos).norm() < unit->range) {
 										Circle c1 = Circle(unit->pos, OnSpotUnitRectangle(unit).hw*0.7);
 										Circle c2 = Circle(current->target->pos, OnSpotUnitRectangle(current->target).hw*0.7);
-										if(FreePath(&c1, &c2, map))
+										if(FreePath(&c1, &c2, map, true))
 											unit->rangedTarget = current->target;
 									}
 									if(!unit->rangedTarget) {
@@ -955,9 +953,10 @@ class Model : public Listener{
 														//los check
 														Eigen::Vector2d pointOfImpact = soldier->pos + vel * t;
 														Circle c1 = Circle(soldier->pos, soldier->rad);
-														Circle c2 = Circle(pointOfImpact, soldier->rad);
-														if(!FreePath(&c1, &c2, map))
+														Circle c2 = Circle(pointOfImpact, soldier->rad);//soldier->rad);
+														if(!FreePath(&c1, &c2, map, true)) {
 															canFire = false;
+														}
 														if(canFire && soldier->rangedTarget->meleeTarget && !soldier->rangedTarget->meleeTarget->large) {
 															Soldier* mtarget = soldier->rangedTarget->meleeTarget;
 															Eigen::Vector2d targetPos = soldier->pos + vel * t;

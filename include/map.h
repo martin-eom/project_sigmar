@@ -27,7 +27,11 @@ class Map;
 class MapObject {
 public:
 	int type;
+	bool high = true;
 	virtual void AutoWaypoints(double rad, Map* map) {}
+	void toggle_high() {
+		high = !high;
+	};
 	MapObject() {type = MAP_NONE;}
 };
 
@@ -232,28 +236,32 @@ void Map::setAllNeighbours() {
 						if(j < 0) j = 0;
 						if(j > (*it2)->ncols - 1) j = (*it2)->ncols - 1;
 						// reducing number tiles to check for collision
-						int up, down, left, right = 0;
+						int up, down, left, right;
 						up = down = left = right = 0;
 						while(true) {
 							if(i - down <= 0) break;
-							down++;
 							if(tile->rec->pos.coeff(1) - (*it2)->grid.at(i - down).at(j)->rec->pos.coeff(1) > exclusion_dist)
-								break;}
+								break;
+							down++;
+						}
 						while(true) {
 							if(i + up >= (*it2)->nrows - 1) break;
-							up++;
 							if((*it2)->grid.at(i + up).at(j)->rec->pos.coeff(1) - tile->rec->pos.coeff(1) > exclusion_dist)
-								break;}
+								break;
+							up++;
+						}
 						while(true) {
 							if(j - left <= 0) break;
-							left++;
 							if(tile->rec->pos.coeff(0) - (*it2)->grid.at(i).at(j - left)->rec->pos.coeff(0) > exclusion_dist)
-								break;}
+								break;
+							left++;
+						}
 						while(true) {
-							if(j + right >= (*it2)->nrows - 1) break;
+							if(j + right >= (*it2)->ncols - 1) break;
+							if((*it2)->grid.at(i).at(j + right)->rec->pos.coeff(0) - tile->rec->pos.coeff(0) > exclusion_dist)
+								break;
 							right++;
-							if((*it2)->grid.at(i).at(j + right)->rec->pos.coeff(1) - tile->rec->pos.coeff(0) > exclusion_dist)
-								break;}
+						}
 						// checking the remaining tiles for neighbours
 						for(int m = i - down; m <= i + up; m++) {
 							for(int n = j - left; n <= j + right; n++) {
@@ -541,7 +549,7 @@ void SoldierRectangleCollision(Soldier* soldier, Rrectangle* rec) {
 		break;
 	case 0:
 		for(int i = 0; i < 4; i++) {
-			Corner* corner = &(rec->corners.at(i));
+			Corner* corner = (rec->corners.at(i));
 			Eigen::Vector2d dist = soldier->pos - corner->pos;
 			double d = dist.norm();
 			if(d <= soldier->rad) {
@@ -624,13 +632,15 @@ void AutoWaypoints(double rad, Map* map) {
 		for(auto obj : objreference) {
 			switch(obj->type) {
 			case MAP_CIRCLE:
-				if(LenientCircleCircleCollision(dynamic_cast<Circle*>(obj), dynamic_cast<Circle*>(wp)))
+				if(LenientCircleCircleCollision(dynamic_cast<Circle*>(obj), dynamic_cast<Circle*>(wp))) {
 					collision = true;
+				}
 				break;
 			case MAP_RECTANGLE:
 			case MAP_BORDER:
-				if(CircleRectangleCollision(dynamic_cast<Circle*>(wp), dynamic_cast<Rrectangle*>(obj)))
+				if(CircleRectangleCollision(dynamic_cast<Circle*>(wp), dynamic_cast<Rrectangle*>(obj))) {
 					collision = true;
+				}
 				break;
 			}
 			if(collision) {

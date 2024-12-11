@@ -909,6 +909,17 @@ void MapEditorController::handleKeyUpEvent(SDL_Event e, GeneralView* view) {
 			}
 		}
 		break;
+	case SDLK_f:
+		if(shift) {
+		}
+		else {
+			switch(state) {
+			case EDITOR_PLACING_CIRCLE:
+			case EDITOR_PLACING_RECTANGLE:
+				objToPlace->toggle_high();
+			}
+		}
+		break;
 	case SDLK_h:
 		help = !help;
 		break;

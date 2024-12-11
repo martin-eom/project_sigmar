@@ -365,7 +365,7 @@ void ProjectileCollisionHandling(Map* map) {
 				for(auto projectile: tile->projectiles) {
 					Point p(projectile->get_pos());
 					for(auto obj : tile->mapObjects) {
-						if(!projectile->dead) {
+						if(!projectile->dead && obj->high) {
 							switch(obj->type) {
 							case MAP_RECTANGLE:
 							case MAP_BORDER:

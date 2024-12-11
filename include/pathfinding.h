@@ -4,20 +4,22 @@
 #include <map.h>
 #include <Dense>
 
-bool FreePath(Circle* w1, Circle* w2, Map* map) {
+bool FreePath(Circle* w1, Circle* w2, Map* map, bool hightSensitive = false) {
 	Eigen::Vector2d p1 = w1->pos;
 	Eigen::Vector2d p2 = w2->pos;
 	Point u(p1);
 	Point v(p2);
 	bool collision = false;
 	for(auto obj : map->mapObjects) {
-		switch(obj->type) {
-		case MAP_CIRCLE:
-			if(LineCircleCollision(&u, &v, dynamic_cast<Circle*>(obj))) collision = true;
-			break;
-		case MAP_RECTANGLE:
-			if(LineRectangleCollison(&u, &v, dynamic_cast<Rrectangle*>(obj))) collision = true;
-			break;
+		if(!hightSensitive || obj->high) {
+			switch(obj->type) {
+			case MAP_CIRCLE:
+				if(LineCircleCollision(&u, &v, dynamic_cast<Circle*>(obj))) collision = true;
+				break;
+			case MAP_RECTANGLE:
+				if(LineRectangleCollison(&u, &v, dynamic_cast<Rrectangle*>(obj))) collision = true;
+				break;
+			}
 		}
 		if(collision) break;
 	}
@@ -29,13 +31,15 @@ bool FreePath(Circle* w1, Circle* w2, Map* map) {
 	Eigen::Matrix2d rot; rot << cos, -sin, sin, cos;
 	Rrectangle rec = Rrectangle(hw, hl, p1 + 0.5*diff, rot);
 	for(auto obj : map->mapObjects) {
-		switch(obj->type) {
-		case MAP_CIRCLE:
-			if(CircleRectangleCollision(dynamic_cast<Circle*>(obj), &rec)) collision = true;
-			break;
-		case MAP_RECTANGLE:
-			if(RectangleRectangleCollision(dynamic_cast<Rrectangle*>(obj), &rec)) collision = true;
-			break;
+		if(!hightSensitive || obj->high) {
+			switch(obj->type) {
+			case MAP_CIRCLE:
+				if(CircleRectangleCollision(dynamic_cast<Circle*>(obj), &rec)) collision = true;
+				break;
+			case MAP_RECTANGLE:
+				if(RectangleRectangleCollision(dynamic_cast<Rrectangle*>(obj), &rec)) collision = true;
+				break;
+			}
 		}
 		if(collision) break;
 	}

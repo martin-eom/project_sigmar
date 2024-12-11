@@ -24,6 +24,7 @@ Color* darkGreen = new Color(0x2e, 0x43, 0x28, 0xff);
 Color* colorPurple = new Color(0xff, 0x00, 0xff, 0xff);
 Color* colorRed = new Color(0xff, 0x00, 0x00, 0xff);
 Color* colorBlue = new Color(0x00, 0x00, 0xff, 0xff);
+Color* lightBlue = new Color(0x00, 0xc8, 0xff, 0xff);
 Color* colorGrey = new Color(0x88, 0x88, 0x88, 0xff);
 Color* darkGrey = new Color(0x50, 0x50, 0x50, 0xff);
 Color* colorOrange = new Color(0xff, 0xa5, 0x00, 0x99);
@@ -234,13 +235,14 @@ class MapEditorView : public GeneralView {
 	std::string _zoom		= "+/-         - zoom";
 	std::string _zoomMove	= "i/j/k/l     - move zoomed area";
 	std::string _awp		= "a           - automatically place waypoints";
+	std::string _toggleHigh = "f           - toggle object flatness";
 
 
 	std::string _options_menu =	_new_map + "\n" + _save_map + "\n" + _load_map + "\n"+ _quit;
 	std::string _control_scheme = _circle + "\n" + _rec + "\n" + _dpZone + "\n" + _wp + "\n" + _select + "\n" + _pf + + "\n" + _awp + "\n" + _zoom + "\n" + _zoomMove + "\n" + _lshift;
-	std::string _rplace = _rrot + "\n" + _rw + "\n" + _rh + "\n" + _zoom + "\n" + _zoomMove + "\n" + _pesc + "\n" + _lshift;
+	std::string _rplace = _rrot + "\n" + _rw + "\n" + _rh + "\n" + _toggleHigh + "\n" + _zoom + "\n" + _zoomMove + "\n" + _pesc + "\n" + _lshift;
 	std::string _dzplace = _rplace + "\n" + _dzPlayer;
-	std::string _cplace = _crad + "\n" + _zoom + "\n" + _zoomMove + "\n" + _pesc + "\n" + _lshift;
+	std::string _cplace = _crad + "\n" + _toggleHigh + "\n" + _zoom + "\n" + _zoomMove + "\n" + _pesc + "\n" + _lshift;
 	std::string _select_scheme = _sarrow + "\n" + _sclick + "\n" + _smove + "\n" + _scopy + "\n" + _sdel + "\n" + _zoom + "\n" + _zoomMove + "\n" + _sesc + "\n" + _lshift;
 	std::string _move_scheme =  _zoom + "\n" + _zoomMove + "\n" + _smesc + "\n" + _lshift;
 	std::string _copy_scheme =  _zoom + "\n" + _zoomMove + "\n" + _scesc + "\n" + _lshift;
@@ -364,16 +366,23 @@ void View::createAnimations() {
 void View::drawMapObjects(KeyboardAndMouseController* ctrl, Model* model) {
 	if(model->settings.show_map_object_outlines) {
 		for(auto obj : map->mapObjects) {
+			Color* drawColor = colorPurple;
+			if(!obj->high)
+				drawColor = lightBlue;
 			switch(obj->type) {
 			case MAP_CIRCLE: {
 				Circle* circ = dynamic_cast<Circle*>(obj);
+				if(obj->high)
+					SDL_SetTextureAlphaMod(objCircle->texture, 255);
+				else
+					SDL_SetTextureAlphaMod(objCircle->texture, 50);
 				objCircle->renderZoomed(circ->pos.coeff(0), circ->pos.coeff(1), circ->rad, 32, 32, 0, 0,
 					SCREEN_WIDTH, SCREEN_HEIGHT, ctrl->zoom, ctrl->center);
 				break;}
 			case MAP_BORDER:
 			case MAP_RECTANGLE: {
 				Rrectangle* rec = dynamic_cast<Rrectangle*>(obj);
-				DrawRectangle(rec, renderer, colorPurple, SCREEN_WIDTH, SCREEN_HEIGHT, ctrl->zoom, ctrl->center);
+				DrawRectangle(rec, renderer, drawColor, SCREEN_WIDTH, SCREEN_HEIGHT, ctrl->zoom, ctrl->center);
 				break;}
 			}
 		}
@@ -855,6 +864,8 @@ void MapEditorView::drawPlacedObjects(MapEditorController* ctrl) {
 				objColor = colorGreen; break;
 			}
 		}
+		else if(!object->high)
+			objColor = lightBlue;
 		switch(object->type) {
 		case MAP_WAYPOINT:
 			if(object != ctrl->selectedObj) objColor = colorGrey;
@@ -871,6 +882,21 @@ void MapEditorView::drawPlacedObjects(MapEditorController* ctrl) {
 		case MAP_BORDER:
 		case MAP_RECTANGLE: {
 			Rrectangle* rec = dynamic_cast<Rrectangle*>(object);
+			if(ddebug::_showDebugGraphics) {
+				Color* corCol = colorWhite;
+				for(int nc = 0; nc < rec->corners.size(); nc++) {
+					if(nc == 1) corCol = colorGrey;
+					if(nc == 2) corCol = darkGrey;
+					if(nc == 3) corCol = darkGreen;
+					Corner* corner = rec->corners.at(nc);
+					Circle circ(corner->pos, rec->hdiag*0.25);
+					DrawCircle(&circ, renderer, corCol, SCREEN_WIDTH, SCREEN_HEIGHT, ctrl->zoom, ctrl->center);
+				}
+			}
+			/*for(auto corner: rec->corners) {
+				Circle circ(corner.pos, rec->hdiag*0.25);
+				DrawCircle(&circ, renderer, colorWhite, SCREEN_WIDTH, SCREEN_HEIGHT, ctrl->zoom, ctrl->center);
+			}*/
 			DrawRectangle(rec, renderer, objColor, SCREEN_WIDTH, SCREEN_HEIGHT, ctrl->zoom, ctrl->center);
 			break;}
 		}
@@ -938,19 +964,21 @@ void MapEditorView::drawInputTextbox(MapEditorController* ctrl) {
 
 void MapEditorView::drawPlacingObject(MapEditorController* ctrl) {
 	if(ctrl->objToPlace) {
+		std::string highStat = "flat";
+		if(ctrl->objToPlace->high) highStat = "high";
 		switch(ctrl->objToPlace->type) {
 		case MAP_CIRCLE:
 		case MAP_WAYPOINT: {
 			Circle* circ = dynamic_cast<Circle*>(ctrl->objToPlace);
 			DrawCircle(circ, renderer, colorGreen, SCREEN_WIDTH, SCREEN_HEIGHT, ctrl->zoom, ctrl->center);
-			objDimensions->loadFromString(std::format("rectangle\nradius: {}", circ->rad), font, colorText, textwidth);
+			objDimensions->loadFromString(std::format("rectangle\nradius: {}\n{}", circ->rad, highStat), font, colorText, textwidth);
 			break;}
 		case MAP_BORDER:
 		case MAP_RECTANGLE:
 		case MAP_DEPLOYMENT_ZONE: {
 			Rrectangle* rec = dynamic_cast<Rrectangle*>(ctrl->objToPlace);
 			DrawRectangle(rec, renderer, colorGreen, SCREEN_WIDTH, SCREEN_HEIGHT, ctrl->zoom, ctrl->center);
-			objDimensions->loadFromString(std::format("rectangle\nwidth: {}\nheight: {}", rec->hl*2, rec->hw*2), font, colorText, textwidth);
+			objDimensions->loadFromString(std::format("rectangle\nwidth: {}\nheight: {}\n{}", rec->hl*2, rec->hw*2, highStat), font, colorText, textwidth);
 			break;}
 		}
 		if(objDimensions->texture) {

@@ -56,6 +56,7 @@ void getMapObjects(json* j, Map* map) {
 			json jcirc;
 			jcirc["pos"] = {circ->pos.coeff(0), circ->pos.coeff(1)};
 			jcirc["rad"] = circ->rad;
+			jcirc["high"] = obj->high;
 			circles.push_back(jcirc);
 			break;}
 		case MAP_RECTANGLE:
@@ -68,6 +69,7 @@ void getMapObjects(json* j, Map* map) {
 			jrec["rot"] = {rec->rot.coeff(0,0), rec->rot.coeff(0,1), rec->rot.coeff(1,0), rec->rot.coeff(1,1)};
 			if(obj->type == MAP_BORDER) jrec["b"] = 1;
 			else jrec["b"] = 0;
+			jrec["high"] = obj->high;
 			rectangles.push_back(jrec);
 			break;}
 		case MAP_WAYPOINT: {
@@ -77,6 +79,7 @@ void getMapObjects(json* j, Map* map) {
 			jcirc["rad"] = circ->rad;
 			if(dynamic_cast<MapWaypoint*>(obj)->_auto) jcirc["auto"] = 1;
 			else jcirc["auto"] = 0;
+			jcirc["high"] = obj->high;
 			waypoints.push_back(jcirc);
 			break;}
 		}
@@ -121,6 +124,8 @@ void readMapObjectsFromJSON(json* j, Map* map) {
 	for(auto jcirc : (*j)["circles"]) {
 		Eigen::Vector2d pos; pos << jcirc["pos"][0], jcirc["pos"][1];
 		MapCircle* circ = new MapCircle(pos, jcirc["rad"]);
+		if(jcirc.contains("high"))
+			circ->high = jcirc["high"];
 		map->AddMapObject(circ);
 	}
 	for(auto jrec : (*j)["rectangles"]) {
@@ -132,6 +137,8 @@ void readMapObjectsFromJSON(json* j, Map* map) {
 			else rec = new MapRectangle(jrec["hl"], jrec["hw"], pos, rot);
 		}
 		else rec = new MapRectangle(jrec["hl"], jrec["hw"], pos, rot);
+		if(jrec.contains("high"))
+			rec->high = jrec["high"];
 		map->AddMapObject(rec);
 	}
 	if((*j).contains("deployment_zones")){
@@ -399,7 +406,7 @@ void Map::writeNeighbourFile(std::string filename) {
 					int nRedNeighbours = tile->redundantNeighbours.at(ngrid2).size();
 					out << nRedNeighbours << "\n";
 					for(int nrn = 0; nrn < nRedNeighbours; nrn++) {
-						out << tile->redundantNeighbours.at(ngrid2).at(nrn)->nrow * grids.at(ngrid2)->nrows
+						out << tile->redundantNeighbours.at(ngrid2).at(nrn)->nrow * grids.at(ngrid2)->ncols
 							+ tile->redundantNeighbours.at(ngrid2).at(nrn)->ncol << "\n";
 					}
 				}
