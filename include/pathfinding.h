@@ -10,19 +10,31 @@ bool FreePath(Circle* w1, Circle* w2, Map* map, bool hightSensitive = false) {
 	Point u(p1);
 	Point v(p2);
 	bool collision = false;
-	for(auto obj : map->mapObjects) {
+	/*for(auto obj : map->mapObjects) {
+		std::cout << "next\n";
 		if(!hightSensitive || obj->high) {
 			switch(obj->type) {
-			case MAP_CIRCLE:
-				if(LineCircleCollision(&u, &v, dynamic_cast<Circle*>(obj))) collision = true;
+			case MAP_CIRCLE: {
+				std::cout << "circle\n";
+				if(LineCircleCollision(&u, &v, dynamic_cast<Circle*>(obj))) {collision = true;
+				std::cout << "LineCircleCollision\n";}
+				break;}
+			case MAP_RECTANGLE: {
+				std::cout << "rec\n";
+				if(LineRectangleCollison(&u, &v, dynamic_cast<Rrectangle*>(obj))) {collision = true;
+				std::cout << "LineRectangleCOllision\n";}
+				break;}
+			case MAP_WAYPOINT: {
+				std::cout << "wp\n";
 				break;
-			case MAP_RECTANGLE:
-				if(LineRectangleCollison(&u, &v, dynamic_cast<Rrectangle*>(obj))) collision = true;
-				break;
+			}
+			//case MAP_TRIANGLE:
+			//	if(LinePolygonCollision(&u, &v, dynamic_cast<Triangle*>(obj))) collision = true;
+			//	break;
 			}
 		}
 		if(collision) break;
-	}
+	}*/
 	Eigen::Vector2d diff = p2 - p1;
 	double hw = std::min(w1->rad, w2->rad) * 0.8;
 	double hl = diff.norm() / 2;
@@ -37,7 +49,14 @@ bool FreePath(Circle* w1, Circle* w2, Map* map, bool hightSensitive = false) {
 				if(CircleRectangleCollision(dynamic_cast<Circle*>(obj), &rec)) collision = true;
 				break;
 			case MAP_RECTANGLE:
-				if(RectangleRectangleCollision(dynamic_cast<Rrectangle*>(obj), &rec)) collision = true;
+				//std::cout << "rec\n";
+				//if(RectangleRectangleCollision(dynamic_cast<Rrectangle*>(obj), &rec)) {collision = true;
+				//std::cout << "RecRecCollision\n";}
+				//if(RectangleRectangleCollision(dynamic_cast<Rrectangle*>(obj), &rec)) {collision = true;
+				//std::cout << "RecRecCollision\n";}
+				//break;}
+			case MAP_TRIANGLE:
+				if(PolygonPolygonCollision(dynamic_cast<Ppolygon*>(obj), &rec)) collision = true;
 				break;
 			}
 		}

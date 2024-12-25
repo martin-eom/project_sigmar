@@ -215,8 +215,12 @@ class MapEditorView : public GeneralView {
 	std::string _wp			= "w           - select waypoint";
 	std::string _wprad		= "w           - change radius";
 	std::string _pf			= "p           - update pathfinding";
+	std::string _tri		= "t           - select triangle";
+	std::string _ta			= "w           - change a";
+	std::string _tb			= "e           - change b";
+	std::string _tg         = "g           - change gamma";
 	std::string _rec		= "r           - select rectangle";
-	std::string _rrot		= "hold ctrl   - rotate rectangle";
+	std::string _rrot		= "hold ctrl   - rotate";
 	std::string _rw			= "w           - change width";
 	std::string _rh			= "e           - change height";
 	std::string _pesc		= "esc         - aboart placement";
@@ -239,7 +243,8 @@ class MapEditorView : public GeneralView {
 
 
 	std::string _options_menu =	_new_map + "\n" + _save_map + "\n" + _load_map + "\n"+ _quit;
-	std::string _control_scheme = _circle + "\n" + _rec + "\n" + _dpZone + "\n" + _wp + "\n" + _select + "\n" + _pf + + "\n" + _awp + "\n" + _zoom + "\n" + _zoomMove + "\n" + _lshift;
+	std::string _control_scheme = _circle + "\n" + _tri + "\n" + _rec + "\n" + _dpZone + "\n" + _wp + "\n" + _select + "\n" + _pf + + "\n" + _awp + "\n" + _zoom + "\n" + _zoomMove + "\n" + _lshift;
+	std::string _tplace = _rrot + "\n" + _ta + "\n" + _tb + "\n" + _tg + "\n" + _toggleHigh + "\n" + _zoom + "\n" + _zoomMove + "\n" + _pesc + "\n" + _lshift;
 	std::string _rplace = _rrot + "\n" + _rw + "\n" + _rh + "\n" + _toggleHigh + "\n" + _zoom + "\n" + _zoomMove + "\n" + _pesc + "\n" + _lshift;
 	std::string _dzplace = _rplace + "\n" + _dzPlayer;
 	std::string _cplace = _crad + "\n" + _toggleHigh + "\n" + _zoom + "\n" + _zoomMove + "\n" + _pesc + "\n" + _lshift;
@@ -298,7 +303,7 @@ private:
 		Eigen::Matrix2d rot; rot << 1, 0, 0, 1;
 		Eigen::Vector2d map_center; map_center << map->width / 2, map->height / 2;
 		Rrectangle map_bg(map->height / 2 - 1, map->width / 2 - 1, map_center, rot);
-		DrawRectangle(&map_bg, renderer, darkGrey, SCREEN_WIDTH, SCREEN_HEIGHT, ctrl->zoom, ctrl->center);
+		DrawPolygon(&map_bg, renderer, darkGrey, SCREEN_WIDTH, SCREEN_HEIGHT, ctrl->zoom, ctrl->center);
 
 		drawPlacedObjects(ctrl);
 		drawMenu(ctrl);
@@ -309,7 +314,9 @@ private:
 	}
 	void Notify(Event* ev) {
 		if(ev->type == TICK_EVENT) {
+			debug("[view: TICK EVENT]\n");
 			Update();
+			debug("[view: end Tick]\n");
 		}
 	}
 };
@@ -379,10 +386,12 @@ void View::drawMapObjects(KeyboardAndMouseController* ctrl, Model* model) {
 				objCircle->renderZoomed(circ->pos.coeff(0), circ->pos.coeff(1), circ->rad, 32, 32, 0, 0,
 					SCREEN_WIDTH, SCREEN_HEIGHT, ctrl->zoom, ctrl->center);
 				break;}
+			case MAP_TRIANGLE:
 			case MAP_BORDER:
 			case MAP_RECTANGLE: {
-				Rrectangle* rec = dynamic_cast<Rrectangle*>(obj);
-				DrawRectangle(rec, renderer, drawColor, SCREEN_WIDTH, SCREEN_HEIGHT, ctrl->zoom, ctrl->center);
+				//Rrectangle* rec = dynamic_cast<Rrectangle*>(obj);
+				Ppolygon* pol = dynamic_cast<Ppolygon*>(obj);
+				DrawPolygon(pol, renderer, drawColor, SCREEN_WIDTH, SCREEN_HEIGHT, ctrl->zoom, ctrl->center);
 				break;}
 			}
 		}
@@ -391,7 +400,7 @@ void View::drawMapObjects(KeyboardAndMouseController* ctrl, Model* model) {
 		Color* drawColor = colorRed;
 		if(obj->player_id == 0) drawColor = colorBlue;
 		Rrectangle* rec = dynamic_cast<Rrectangle*>(obj);
-		DrawRectangle(rec, renderer, drawColor, SCREEN_WIDTH, SCREEN_HEIGHT, ctrl->zoom, ctrl->center);
+		DrawPolygon(rec, renderer, drawColor, SCREEN_WIDTH, SCREEN_HEIGHT, ctrl->zoom, ctrl->center);
 	}
 	if(ddebug::_showDebugGraphics) {
 		for(auto obj : map->waypoints) {
@@ -428,7 +437,7 @@ void View::drawProposedOrders1(KeyboardAndMouseController* ctrl, Model* model) {
 				rec = UnitRectangle(ao->target, ao->target->currentOrder);
 				recColor = colorOrange;
 			}
-			DrawRectangle(&rec, renderer, recColor, SCREEN_WIDTH, SCREEN_HEIGHT, ctrl->zoom, ctrl->center);
+			DrawPolygon(&rec, renderer, recColor, SCREEN_WIDTH, SCREEN_HEIGHT, ctrl->zoom, ctrl->center);
 		}
 	};
 
@@ -494,7 +503,7 @@ void View::drawCurrentOrders(KeyboardAndMouseController* ctrl, Model* model, Uni
 			//DrawCircle(&circ, renderer, colorGrey, SCREEN_WIDTH, SCREEN_HEIGHT, ctrl->zoom, ctrl->center);
 			if(unit->rangedTarget && unit == ctrl->selectedUnit) {
 				Rrectangle rec = OnSpotUnitRectangle(unit->rangedTarget);//, unit->rangedTarget->currentOrder);
-				DrawRectangle(&rec, renderer, colorPurple, SCREEN_WIDTH, SCREEN_HEIGHT, ctrl->zoom, ctrl->center);
+				DrawPolygon(&rec, renderer, colorPurple, SCREEN_WIDTH, SCREEN_HEIGHT, ctrl->zoom, ctrl->center);
 			}
 		}
 						
@@ -507,17 +516,17 @@ void View::drawCurrentOrders(KeyboardAndMouseController* ctrl, Model* model, Uni
 					Order* o = unit->orders.at(i);
 					if(o->type == ORDER_MOVE) {
 						Rrectangle rec = UnitRectangle(unit, i);
-						DrawRectangle(&rec, renderer, colorGreen, SCREEN_WIDTH, SCREEN_HEIGHT, ctrl->zoom, ctrl->center);
+						DrawPolygon(&rec, renderer, colorGreen, SCREEN_WIDTH, SCREEN_HEIGHT, ctrl->zoom, ctrl->center);
 					}
 					else if(o->type == ORDER_ATTACK) {
 						AttackOrder* ao = dynamic_cast<AttackOrder*>(o);
 						Rrectangle rec = UnitRectangle(ao->target, ao->target->currentOrder);
-						DrawRectangle(&rec, renderer, colorOrange, SCREEN_WIDTH, SCREEN_HEIGHT, ctrl->zoom, ctrl->center);
+						DrawPolygon(&rec, renderer, colorOrange, SCREEN_WIDTH, SCREEN_HEIGHT, ctrl->zoom, ctrl->center);
 					}
 					else if(o->type == ORDER_TARGET) {
 						TargetOrder* to = dynamic_cast<TargetOrder*>(o);
 						Rrectangle rec = UnitRectangle(to->target, to->target->currentOrder);
-						DrawRectangle(&rec, renderer, colorOrange, SCREEN_WIDTH, SCREEN_HEIGHT, ctrl->zoom, ctrl->center);
+						DrawPolygon(&rec, renderer, colorOrange, SCREEN_WIDTH, SCREEN_HEIGHT, ctrl->zoom, ctrl->center);
 					}
 					if(i == 0 && unit->placed) {
 						Point p1(o->pos); Point p2(unit->pos);
@@ -879,6 +888,10 @@ void MapEditorView::drawPlacedObjects(MapEditorController* ctrl) {
 				if(dynamic_cast<DeploymentZone*>(object)->player_id == 0) objColor = colorBlue;
 				else objColor = colorRed;
 			}
+		case MAP_TRIANGLE: {
+			Triangle* tri = dynamic_cast<Triangle*>(object);
+			DrawPolygon(tri, renderer, objColor, SCREEN_WIDTH, SCREEN_HEIGHT, ctrl->zoom, ctrl->center);
+			break;}
 		case MAP_BORDER:
 		case MAP_RECTANGLE: {
 			Rrectangle* rec = dynamic_cast<Rrectangle*>(object);
@@ -897,7 +910,7 @@ void MapEditorView::drawPlacedObjects(MapEditorController* ctrl) {
 				Circle circ(corner.pos, rec->hdiag*0.25);
 				DrawCircle(&circ, renderer, colorWhite, SCREEN_WIDTH, SCREEN_HEIGHT, ctrl->zoom, ctrl->center);
 			}*/
-			DrawRectangle(rec, renderer, objColor, SCREEN_WIDTH, SCREEN_HEIGHT, ctrl->zoom, ctrl->center);
+			DrawPolygon(rec, renderer, objColor, SCREEN_WIDTH, SCREEN_HEIGHT, ctrl->zoom, ctrl->center);
 			break;}
 		}
 	}
@@ -925,6 +938,8 @@ void MapEditorView::drawMenu(MapEditorController* ctrl) {
 		case EDITOR_PLACING_CIRCLE:
 		case EDITOR_PLACING_WP:
 			text = _cplace; break;
+		case EDITOR_PLACING_TRIANGLE:
+			text = _tplace; break;
 		case EDITOR_PLACING_DP_ZONE:
 			text = _dzplace; break;
 		case EDITOR_PLACING_RECTANGLE:
@@ -973,11 +988,17 @@ void MapEditorView::drawPlacingObject(MapEditorController* ctrl) {
 			DrawCircle(circ, renderer, colorGreen, SCREEN_WIDTH, SCREEN_HEIGHT, ctrl->zoom, ctrl->center);
 			objDimensions->loadFromString(std::format("rectangle\nradius: {}\n{}", circ->rad, highStat), font, colorText, textwidth);
 			break;}
+		case MAP_TRIANGLE: {
+			Triangle* tri = dynamic_cast<Triangle*>(ctrl->objToPlace);
+			DrawPolygon(tri, renderer, colorGreen, SCREEN_WIDTH, SCREEN_HEIGHT, ctrl->zoom, ctrl->center);
+			objDimensions->loadFromString(std::format("triangle\na: {}\nb: {}\ngamma: {}", tri->a, tri->b, tri->gamma, highStat), font, colorText, textwidth);
+		}break;
 		case MAP_BORDER:
 		case MAP_RECTANGLE:
 		case MAP_DEPLOYMENT_ZONE: {
 			Rrectangle* rec = dynamic_cast<Rrectangle*>(ctrl->objToPlace);
-			DrawRectangle(rec, renderer, colorGreen, SCREEN_WIDTH, SCREEN_HEIGHT, ctrl->zoom, ctrl->center);
+			DrawPolygon(rec, renderer, colorGreen, SCREEN_WIDTH, SCREEN_HEIGHT, ctrl->zoom, ctrl->center);
+			//DrawRectangle(rec, renderer, colorGreen, SCREEN_WIDTH, SCREEN_HEIGHT, ctrl->zoom, ctrl->center);
 			objDimensions->loadFromString(std::format("rectangle\nwidth: {}\nheight: {}\n{}", rec->hl*2, rec->hw*2, highStat), font, colorText, textwidth);
 			break;}
 		}

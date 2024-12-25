@@ -173,6 +173,20 @@ void DrawUnitArrow(Eigen::Vector2d pos, Eigen::Matrix2d rot, SDL_Renderer* rende
 	SDL_RenderDrawLine(renderer, p1.coeff(0), p1.coeff(1), p3.coeff(0), p3.coeff(1));
 }
 
+void DrawPolygon(Ppolygon* pol, SDL_Renderer* renderer, Color* color, int SCREEN_WIDTH, int SCREEN_HEIGHT, double zoom, Eigen::Vector2d center) {
+	Eigen::Vector2d diag; diag << SCREEN_WIDTH / 2., SCREEN_HEIGHT / 2.;
+	Ppolygon zoomPol(pol->pos*zoom - center + diag, pol->rot);
+	for(auto corner : pol->corners) {
+		zoomPol.corners.push_back(new Corner(corner->pos*zoom - center + diag, &zoomPol));
+	}
+	SDL_SetRenderDrawColor(renderer, color->r, color->g, color->b, color->al);
+	for(int nCorner = 0; nCorner < zoomPol.corners.size(); nCorner++) {
+		Eigen::Vector2d p0 = zoomPol.corners.at(nCorner)->pos;
+		Eigen::Vector2d p1 = zoomPol.corners.at((nCorner+1)%zoomPol.corners.size())->pos;
+		SDL_RenderDrawLine(renderer, p0.coeff(0), SCREEN_HEIGHT - p0.coeff(1), p1.coeff(0), SCREEN_HEIGHT - p1.coeff(1));
+	}
+}
+
 void DrawRectangle(Rrectangle* rec, SDL_Renderer* renderer, Color* color, int SCREEN_WIDTH, int SCREEN_HEIGHT, double zoom, Eigen::Vector2d center) {
 	Eigen::Vector2d diag; diag << SCREEN_WIDTH / 2., SCREEN_HEIGHT / 2.;
 	Rrectangle rrec(rec->hl*zoom, rec->hw*zoom, rec->pos*zoom - center + diag, rec->rot);

@@ -144,6 +144,44 @@ int main(int argc, char* argv[1]) {
 				T_OF_NEXT_TICK = CURRENT_TICK + em->dt * 1000;
 			}
 
+			auto reshapingTriangle = [&](int axis, int prevState) {
+				if(!SDL_IsTextInputActive()) {
+					std::string axisText;
+					switch(axis) {
+					case TRI_A: axisText = "enter new length a: "; break;
+					case TRI_B: axisText = "enter new length b: "; break;
+					case TRI_GAMMA: axisText = "enter new angle gamma: "; break;
+					}
+					ResetTextbox(axisText, true, ctrl, view);
+				}
+				if(ctrl->input_confirmed) {
+					ctrl->input_confirmed = false;
+					if(Isdouble(ctrl->input)) {
+						switch(axis) {
+						case TRI_A: {
+							ctrl->lastTriangleA = stod(ctrl->input);
+							Triangle* tri = dynamic_cast<Triangle*>(ctrl->objToPlace);
+							tri->Reshape(ctrl->lastTriangleA, tri->b, tri->gamma);
+						}break;
+						case TRI_B: {
+							ctrl->lastTriangleB = stod(ctrl->input);
+							Triangle* tri = dynamic_cast<Triangle*>(ctrl->objToPlace);
+							tri->Reshape(tri->a, ctrl->lastTriangleB, tri->gamma);
+						}break;
+						case TRI_GAMMA: {
+							double new_gamma = stod(ctrl->input);
+							if(0 < new_gamma && new_gamma < 180) {
+								ctrl->lastTriangleGamma = new_gamma;
+								Triangle* tri = dynamic_cast<Triangle*>(ctrl->objToPlace);
+								tri->Reshape(tri->a, tri->b, ctrl->lastTriangleGamma);
+							}
+						}break;
+						}
+					}
+					ctrl->state = prevState;
+				}
+			};
+
 			auto reshapingRectangle = [&](int axis, int prevState) {
 				if(!SDL_IsTextInputActive()) {
 					std::string axisText;
@@ -254,6 +292,30 @@ int main(int argc, char* argv[1]) {
 					ctrl->state = EDITOR_PLACING_WP;
 				}
 				break;
+			case EDITOR_PLACING_TRIANGLE: {
+				ResetTextbox("", false, ctrl, view);
+				dynamic_cast<Ppolygon*>(ctrl->objToPlace)->Reposition(ctrl->mousePos);
+				}break;
+			case EDITOR_ROTATING_TRIANGLE: {
+				ResetTextbox("", false, ctrl, view);
+				Ppolygon* pol = dynamic_cast<Ppolygon*>(ctrl->objToPlace);
+				Eigen::Vector2d diff = ctrl->mousePos - pol->pos;
+				if(diff.coeff(0) != 0 || diff.coeff(1) != 0) {
+					double cos = diff.coeff(0) / diff.norm();
+					double sin = diff.coeff(1) / diff.norm();
+					Eigen::Matrix2d rot; rot << cos, -sin, sin, cos;
+					pol->Rotate(rot);
+				}
+			}break;
+			case EDITOR_ENTERING_TRI_A:
+				reshapingTriangle(TRI_A, EDITOR_PLACING_TRIANGLE);
+				break;
+			case EDITOR_ENTERING_TRI_B:
+				reshapingTriangle(TRI_B, EDITOR_PLACING_TRIANGLE);
+				break;
+			case EDITOR_ENTERING_TRI_GAMMA:
+				reshapingTriangle(TRI_GAMMA, EDITOR_PLACING_TRIANGLE);
+				break;
 			case EDITOR_PLACING_RECTANGLE:
 			case EDITOR_PLACING_DP_ZONE: {
 				ResetTextbox("", false, ctrl, view);
@@ -332,6 +394,8 @@ int main(int argc, char* argv[1]) {
 					switch(ctrl->objToPlace->type) {
 					case MAP_CIRCLE:
 						ctrl->state = EDITOR_PLACING_CIRCLE; break;
+					case MAP_TRIANGLE:
+						ctrl->state = EDITOR_PLACING_TRIANGLE; break;
 					case MAP_RECTANGLE:
 						ctrl->state = EDITOR_PLACING_RECTANGLE; break;
 					case MAP_DEPLOYMENT_ZONE:
@@ -349,6 +413,8 @@ int main(int argc, char* argv[1]) {
 					switch(ctrl->objToPlace->type) {
 					case MAP_CIRCLE:
 						ctrl->state = EDITOR_PLACING_CIRCLE; break;
+					case MAP_TRIANGLE:
+						ctrl->state = EDITOR_PLACING_TRIANGLE; break;
 					case MAP_RECTANGLE:
 						ctrl->state = EDITOR_PLACING_RECTANGLE; break;
 					case MAP_DEPLOYMENT_ZONE:

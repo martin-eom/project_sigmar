@@ -47,6 +47,45 @@ public:
 	double y() {return pos.coeff(1);}
 };
 
+class Straight {
+public:
+	bool vertical = false;
+	double vertical_x = false;
+	double a = 1;
+	double b = 0;
+
+	Straight(Point* p1, Point* p2) {
+		if(p2->x() == p1->x()) {
+			vertical = true;
+			vertical_x = p1->x();
+		}
+		else {
+			a = (p2->y() - p1->y()) / (p2->x() - p1->x());
+			b = p1->y() - a*p1->x();
+		}
+	}
+};
+
+Eigen::Vector2d StraightIntersect(Straight l1, Straight l2) {
+	// ONLY WORKS if intersect EXISTS
+	Eigen::Vector2d intersect;
+	double x,y;
+	if(l1.vertical) {
+		x = l1.vertical_x;
+		y = l2.a*x + l2.b;
+	}
+	else if(l2.vertical) {
+		x = l2.vertical_x;
+		y = l1.a*x + l1.b;
+	}
+	else {
+		x = (l2.b - l1.b) / (l1.a - l2.a);
+		y = l1.a*x + l1.b;
+	}
+	intersect << x, y;
+	return intersect;
+}
+
 class Circle : public Point {
 public:
 	double rad;
@@ -89,6 +128,49 @@ public:
 	}
 };
 
+class Triangle : public Ppolygon {
+public:
+	double a;
+	double b;
+	double gamma; // in degree
+	Eigen::Matrix2d gamma_rot;
+	//void Reshape(double a, double b, double gamma);
+
+	Triangle(double a, double b, double gamma, Eigen::Vector2d pos, Eigen::Matrix2d rot) : Ppolygon(pos, rot) {
+		if(a == 0) this->a = 1;
+		else this->a = a;
+		if(b == 0) this->b = 1;
+		else this->b = b;
+		if(gamma <= 0 || gamma >= 180) this->gamma = 90;
+		else this->gamma = gamma;
+		//M_PI
+		gamma_rot = Rotation(M_PI/180*this->gamma);
+		corners.push_back(new Corner(pos, this));
+		Eigen::Vector2d p3(this->b, 0);
+		p3 = (rot * (gamma_rot * p3)) + pos;
+		corners.push_back(new Corner(p3, this));
+		Eigen::Vector2d p2(this->a, 0);
+		p2 = (rot * p2) + pos;
+		corners.push_back(new Corner(p2, this));
+	}
+
+	void Reshape(double a, double b, double gamma) {
+		if(a == 0) this->a = 1;
+		else this->a = a;
+		if(b == 0) this->b = 1;
+		else this->b = b;
+		if(gamma <= 0 || gamma >= 180) this->gamma = 90;
+		else this->gamma = gamma;
+		gamma_rot = Rotation(M_PI/180*this->gamma);
+		Eigen::Vector2d p3(this->b, 0);
+		p3 = (rot * (gamma_rot * p3)) + pos;
+		corners.at(1)->pos = p3;
+		Eigen::Vector2d p2(this->a, 0);
+		p2 = (rot * p2) + pos;
+		corners.at(2)->pos = p2;
+	}
+};
+
 class Rrectangle : public Ppolygon {
 public:
 	double hl;	//half length
@@ -103,6 +185,12 @@ public:
 	//void Reposition(Eigen::Vector2d pos);
 	//void Rotate(Eigen::Matrix2d rot);
 	void Reshape(double hl, double hw);
+};
+
+enum TRI_AXIS {
+	TRI_A,
+	TRI_B,
+	TRI_GAMMA
 };
 
 enum REC_AXIS {
@@ -157,11 +245,17 @@ void Rrectangle::Reshape(double hl, double hw) {
 	this->hw = hw;
 }
 
+Eigen::Vector2d LineLineIntersect(Point* p00, Point* p01, Point* p10, Point* p11) {
+	Eigen::Vector2d intersect;
+
+	return intersect;
+}
+
 
 // Collision detection functions
 bool LineLineCollision(Point* p00, Point* p01, Point* p10, Point* p11) {
 	//Bezier parameters
-	double t_numerator = (p00->pos.coeff(0) - p10->pos.coeff(0))*(p10->pos.coeff(1) - p11->pos.coeff(1))
+	/*double t_numerator = (p00->pos.coeff(0) - p10->pos.coeff(0))*(p10->pos.coeff(1) - p11->pos.coeff(1))
 						- (p00->pos.coeff(1) - p10->pos.coeff(1))*(p10->pos.coeff(0) - p11->pos.coeff(0));
 	double t_denominator = (p00->pos.coeff(0) - p01->pos.coeff(0))*(p10->pos.coeff(1) - p11->pos.coeff(1))
 						- (p00->pos.coeff(1) - p01->pos.coeff(1))*(p10->pos.coeff(0) - p11->pos.coeff(0));
@@ -177,7 +271,34 @@ bool LineLineCollision(Point* p00, Point* p01, Point* p10, Point* p11) {
 	if((u_numerator < 0 && u_denominator < 0) || (0 <= u_numerator && 0 <= u_denominator)) {
 		if(std::abs(u_denominator) >= std::abs(u_numerator)) u_intersect = true;
 	}
-	return t_intersect && u_intersect;
+	return t_intersect && u_intersect;*/
+	Eigen::Vector2d p2 = p01->pos - p00->pos;
+	Eigen::Vector2d p3 = p10->pos - p00->pos;
+	Eigen::Vector2d p4 = p11->pos - p00->pos;
+	Eigen::Matrix2d rot = Rotation(-Angle(p2.coeff(1), p2.coeff(0)));
+	p2 = rot * p2;
+	p3 = rot * p3;
+	p4 = rot * p4;
+	if(p3.coeff(1) == p4.coeff(1)) {
+		// special case, all ends should return
+		if(p3.coeff(1) == 0) {
+			if(std::min(p3.coeff(0), p4.coeff(0)) <= 0 && 
+				0 <= std::max(p3.coeff(0), p4.coeff(0)))
+				return true;
+			else if(std::min(p3.coeff(0), p4.coeff(0)) <= p2.coeff(0) && 
+				p2.coeff(0) <= std::max(p3.coeff(0), p4.coeff(0)))
+				return true;
+			else return false;
+		}
+		else return false;
+	}
+	double xIntersect = p3.coeff(0);
+	if(p3.coeff(0) != p4.coeff(0)) {
+		xIntersect -= p3.coeff(1) * (p4.coeff(0) - p3.coeff(0)) / (p4.coeff(1) - p3.coeff(1));
+	}
+	return xIntersect >= 0 && xIntersect <= p2.coeff(0)
+		&& xIntersect >= std::min(p3.coeff(0),p4.coeff(0))
+		&& xIntersect <= std::max(p3.coeff(0), p4.coeff(0));
 }
 
 bool LineCircleCollision(Point* l1, Point* l2, Circle* circ) {
@@ -228,6 +349,17 @@ bool PointRectangleCollision(Point* p, Rrectangle* rec) {
 	/*Eigen::Vector2d rotPos = rec->rot.transpose() * (p->pos - rec->pos);
 	return -rec->hw <= rotPos.coeff(0) && rotPos.coeff(0) <= rec->hw 
 		&& -rec->hl <= rotPos.coeff(1) && rotPos.coeff(1) <= rec->hl;*/
+}
+
+bool LinePolygonCollision(Point* l1, Point* l2, Ppolygon* pol) {
+	if(PointPolygonCollision(l1, pol)) return true;
+	if(PointPolygonCollision(l2, pol)) return true;
+	for(int nCorner = 0; nCorner < pol->corners.size() * 0.5; nCorner++) {
+		if(LineLineCollision(l1, l2, 
+			pol->corners.at(nCorner), pol->corners.at((nCorner + pol->corners.size()/2)%pol->corners.size())))
+			return true;
+	}
+	return false;
 }
 
 bool LineRectangleCollison(Point* l1, Point* l2, Rrectangle* rec) {
@@ -299,7 +431,28 @@ bool CircleRectangleCollision(Circle* circle, Rrectangle* rec) {
 	return false;*/
 }
 
+bool PolygonPolygonCollision(Ppolygon* pol1, Ppolygon* pol2) {
+	for(auto corner : pol1->corners) {
+		if(PointPolygonCollision(corner, pol2)) return true;
+	}
+	for(auto corner : pol2->corners) {
+		if(PointPolygonCollision(corner, pol1)) return true;
+	}
+	for(int nCorner1 = 0; nCorner1 < pol1->corners.size() * 0.5; nCorner1++) {
+		for(int nCorner2 = 0; nCorner2 < pol2->corners.size(); nCorner2++) {
+			if(LineLineCollision(
+				pol1->corners.at(nCorner1), pol1->corners.at((nCorner1 + pol1->corners.size()/2)%pol1->corners.size()),
+				pol2->corners.at(nCorner2), pol2->corners.at((nCorner2+1)%pol2->corners.size())
+				))
+				return true;
+		}
+	}
+	return false;
+}
+
 bool RectangleRectangleCollision(Rrectangle* rec1, Rrectangle* rec2) {
+	return PolygonPolygonCollision(rec1, rec2);
+	// below is wrong
 	for(auto corner : rec1->corners) {
 		if(PointRectangleCollision(corner, rec2)) {return true;}
 	}

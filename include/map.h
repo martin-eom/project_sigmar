@@ -15,6 +15,7 @@
 
 enum MAP_OBJECT_TYPES {
 	MAP_NONE,
+	MAP_TRIANGLE,
 	MAP_RECTANGLE,
 	MAP_BORDER,
 	MAP_DEPLOYMENT_ZONE,
@@ -45,6 +46,12 @@ class MapWaypoint : public MapCircle {
 public:
 	bool _auto;
 	MapWaypoint(Eigen::Vector2d pos, double rad) : MapCircle(pos, rad) {_auto = false; type = MAP_WAYPOINT;}
+};
+
+class MapTriangle : public MapObject, public Triangle {
+public:
+	MapTriangle(double a, double b, double gamma, Eigen::Vector2d pos, Eigen::Matrix2d rot) : MapObject(), Triangle(a, b, gamma, pos, rot) {type = MAP_TRIANGLE;}
+	void AutoWaypoints(double rad, Map* map);
 };
 
 class MapRectangle : public MapObject, public Rrectangle {
@@ -338,6 +345,19 @@ void Map::AddMapObject(MapObject* obj, bool update) {
 			}
 		}
 		break;}
+	case MAP_TRIANGLE: {
+		Triangle* tri = dynamic_cast<Triangle*>(obj);
+		for(auto grid: grids) {
+			for(auto row: grid->grid) {
+				for(auto tile: row) {
+					Rrectangle extended = Rrectangle(tile->rec->hl*2, tile->rec->hw*2, tile->rec->pos, tile->rec->rot);
+					if(PolygonPolygonCollision(tri, &extended)) {
+						tile->mapObjects.push_back(obj);
+					}
+				}
+			}
+		}
+		}break;
 	case MAP_BORDER:
 	case MAP_RECTANGLE: {
 		Rrectangle* rec = dynamic_cast<Rrectangle*>(obj);
@@ -375,6 +395,7 @@ void Map::RemoveMapObject(MapObject* obj) {
 	std::erase(mapObjects, obj);
 	switch(obj->type) {
 	case MAP_CIRCLE:
+	case MAP_TRIANGLE:
 	case MAP_RECTANGLE:
 		for(auto grid: grids) {
 			for(auto row: grid->grid) {
@@ -591,6 +612,55 @@ void MapCircle::AutoWaypoints(double rad, Map* map) {
 	}
 }
 
+/*void PolygonAutoWaypoints(Polygon* pol, double rad, Map* map) {
+	
+}*/
+
+void MapTriangle::AutoWaypoints(double rad, Map* map) {
+	for(int i = 0; i < corners.size(); i++) {
+		Eigen::Vector2d pos;
+		Corner* c1 = corners.at(i);
+		Corner* c2 = corners.at((i+1)%corners.size());
+		Corner* c3 = corners.at((i+2)%corners.size());
+		Eigen::Vector2d p1 = c1->pos - c2->pos;
+		Eigen::Vector2d p3 = c3->pos - c2->pos;
+		Eigen::Matrix2d rot1 = Rotation(Angle(-p1.coeff(1)/p1.norm(), -p1.coeff(0)/p1.norm()));
+		p3 = rot1.transpose() * p3;
+		double cornerAngle = Angle(-p3.coeff(1) / p3.norm(), -p3.coeff(0) / p3.norm());
+		std::cout << "angle: " << cornerAngle * 180 / M_PI << "\n";
+		MapWaypoint* w;
+		if(cornerAngle == M_PI/2) {
+			pos << rad, rad;
+			w = new MapWaypoint(rot1 * pos + c2->pos, rad);
+			w->_auto = true;
+			map->AddMapObject(w);
+			std::cout << w->pos << "\n";
+		}
+		else if(cornerAngle > M_PI/2) {
+			pos << rad / p3.coeff(1) * (p3.coeff(0) - p3.norm() / std::sqrt(2)), rad;
+			w = new MapWaypoint(rot1 * pos + c2->pos, rad);
+			w->_auto = true;
+			map->AddMapObject(w);
+			std::cout << w->pos << "\n";
+		}
+		else {
+			pos << rad, rad;
+			w = new MapWaypoint(rot1 * pos + c2->pos, rad);
+			w->_auto = true;
+			map->AddMapObject(w);
+			std::cout << w->pos << "\n";
+			p3 = c3->pos - c2->pos;
+			Eigen::Matrix2d rot3 = Rotation(Angle(-p3.coeff(1)/p3.norm(), -p3.coeff(0)/p3.norm()));
+			pos << rad, -rad;
+			w = new MapWaypoint(rot3 * pos + c2->pos, rad);
+			w->_auto = true;
+			map->AddMapObject(w);
+			std::cout << w->pos << "\n";
+		}
+	}
+	std::cout << "mapwaypoint size: " << map->waypoints.size() << "\n";
+}
+
 void MapRectangle::AutoWaypoints(double rad, Map* map) {
 	std::vector<Eigen::Vector2d> centers;
 	Eigen::Vector2d p1, p2, p3, p4;
@@ -615,10 +685,14 @@ void AutoWaypoints(double rad, Map* map) {
 	}
 	//creating new automatic waypoints
 	std::vector<MapObject*> objreference = map->mapObjects;
+	// this should access the virtual method instead of needing a switch
 	for(auto obj : objreference) {
 		switch(obj->type) {
 		case MAP_CIRCLE:
 			dynamic_cast<MapCircle*>(obj)->AutoWaypoints(rad, map);
+			break;
+		case MAP_TRIANGLE:
+			dynamic_cast<MapTriangle*>(obj)->AutoWaypoints(rad, map);
 			break;
 		case MAP_RECTANGLE:
 			dynamic_cast<MapRectangle*>(obj)->AutoWaypoints(rad, map);
@@ -633,6 +707,11 @@ void AutoWaypoints(double rad, Map* map) {
 			switch(obj->type) {
 			case MAP_CIRCLE:
 				if(LenientCircleCircleCollision(dynamic_cast<Circle*>(obj), dynamic_cast<Circle*>(wp))) {
+					collision = true;
+				}
+				break;
+			case MAP_TRIANGLE:
+				if(CirclePolygonCollision(dynamic_cast<Circle*>(wp), dynamic_cast<Triangle*>(obj))) {
 					collision = true;
 				}
 				break;

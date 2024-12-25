@@ -46,6 +46,7 @@ Map::Map(std::string filename) {
 
 void getMapObjects(json* j, Map* map) {
 	json circles = json::array();
+	json triangles = json::array();
 	json rectangles = json::array();
 	json waypoints = json::array();
 	json deployment_zones = json::array();
@@ -58,6 +59,17 @@ void getMapObjects(json* j, Map* map) {
 			jcirc["rad"] = circ->rad;
 			jcirc["high"] = obj->high;
 			circles.push_back(jcirc);
+			break;}
+		case MAP_TRIANGLE: {
+			Triangle* tri = dynamic_cast<Triangle*>(obj);
+			json jtri;
+			jtri["a"] = tri->a;
+			jtri["b"] = tri->b;
+			jtri["gamma"] = tri->gamma;
+			jtri["pos"] = {tri->pos.coeff(0), tri->pos.coeff(1)};
+			jtri["rot"] = {tri->rot.coeff(0,0), tri->rot.coeff(0,1), tri->rot.coeff(1,0), tri->rot.coeff(1,1)};
+			jtri["high"] = obj->high;
+			triangles.push_back(jtri);
 			break;}
 		case MAP_RECTANGLE:
 		case MAP_BORDER: {
@@ -94,6 +106,7 @@ void getMapObjects(json* j, Map* map) {
 		deployment_zones.push_back(jdz);
 	}
 	(*j)["circles"] = circles;
+	(*j)["triangles"] = triangles;
 	(*j)["rectangles"] = rectangles;
 	(*j)["waypoints"] = waypoints;
 	(*j)["deployment_zones"] = deployment_zones;
@@ -127,6 +140,16 @@ void readMapObjectsFromJSON(json* j, Map* map) {
 		if(jcirc.contains("high"))
 			circ->high = jcirc["high"];
 		map->AddMapObject(circ);
+	}
+	if(j->contains("triangles")) {
+		for(auto jtri : (*j)["triangles"]) {
+			Eigen::Vector2d pos; pos << jtri["pos"][0], jtri["pos"][1];
+			Eigen::Matrix2d rot; rot << jtri["rot"][0], jtri["rot"][1], jtri["rot"][2], jtri["rot"][3];
+			MapObject* tri = new MapTriangle(jtri["a"], jtri["b"], jtri["gamma"], pos, rot);
+			if(jtri.contains("high"))
+				tri->high = jtri["high"];
+			map->AddMapObject(tri);
+		}
 	}
 	for(auto jrec : (*j)["rectangles"]) {
 		Eigen::Vector2d pos; pos << jrec["pos"][0], jrec["pos"][1];
