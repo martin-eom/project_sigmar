@@ -275,7 +275,7 @@ bool LineLineCollision(Point* p00, Point* p01, Point* p10, Point* p11) {
 	Eigen::Vector2d p2 = p01->pos - p00->pos;
 	Eigen::Vector2d p3 = p10->pos - p00->pos;
 	Eigen::Vector2d p4 = p11->pos - p00->pos;
-	Eigen::Matrix2d rot = Rotation(-Angle(p2.coeff(1), p2.coeff(0)));
+	Eigen::Matrix2d rot = Rotation(-Angle(p2.coeff(1) / p2.norm(), p2.coeff(0) / p2.norm()));
 	p2 = rot * p2;
 	p3 = rot * p3;
 	p4 = rot * p4;
@@ -438,6 +438,7 @@ bool PolygonPolygonCollision(Ppolygon* pol1, Ppolygon* pol2) {
 	for(auto corner : pol2->corners) {
 		if(PointPolygonCollision(corner, pol1)) return true;
 	}
+	// check one diagonal connected to each corner
 	for(int nCorner1 = 0; nCorner1 < pol1->corners.size() * 0.5; nCorner1++) {
 		for(int nCorner2 = 0; nCorner2 < pol2->corners.size(); nCorner2++) {
 			if(LineLineCollision(
@@ -447,6 +448,17 @@ bool PolygonPolygonCollision(Ppolygon* pol1, Ppolygon* pol2) {
 				return true;
 		}
 	}
+	// or check every edge with every edge of the other polygon (more expensive)
+	/*for(int nCorner1 = 0; nCorner1 < pol1->corners.size(); nCorner1++) {
+		for(int nCorner2 = 0; nCorner2 < pol2->corners.size(); nCorner2++) {
+			if(LineLineCollision(
+			pol1->corners.at(nCorner1), pol1->corners.at((nCorner1 + 1)%pol1->corners.size()),
+			pol2->corners.at(nCorner2), pol2->corners.at((nCorner2 + 1)%pol2->corners.size())
+			)) {
+				return true;
+			}
+		}
+	}*/
 	return false;
 }
 
