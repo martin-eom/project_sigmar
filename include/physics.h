@@ -588,11 +588,9 @@ void MapObjectCollisionHandling(Map* map) {
 						for(auto object : tile->mapObjects) {
 							switch(object->type) {
 							case MAP_TRIANGLE:
-								SoldierPolygonCollision(soldier, dynamic_cast<Ppolygon*>(object));
-								break;
 							case MAP_RECTANGLE:
 							case MAP_BORDER:
-								SoldierRectangleCollision(soldier, dynamic_cast<Rrectangle*>(object));
+								SoldierPolygonCollision(soldier, dynamic_cast<Ppolygon*>(object));
 								break;
 							case MAP_CIRCLE:
 								SoldierCircleCollision(soldier, dynamic_cast<Circle*>(object));
