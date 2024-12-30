@@ -367,9 +367,11 @@ void ProjectileCollisionHandling(Map* map) {
 					for(auto obj : tile->mapObjects) {
 						if(!projectile->dead && obj->high) {
 							switch(obj->type) {
+							case MAP_TRIANGLE:
 							case MAP_RECTANGLE:
 							case MAP_BORDER:
-								if(PointRectangleCollision(&p, dynamic_cast<Rrectangle*>(obj))) {
+								//if(PointRectangleCollision(&p, dynamic_cast<Rrectangle*>(obj))) {
+								if(PointPolygonCollision(&p, dynamic_cast<Ppolygon*>(obj))) {
 									projectile->dead = true;
 								}
 								break;
@@ -585,6 +587,9 @@ void MapObjectCollisionHandling(Map* map) {
 					if(soldier) {
 						for(auto object : tile->mapObjects) {
 							switch(object->type) {
+							case MAP_TRIANGLE:
+								SoldierPolygonCollision(soldier, dynamic_cast<Ppolygon*>(object));
+								break;
 							case MAP_RECTANGLE:
 							case MAP_BORDER:
 								SoldierRectangleCollision(soldier, dynamic_cast<Rrectangle*>(object));

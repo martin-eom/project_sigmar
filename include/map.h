@@ -471,6 +471,103 @@ void SoldierCircleCollision(Soldier* soldier, Circle* circle) {
 	}
 }
 
+enum COLLISION_EDGE {
+	COLLISION_EDGE_LEFT,
+	COLLISION_EDGE_RIGHT,
+	COLLISION_CORNER
+};
+
+void SoldierPolygonCollision(Soldier* soldier, Ppolygon* pol) {
+	Eigen::Vector2d knockVel;
+	knockVel << 0., 0.;
+	// find closest corner
+	int closest = 0;
+	double minCornerDist; minCornerDist = std::numeric_limits<float>::infinity();
+	for(int i = 0; i < pol->corners.size(); i++) {
+		Eigen::Vector2d diff = soldier->pos - pol->corners.at(i)->pos;
+		double dist = diff.coeff(0)*diff.coeff(0) + diff.coeff(1)*diff.coeff(1);
+		if(dist < minCornerDist) {
+			minCornerDist = dist;
+			closest = i;
+		}
+	}
+	//find closest of the two edges
+	int collisionEdge = COLLISION_CORNER;
+	double minEdgeDist; minEdgeDist = std::numeric_limits<float>::infinity(); 
+	//Eigen::Vector2d solPos = soldier->pos - pol->corners.at(closest)->pos;
+	Eigen::Vector2d leftEdge = pol->corners.at((closest - 1 + pol->corners.size())%pol->corners.size())->pos
+		- pol->corners.at(closest)->pos;
+	Eigen::Vector2d rightEdge = pol->corners.at((closest +1)%pol->corners.size())->pos
+		- pol->corners.at(closest)->pos;
+	Eigen::Matrix2d rot; Eigen::Vector2d solPos;
+	rot = Rotation(-Angle(leftEdge.coeff(1) / leftEdge.norm(), leftEdge.coeff(0) / leftEdge.norm()));
+	solPos = rot * (soldier->pos - pol->corners.at(closest)->pos);
+	Eigen::Vector2d temp; temp = rot * leftEdge;
+	if(0 <= solPos.coeff(0) && solPos.coeff(0) <= temp.coeff(0)) {
+		minEdgeDist = abs(solPos.coeff(1));
+		collisionEdge = COLLISION_EDGE_LEFT;
+	}
+	rot = Rotation(-Angle(rightEdge.coeff(1) / rightEdge.norm(), rightEdge.coeff(0) / rightEdge.norm()));
+	solPos = rot * (soldier->pos - pol->corners.at(closest)->pos);
+	temp = rot * rightEdge;
+	if(0 <= solPos.coeff(0) && solPos.coeff(0) <= temp.coeff(0)) {
+		double newEdgeDist = abs(solPos.coeff(1));
+		if(newEdgeDist < minEdgeDist) {
+			minEdgeDist = newEdgeDist;
+			collisionEdge = COLLISION_EDGE_RIGHT;
+		}
+	}
+	// switch
+	Eigen::Vector2d rotVel;
+	Eigen::Vector2d soldierPosCorrection; soldierPosCorrection << 0., 0.;
+	double collisionStrength = 2.;	//2. is physical
+	switch(collisionEdge) {
+	case COLLISION_CORNER: {
+		solPos = soldier->pos - pol->corners.at(closest)->pos;
+		if(solPos.norm() < soldier->rad) {
+			rot = Rotation(Angle(solPos.coeff(1) / solPos.norm(), solPos.coeff(0) / solPos.norm()));
+			rotVel = rot.transpose() * soldier->vel;
+			rotVel(0) *= -collisionStrength;
+			rotVel(1) = 0;
+			rotVel = rot * rotVel;
+			if(rotVel.coeff(0) < 0) {
+				knockVel = rotVel;
+				soldierPosCorrection(0) = soldier->rad - solPos.norm();
+				soldierPosCorrection = rot * soldierPosCorrection;
+			}
+		}
+	}break;
+	case COLLISION_EDGE_LEFT: {
+		rot = Rotation(Angle(leftEdge.coeff(1) / leftEdge.norm(), leftEdge.coeff(0) / leftEdge.norm()));
+		solPos = rot.transpose() * (soldier->pos - pol->corners.at(closest)->pos);
+		rotVel = rot.transpose() * soldier->vel;
+		if(rotVel.coeff(1) > 0 && solPos.coeff(1) > -soldier->rad) {
+			rotVel(0) = 0;
+			rotVel(1) *= -collisionStrength;
+			rotVel = rot * rotVel;
+			knockVel = rotVel;
+			soldierPosCorrection(1) = -soldier->rad - solPos.coeff(1);
+			soldierPosCorrection = rot * soldierPosCorrection;
+		}
+	}break;
+	case COLLISION_EDGE_RIGHT: {
+		rot = Rotation(Angle(rightEdge.coeff(1) / rightEdge.norm(), rightEdge.coeff(0) / rightEdge.norm()));
+		solPos = rot.transpose() * (soldier->pos - pol->corners.at(closest)->pos);
+		rotVel = rot.transpose() * soldier->vel;
+		if(rotVel.coeff(1) < 0 && solPos.coeff(1) < soldier->rad) {
+			rotVel(0) = 0;
+			rotVel(1) *= -collisionStrength;
+			rotVel = rot * rotVel;
+			knockVel = rotVel;
+			soldierPosCorrection(1) = soldier->rad - solPos.coeff(1);
+			soldierPosCorrection = rot * soldierPosCorrection;
+		}
+	}break;
+	}
+	soldier->knockVel += knockVel;
+	soldier->pos += soldierPosCorrection;
+}
+
 void SoldierRectangleCollision(Soldier* soldier, Rrectangle* rec) {
 	Eigen::Vector2d knockVel;
 	knockVel << 0., 0.;
