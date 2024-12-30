@@ -527,10 +527,10 @@ void SoldierPolygonCollision(Soldier* soldier, Ppolygon* pol) {
 		if(solPos.norm() < soldier->rad) {
 			rot = Rotation(Angle(solPos.coeff(1) / solPos.norm(), solPos.coeff(0) / solPos.norm()));
 			rotVel = rot.transpose() * soldier->vel;
-			rotVel(0) *= -collisionStrength;
-			rotVel(1) = 0;
-			rotVel = rot * rotVel;
 			if(rotVel.coeff(0) < 0) {
+				rotVel(0) *= -collisionStrength;
+				rotVel(1) = 0;
+				rotVel = rot * rotVel;
 				knockVel = rotVel;
 				soldierPosCorrection(0) = soldier->rad - solPos.norm();
 				soldierPosCorrection = rot * soldierPosCorrection;
