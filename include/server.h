@@ -6,6 +6,9 @@
 #include <physics.h>
 #include <map.h>
 #include <model.h>
+#include <combat_mechanics.h>
+#include <unit_order_progression.h>
+#include <individual_pathfinding.h>
 #include <player.h>
 
 #include <cstdio>

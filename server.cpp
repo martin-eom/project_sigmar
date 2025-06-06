@@ -45,13 +45,8 @@ void OpenWindow(Map* map) {
 	em = new GameEventManager(30);
 	dynamic_cast<GameEventManager*>(em)->map = map;
 	model = new Model(em, map);
-	//model->loadSoldierTypes("config/templates/classes.json");
-	//model->loadUnitTypes("config/templates/units.json");
-	//model->loadDamageInfo();
-	//model->loadSettings("config/game_settings.json");
 	model->init();
 	dynamic_cast<GameEventManager*>(em)->model = model;
-	// #### set up players with units from armylist.json
 	Player* player1 = new Player(true);
 	model->players.push_back(player1);
 	model->player1 = player1;
@@ -59,8 +54,6 @@ void OpenWindow(Map* map) {
 	model->players.push_back(player2);
 	model->player2 = player2;
 	model->loadArmyLists("config/templates/armylist.json");
-	//ctrl->SetPlayer();
-	//ctrl->SetUnit();
 	ctrl = new KeyboardAndMouseController(em, SCREEN_WIDTH, SCREEN_HEIGHT, map);
 	dynamic_cast<GameEventManager*>(em)->ctrl = ctrl;
 
@@ -121,10 +114,12 @@ int main(int argc, char* argv[1]) {
 	SDL_StopTextInput();
 
 	//map = new Map("maps/testmap.json");
-	map = new Map("maps/pillars2.json");
+	//map = new Map("maps/pillars2.json");
+	map = new Map("maps/field.json");
+	//map = new Map("maps/testmap.json");
 	OpenWindow(map);
 
-	// Extra Debug section
+	/*// Extra Debug section
 	Eigen::Vector2d start_pos;
 	start_pos << 20, 90;
 	Eigen::Vector2d vel;
@@ -138,7 +133,7 @@ int main(int argc, char* argv[1]) {
 	//Event ume = UnitRosterModifiedEvent();
 	//em->Post(&ume);
 	//UnitPlaceRequest placeTurret(turret, start_pos, rot);
-	//em->Post(&placeTurret);
+	//em->Post(&placeTurret);*/
 
 	// Main loop
 	bool quit = false;

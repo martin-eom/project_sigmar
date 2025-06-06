@@ -878,9 +878,14 @@ void MapEditorView::drawPlacedObjects(MapEditorController* ctrl) {
 		switch(object->type) {
 		case MAP_WAYPOINT:
 			if(object != ctrl->selectedObj) objColor = colorGrey;
+			break;//this line prevents drawing of waypoints
 		case MAP_CIRCLE: {
 			Circle* circ = dynamic_cast<Circle*>(object);
 			DrawCircle(circ, renderer, objColor, SCREEN_WIDTH, SCREEN_HEIGHT, ctrl->zoom, ctrl->center);
+			break;}
+		case MAP_TRIANGLE: {
+			Triangle* tri = dynamic_cast<Triangle*>(object);
+			DrawPolygon(tri, renderer, objColor, SCREEN_WIDTH, SCREEN_HEIGHT, ctrl->zoom, ctrl->center);
 			break;}
 		case MAP_DEPLOYMENT_ZONE:
 			// here go the color selection rules
@@ -888,10 +893,6 @@ void MapEditorView::drawPlacedObjects(MapEditorController* ctrl) {
 				if(dynamic_cast<DeploymentZone*>(object)->player_id == 0) objColor = colorBlue;
 				else objColor = colorRed;
 			}
-		case MAP_TRIANGLE: {
-			Triangle* tri = dynamic_cast<Triangle*>(object);
-			DrawPolygon(tri, renderer, objColor, SCREEN_WIDTH, SCREEN_HEIGHT, ctrl->zoom, ctrl->center);
-			break;}
 		case MAP_BORDER:
 		case MAP_RECTANGLE: {
 			Rrectangle* rec = dynamic_cast<Rrectangle*>(object);
@@ -918,7 +919,7 @@ void MapEditorView::drawPlacedObjects(MapEditorController* ctrl) {
 		for(int j = i+1; j < map->wp_path_next.at(i).size(); j++) {
 			if(i != j && map->wp_path_next.at(i).at(j) == j && map->waypoints.size() > std::max(i,j)){
 				Point p1(map->waypoints.at(i)->pos); Point p2(map->waypoints.at(j)->pos);
-				DrawLine(&p1, &p2, renderer, colorBlue, SCREEN_WIDTH, SCREEN_HEIGHT, ctrl->zoom, ctrl->center);
+				//DrawLine(&p1, &p2, renderer, colorBlue, SCREEN_WIDTH, SCREEN_HEIGHT, ctrl->zoom, ctrl->center);
 
 			}
 		}

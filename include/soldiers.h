@@ -21,6 +21,7 @@
 
 class Soldier;
 class Unit;
+class Map;
 
 class SoldierNeighbourContainer {
 public:
@@ -227,6 +228,19 @@ class Soldier : public Circle{
 			damp = Force / pow(maxSpeed, 2);
 		};
 
+		void IndivPathProgression(Map* map);
+		void ChooseMeleeTargetsByRangeAndCone(std::vector<SoldierNeighbourContainer>* targets, std::vector<SoldierNeighbourContainer>* notInCone);
+		bool OnAttackOrder();
+		void HandleCharging(std::vector<SoldierNeighbourContainer>* targets);
+		void UpdateChargingStatus(std::vector<SoldierNeighbourContainer>* targets, Order* o);
+		void FindTargetIfNoneInRange(Order* o);
+		void CheckIfPathToTarget(Map* map);
+		void ResolveAttacks(Model* model, std::vector<SoldierNeighbourContainer>* targets);
+		void GetValidTargetRangedTarget();
+		bool TargetInRangedCone();
+		bool HasLOSToPointOfImpact(Eigen::Vector2d pointOfImpact, Map* map);
+		bool AllyTooCloseToTarget(Eigen::Vector2d pointOfImpact, double flightTime);
+		void FireOrReloadIfPossible(Map* map, EventManager* em);
 };
 
 

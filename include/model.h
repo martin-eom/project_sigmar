@@ -11,77 +11,13 @@
 #include <pathfinding.h>
 #include <projectiles.h>
 #include <information.h>
+#include <timing.h>
 
 
 #include <cstdlib>
 #include <map>
 #include <chrono>
 
-void Unit::PostCombatFormup() {
-	orders.push_back(new MoveOrder(pos, rot, MOVE_FORMUP, true));
-}
-
-void Unit::NextOrderPathfinding(Order* oldOrder, Order* newOrder, Map* map) {
-	std::vector<Order*> newOrders;
-	double rad = ncols*(yspacing - 1);
-	MapWaypoint w1(newOrder->pos, rad);
-	MapWaypoint w2(oldOrder->pos, rad);
-	Eigen::Matrix2d Rot;
-	if(!FreePath(&w1, &w2, map)) {
-		std::vector<Eigen::Vector2d> positions = findPath(&w1, &w2, map);
-		for(int npos = 1; npos < positions.size(); npos++) {
-			Eigen::Vector2d diff = positions.at(npos) - positions.at(npos - 1);
-			double d = diff.norm();
-			double cos = diff.coeff(0)/d;
-			double sin = diff.coeff(1)/d;
-			if(d > 0)
-				Rot << cos, -sin, sin, cos;
-			else
-				Rot << 1, 0, 0, 1;
-			if(newOrder->type == ORDER_ATTACK && npos == positions.size() - 1) {
-				int movetype = MOVE_FORMUP;
-				if(enemyContact || true)
-					movetype = MOVE_PASSINGTHROUGH;
-				newOrders.push_back(new MoveOrder(positions.at(npos-1), Rot, movetype, true, true, newOrder->target));
-				newOrders.at(newOrders.size() - 1)->setCombat();
-				newOrder->rot = Rot;
-			}
-			else if(newOrder->type == ORDER_ATTACK) {
-				newOrders.push_back(new MoveOrder(positions.at(npos-1), Rot, MOVE_PASSINGTHROUGH, true, true, newOrder->target));
-				newOrders.at(newOrders.size()-1)->setCombat();
-			}
-			else
-				newOrders.push_back(new MoveOrder(positions.at(npos-1), Rot, MOVE_PASSINGTHROUGH, true, true));
-		}
-	}
-	orders.insert(orders.begin() + currentOrder + 1, newOrders.begin(), newOrders.end());
-	// THE FOLLOWING IS IN THE WRONG PLACE
-	// let soldiers on currentOrder instant-complete the first new order if they have los on the second
-	for(auto row: soldiers) {
-		for(auto soldier: row) {
-			if(soldier->currentOrder == currentOrder && currentOrder < orders.size() - 1) {
-				MapWaypoint w1(soldier->pos, soldier->rad);
-				MapWaypoint w2(orders.at(currentOrder+1)->pos, soldier->rad);
-				if(FreePath(&w1, &w2, map)) {
-					soldier->arrived = true;
-					nSoldiersArrived++;
-				}
-			}
-		}
-	}
-}
-
-void Unit::ResetCharging() {
-	for(auto row: soldiers) {
-		for(auto soldier: row) {
-			if(soldier->currentOrder == currentOrder) {
-				soldier->charging = true;
-				soldier->chargeTimer.reset();
-			}
-		}
-	}
-	enemyContact = false;
-}
 
 void OrderPathfinding(Unit* unit, Map* map, std::vector<Order*> nos = std::vector<Order*>(), int start_order = 0) {
 	std::vector<Order*> newOrders = std::vector<Order*>();
@@ -214,7 +150,24 @@ class Model : public Listener{
 		void loadDamageInfo();
 		void loadSettings(std::string filename);
 		void init();
+
+		void GameStateCheck();
+		void PlaceUnits();
+		void MapSoldiersToGrid();
+		void RangedTargetFinding();
+		void MeleeCombat();
+		void Shooting();
+		void ProjectileHitResolution();
+		void DamageResolution();
+		void ProjectileCleanup();
 	
+		void GiveOrdersResponse(Event* ev);
+		void GiveAllOrdersResponse(Event* ev);
+		void AppendOrdersResponse(Event* ev);
+		void ReformResponse(Event* ev);
+		void KillResponse(Event* ev);
+		void TickResponse(Event* ev);
+
 		Model(EventManager* em, Map* map) : Listener(em) {
 			this->map = map;
 			dt = &(em->dt);
@@ -224,109 +177,13 @@ class Model : public Listener{
 	private:
 		void Notify(Event* ev) {
 			if(ev->type == GIVE_ORDERS_REQUEST) {
-				switch(state) {
-				case MODEL_SIMULATION:
-				case MODEL_GAME_PAUSED: {
-					GiveOrdersRequest* oev = dynamic_cast<GiveOrdersRequest*>(ev);
-					Unit* unit = oev->unit;
-					if(unit) {
-						if(unit->placed) {
-							// deleting all future orders as well as the current one
-							debug("Beginning order deletion");
-							if(unit->orders.at(unit->currentOrder)->type == ORDER_ATTACK) {
-								/*for(auto row: unit->soldiers) {
-									for(auto soldier: row) {
-										if(soldier->currentOrder == unit->currentOrder) {
-											soldier->charging = true;
-											soldier->chargeTimer.reset();
-										}
-									}
-								}
-								unit->enemyContact = false;*/
-								unit->ResetCharging();
-							}
-							while(unit->orders.size() > unit->currentOrder) unit->orders.pop_back();
-							debug("Finished order deletion");
-							// setting a new current order to the current unit position as starting point for the pathfinding calculation
-							if(!oev->orders.empty() && oev->orders.at(0)->type == ORDER_ATTACK)
-								unit->orders.push_back(new MoveOrder(unit->pos, unit->rot, MOVE_PASSINGTHROUGH, true, false, oev->orders.at(0)->target));
-							else
-								unit->orders.push_back(new MoveOrder(unit->pos, unit->rot, MOVE_PASSINGTHROUGH, true, false));
-						}
-						// appending the new orders
-						for(auto order : oev->orders) {
-							if(order->type == ORDER_ATTACK) {
-								order->setCombat();
-								Unit* target = dynamic_cast<AttackOrder*>(order)->target;
-								if(target->orders.at(target->currentOrder)->type == ORDER_ATTACK)
-									order->pos = target->pos;
-								else
-									order->pos = target->pos;
-								//target->targetedBy.push_back(unit);
-							}
-							unit->orders.push_back(order);
-						}
-						debug("Pushed back new orders");
-						if(!unit->placed) unit->currentOrder = 0;
-						Order* o = unit->orders.at(unit->currentOrder);
-						debug("Found new new order");
-						for(auto row : unit->soldiers) {
-							for(auto soldier : row) {
-								if(soldier->placed && soldier->alive) {
-									if(soldier->currentOrder == unit->currentOrder) {
-										soldier->arrived = false;
-									}
-								}
-							}
-						}
-						unit->nSoldiersArrived = 0;
-						// doing pathfinding on all orders
-						// Pathfinding belongs in nextOrder
-						//OrderPathfinding(unit, map);
-						// debug
-						// end debug
-						// reforming so that the new position targets are set
-						if(unit->placed) {
-							ReformUnit(unit);
-							//MoveTarget(unit);
-							unit->MoveTarget();
-						}
-					}
-					break;}
-				}
+				GiveOrdersResponse(ev);
 			}
-			if(ev->type == GIVE_ALL_ORDERS_REQUEST) {
-				GiveAllOrdersRequest* gaor = dynamic_cast<GiveAllOrdersRequest*>(ev);
-				for(int n_unit = 0; n_unit < gaor->orderList.size(); n_unit++) {
-					std::vector<Order*> orders = gaor->orderList.at(n_unit);
-					if(orders.size() > 0) {
-						GiveOrdersRequest gor = GiveOrdersRequest(gaor->player->units.at(n_unit), orders);
-						em->Post(&gor);
-					}
-				}
+			else if(ev->type == GIVE_ALL_ORDERS_REQUEST) {
+				GiveAllOrdersResponse(ev);
 			}
-			if(ev->type == APPEND_ORDERS_REQUEST) {
-				switch(state) {
-				case MODEL_SIMULATION:
-				case MODEL_GAME_PAUSED: {
-					AppendOrdersRequest* oev = dynamic_cast<AppendOrdersRequest*>(ev);
-					Unit* unit = oev->unit;
-					if(unit) {
-						for(auto order : oev->orders) {
-							if(order->type == ORDER_ATTACK) {
-								Unit* target = dynamic_cast<AttackOrder*>(order)->target;
-								if(target->orders.at(target->currentOrder)->type == ORDER_ATTACK)
-									order->pos = target->pos;
-								else
-									order->pos = target->posTarget;
-								//target->targetedBy.push_back(unit);
-							}
-							unit->orders.push_back(order);
-						}
-						//OrderPathfinding(unit, map);
-					}
-					break;}
-				}
+			else if(ev->type == APPEND_ORDERS_REQUEST) {
+				AppendOrdersResponse(ev);
 			}
 			else if(ev->type == UNIT_PLACE_REQUEST) {
 				UnitPlaceRequest* pev = dynamic_cast<UnitPlaceRequest*>(ev);
@@ -334,43 +191,13 @@ class Model : public Listener{
 					if(!(pev->unit->placed)) {
 						pev->unit->Place(pev->pos, pev->rot);
 					}
-					else {
-						std::cout << "Unit was already placed.\n";
-					}
-				}
-				else {
-					std::cout << "No unit selected. Attempting to set unit.\n";
-					//SetUnit();
 				}
 			}
 			else if (ev->type == REFORM_EVENT) {
-				switch(state) {
-				case MODEL_SIMULATION:
-				case MODEL_GAME_RUNNING: {
-					for(auto player : players) {
-						for(auto unit : player->units) {
-							if(unit->placed) {
-								ReformUnit(unit);
-								unit->MoveTarget();
-							}
-						}
-					}
-					break;}
-				}
+				ReformResponse(ev);
 			}
 			else if (ev->type == KILL_EVENT) {
-				KillEvent* kev = dynamic_cast<KillEvent*>(ev);
-				Soldier* soldier = kev->soldier;
-				if(soldier->alive) {
-					Unit* unit = soldier->unit;
-					soldier->alive = false;
-					unit->nLiveSoldiers--;
-					if(soldier->currentOrder == 0)
-						unit->nSoldiersOnFirstOrder--;
-					if(soldier->arrived && soldier->currentOrder == unit->currentOrder)
-						unit->nSoldiersArrived--;
-					std::erase(soldier->unit->liveSoldiers, soldier);
-				}
+				KillResponse(ev);
 			}
 			else if (ev->type == PROJECTILE_SPAWN_EVENT) {
 				projectiles.push_back(dynamic_cast<ProjectileSpawnEvent*>(ev)->p);
@@ -382,388 +209,18 @@ class Model : public Listener{
 				}
 			}
 			else if (ev->type == TICK_EVENT) {
-				if(state != MODEL_GAME_PAUSED)
-					nticks++;
 				auto global_start = std::chrono::system_clock::now();
-				// determining if game over
-				auto start = std::chrono::system_clock::now();
-				switch(state) {
-				case MODEL_GAME_RUNNING:
-					if(toNextState.done()) {
-						int sumLife1 = 0; 
-						int sumLife2 = 0;
-						for(auto unit : player1->units) sumLife1 += unit->nLiveSoldiers;
-						for(auto unit : player2->units) sumLife2 += unit->nLiveSoldiers;
-						if(sumLife1 == 0 || sumLife2 == 0) {
-							state = MODEL_GAME_OVER;
-							if(sumLife1 == 0) {
-								if(sumLife2 == 0) result = "Game Over: Draw";
-								else result = "Game Over: Player 2 wins";
-							}
-							else result = "Game Over: Player 1 wins";
-						}
-						else {
-							state = MODEL_GAME_PAUSED;
-							GamePausedEvent gpe;
-							em->Post(&gpe);
-							toNextState.reset();
-						}
-					}
-					else {
-						toNextState.decrement();
-					}
-					break;
-				}
-				auto end = std::chrono::system_clock::now();
-				if(state != MODEL_GAME_PAUSED)
-					time_check_game_over += std::chrono::duration<double>(end - start).count();
-
-				//placing units
-				start = std::chrono::system_clock::now();
-				for(auto player : players) {
-					for(auto unit : player->units) {
-						if(!unit->placed) {
-							if(!unit->orders.empty()) {
-								Order* o = unit->orders.at(0);
-								if(o->type == ORDER_MOVE) {
-									MoveOrder* mo = dynamic_cast<MoveOrder*>(o);
-									UnitPlaceRequest* pev = new UnitPlaceRequest(unit, mo->pos, mo->rot);
-									em->Post(pev);
-								}
-							}
-						}
-					}
-				}
-				end = std::chrono::system_clock::now();
-				if(state != MODEL_GAME_PAUSED)
-					time_placing_units += std::chrono::duration<double>(end - start).count();
+				TickResponse(ev);
 
 				switch(state) {
 				case MODEL_SIMULATION:
 				case MODEL_GAME_RUNNING: {
 					debug("TickEvent: map - begin");
-					//mapping soldiers to grid
 
-					start = std::chrono::system_clock::now();
-
-					for(auto player : players) {
-						for(auto unit : player->units) {
-							if(unit->placed) {
-								if(!unit->nSoldiersOnFirstOrder && unit->nLiveSoldiers) unit->DeleteObsoleteOrder();
-								CollisionScrying(map, unit);
-							}
-						}
-					}
-
-					end = std::chrono::system_clock::now();
-					if(state != MODEL_GAME_PAUSED)
-						time_collision_scrying += std::chrono::duration<double>(end - start).count();
-					start = std::chrono::system_clock::now();
-					//resolving collisions between soldiers and creating enemy neighbourlists
-					CollisionResolution(map, &units, &soldiers, &soldier_locks);
-					end = std::chrono::system_clock::now();
-					if(state != MODEL_GAME_PAUSED)
-						time_collision_resolution += std::chrono::duration<double>(end - start).count();
-					//resolving collisions with map objects
-					start = std::chrono::system_clock::now();
-					MapObjectCollisionHandling(map);
-					end = std::chrono::system_clock::now();
-					if(state != MODEL_GAME_PAUSED)
-						time_map_object_collision_handling += std::chrono::duration<double>(end - start).count();
-					start = std::chrono::system_clock::now();
-					ProjectileCollisionScrying(map, projectiles);
-					end = std::chrono::system_clock::now();
-					if(state != MODEL_GAME_PAUSED)
-						time_projectile_collision_scrying += std::chrono::duration<double>(end - start).count();
-					start = std::chrono::system_clock::now();
-					ProjectileCollisionHandling(map);
-
-					end = std::chrono::system_clock::now();
-					if(state != MODEL_GAME_PAUSED)
-						time_projectile_collision_resolution += std::chrono::duration<double>(end - start).count();
-
-					start = std::chrono::system_clock::now();
-					//for(auto player : players) {
-					int n_units = units.size();
-					#pragma omp parallel for default(shared)
-					for(int n_unit = 0; n_unit < n_units; n_unit++) {
-						//for(auto unit : player->units) {
-						Unit* unit = units.at(n_unit);
-						if(unit->placed) {
-							//moving unit target if combat has already started every so often to keep up with moving units
-							if(unit->orders.at(unit->currentOrder)->_combat) {
-								unit->targetUpdateTimer.decrement();
-								if(unit->targetUpdateTimer.done()) {
-									if(unit->orders.at(unit->currentOrder)->type == ORDER_ATTACK && unit->enemyContact) {
-										// check if target unit has "ran away"
-										bool ranAway = true;
-										for(auto row: unit->soldiers) {
-											for(auto soldier: row) {
-												if(soldier->currentOrder == unit->currentOrder) {
-													// getting delete-copy of pripority queue
-													std::vector<SoldierNeighbourContainer> enemiesCopy;
-													while(!soldier->enemiesInMeleeRange.empty()) {
-														enemiesCopy.push_back(soldier->enemiesInMeleeRange.top());
-														soldier->enemiesInMeleeRange.pop();
-													}
-													// searching through copy to find target in range
-													for(auto enemy: enemiesCopy) {
-														if(enemy.soldier->unit == unit->orders.at(unit->currentOrder)->target) {
-															ranAway = false;
-															break;
-														}
-													}
-													// restoring priority queue
-													for(auto enemy: enemiesCopy) {
-														soldier->enemiesInMeleeRange.push(enemy);
-													}
-												}
-											}
-										}
-										// if so reset charging
-										
-										if(ranAway)
-											unit->ResetCharging();
-										// do rest
-										unit->posTarget = unit->orders.at(unit->currentOrder)->target->pos;
-										unit->MoveTarget();
-									}
-									else {
-										//redo pathfinding to target here!
-										// find actual attack order
-										int attackOrder = unit->currentOrder;
-										while(unit->orders.at(attackOrder)->type != ORDER_ATTACK) {
-											attackOrder++;
-										}
-										double rad = unit->ncols * (unit->yspacing - 1);
-										Unit* target = unit->orders.at(attackOrder)->target;
-										MapWaypoint w1(unit->pos, rad);
-										MapWaypoint w2(target->pos, rad);
-										bool break_alternative = false;
-										if(attackOrder == unit->currentOrder && FreePath(&w1, &w2, map)) {
-											unit->posTarget = target->pos;
-											unit->MoveTarget();
-											//break;
-											break_alternative = true;
-										}
-										if(!break_alternative) {
-										unit->orders.erase(std::remove_if(unit->orders.begin() + unit->currentOrder, 
-											unit->orders.end(),
-											[](const Order* o) {
-												return o->_transition;
-											}), unit->orders.end()
-										);
-										std::vector<Order*> newOrders(unit->orders.begin() + unit->currentOrder, unit->orders.end());
-										em->Post(new GiveOrdersRequest(unit, newOrders));
-										}
-
-										// if they are on the attack order and DO NOT HAVE LINE OF SIGHT they need to get a temporary waypoint and a give orders event
-										// remove all transition orders between current order and attack order
-										//unit->orders.erase(unit->orders.begin() + unit->currentOrder, unit->orders.begin() + attackOrder);
-										// do orderpathfinding between current order and attack order
-										//unit->NextOrderPathfinding(unit->orders.at(unit->currentOrder), unit->orders.at(unit->currentOrder + 1), map);
-									}
-									unit->targetUpdateTimer.reset();
-								}
-							}
-							/*if(unit->enemyContact && unit->orders.at(unit->currentOrder)->type == ORDER_ATTACK) {
-								unit->targetUpdateTimer.decrement();
-								if(unit->targetUpdateTimer.done()) {
-									unit->posTarget = unit->orders.at(unit->currentOrder)->target->pos;
-									unit->MoveTarget();
-									unit->targetUpdateTimer.reset();
-								}
-							}*/
-							//advancing order
-							if(unit->CurrentOrderCompleted()) {
-								if(unit->currentOrder == (unit->orders.size() - 1) 
-									&& (unit->orders.at(unit->currentOrder)->type == ORDER_ATTACK
-										|| unit->orders.at(unit->currentOrder)->type == ORDER_TARGET))
-									unit->PostCombatFormup();
-								if(unit->orders.size() > (unit->currentOrder +1)) {
-									bool transitionOrder = unit->orders.at(unit->currentOrder)->_transition;
-									unit->NextOrder(map);
-									Order* o = unit->orders.at(unit->currentOrder);
-									if(o->type == ORDER_MOVE || true) {
-										ReformUnit(unit);
-										unit->MoveTarget();
-									}
-									//telling other units that this one is moving on if they are targeting it
-									if(!unit->enemyContact && !transitionOrder) {
-										//debug(std::to_string(unit->targetedBy.size()));
-										std::vector<std::vector<Order*>> newOrders;
-										//std::vector<Unit*> targetedByTemp;
-										/*for(auto attacker : unit->targetedBy) {
-											//redo pathfinding
-											newOrders.push_back(std::vector<Order*>());
-											targetedByTemp.push_back(attacker);
-											for(int i = attacker->currentOrder; i < attacker->orders.size(); i++) {
-												o = attacker->orders.at(i);
-												if(!o->_auto) {
-													if(o->type == ORDER_ATTACK) {
-														Unit* target = dynamic_cast<AttackOrder*>(o)->target;
-														o = new AttackOrder(target, target->pos);
-													}
-													newOrders.back().push_back(o);
-												}
-											}
-
-										}*/
-										/*for(int i = 0; i < newOrders.size(); i++) {
-											std::erase(unit->targetedBy, targetedByTemp.at(i));
-											GiveOrdersRequest gev(targetedByTemp.at(i), newOrders.at(i));
-											omp_set_lock(unit_locks.at(targetedByTemp.at(i)->model_index));
-											em->Post(&gev);
-											omp_unset_lock(unit_locks.at(targetedByTemp.at(i)->model_index));
-										}*/
-									}
-								}
-							}
-							//individual movement
-							std::vector<std::vector<Soldier*>>* soldiers = &(unit->soldiers);
-							std::vector<std::vector<Eigen::Vector2d>>* posInUnit = &(unit->posInUnit);
-							for(int i = 0; i < unit->nrows; i++) {
-								for(int j = 0; j < unit->ncols; j++) {
-									Soldier* soldier = soldiers->at(i).at(j);
-									if(soldier && soldier->alive) {
-										soldier->debugFlag1 = false;
-										soldier->debugFlag2 = false;
-										soldier->debugFlag3 = false;
-										//possibly advancing soldier order during combat
-										int co = soldier->currentOrder;
-										if(!soldier->charging && unit->orders.at(co)->type != ORDER_ATTACK && unit->orders.size() > co + 1 && unit->enemyContact) {
-											Order* no = unit->orders.at(co + 1);
-											if(unit->orders.at(co)->target && no->target) {
-												Circle c1(soldier->pos, soldier->rad);
-												Eigen::Vector2d nextPos = no->pos + no->rot * unit->posInUnit.at(i).at(j);
-												Circle c2(nextPos, soldier->rad);
-												if(!soldier->arrived && FreePath(&c1, &c2, map)) {
-													soldier->arrived = true;
-													if(soldier->currentOrder == unit->currentOrder)
-														unit->nSoldiersArrived++;
-												}
-											}
-										}
-
-										//start = std::chrono::system_clock::now();
-
-										//check if need to do indiv pathfinding, but only do this every second or so!
-										soldier->indivPathTimer.decrement();
-										if(soldier->indivPathTimer.done()) {
-											Circle c1(soldier->pos, soldier->rad);
-											Circle c2(NoIPFPosTarget(soldier), soldier->rad);
-											if(soldier->indivPath.empty()) {
-												if(!FreePath(&c1, &c2, map)) {
-													//do indiv pathfinding
-													soldier->indivPath = findPath(&c2, &c1, map);
-												}
-											}
-											else {
-												if(FreePath(&c1, &c2, map)) {
-													soldier->indivPath.clear();
-												}
-												else {
-													Circle c3(soldier->indivPath.at(0), soldier->rad);
-													if(FreePath(&c1, &c3, map)) {
-														if(soldier->indivPath.size() > 1) {
-															Circle c4(soldier->indivPath.at(1), soldier->rad);
-															if(FreePath(&c1, &c4, map))
-																std::erase(soldier->indivPath, soldier->indivPath.at(0));
-														}
-														else {
-															if((c3.pos - c1.pos).norm() < soldier->rad)
-																std::erase(soldier->indivPath, soldier->indivPath.at(0));
-														}
-													}
-													else {
-														//redo indiv pathfinding
-														soldier->indivPath = findPath(&c2, &c1, map);
-													}
-												}
-											}
-											soldier->indivPathTimer.reset();
-										}
-
-
-										//physics step
-										if(soldier->placed && soldier->alive) {
-											TimeStep(soldier, *dt);
-										}
-
-										//advancing soldier order
-										if(soldier->alive && soldier->arrived) {
-											if(soldier->currentOrder < unit->currentOrder) {
-												SoldierNextOrder(soldier, posInUnit->at(i).at(j));
-											}
-										}
-									}
-								}
-							}
-							unit->UpdatePos();
-							unit->UpdateVel();
-						}
-					}
-
-					end = std::chrono::system_clock::now();
-					if(state != MODEL_GAME_PAUSED)
-						time_physics_step += std::chrono::duration<double>(end - start).count();
-
-					//ranged target finding
-					for(auto player : players) {
-						for(auto unit : player->units) {
-							if(unit->placed && unit->ranged) {
-								if(unit->rangedTargetUpdateTimer.decrement()) {
-									unit->rangedTarget = NULL;	// may be bad flag
-									Order* current = unit->orders.at(unit->currentOrder);
-									// need to detect line of sight issues for unit targets
-									if(current->type == ORDER_TARGET && current->target->nLiveSoldiers > 0 && 
-										(current->target->pos - unit->pos).norm() < unit->range) {
-										Circle c1 = Circle(unit->pos, OnSpotUnitRectangle(unit).hw*0.7);
-										Circle c2 = Circle(current->target->pos, OnSpotUnitRectangle(current->target).hw*0.7);
-										if(FreePath(&c1, &c2, map, true))
-											unit->rangedTarget = current->target;
-									}
-									if(!unit->rangedTarget) {
-										std::vector<UnitDistance> inRange;
-										Eigen::Matrix2d rangedCone;
-										rangedCone << std::cos(0.5*M_PI*unit->rangedAngle), -std::sin(0.5*M_PI*unit->rangedAngle), 
-											std::sin(0.5*M_PI*unit->rangedAngle), std::cos(0.5*M_PI*unit->rangedAngle);
-										//assign value to rangedCone
-										for(auto player2 : players) {
-											if(player2 != player) {
-												std::cout << "Selected a different player.\n";
-												// go through all units and list those that are in the cone
-												for(auto unit2 : player2->units) {
-													if(unit2->placed) {
-														Circle circ(unit2->pos, 0);
-														if(ConeCircleCollision(unit->pos, unit->rot, rangedCone, unit->range, &circ)
-															&& (unit->pos - unit2->pos).norm() < unit->range) {
-															inRange.push_back(UnitDistance(unit, unit2));
-															// currently ignores range stat
-														}
-													}
-													//make some kind of priority score
-												}
-											}
-										}
-										std::sort(inRange.begin(), inRange.end(), compareUnitDistance);
-										if(!inRange.empty()) {
-											unit->rangedTarget = inRange.at(0).unit;
-											debug("Targets found, horray!");
-										}
-										else {
-											unit->rangedTarget = NULL;
-											debug("No ranged targets found.");
-										}
-									}
-									unit->rangedTargetUpdateTimer.reset();
-								}
-							}
-						}
-					}
+					/*
 					//combat
-
-					start = std::chrono::system_clock::now();
+					
+					auto start = std::chrono::system_clock::now();
 
 					for(auto player : players) {
 						for(auto unit : player->units) {
@@ -774,7 +231,7 @@ class Model : public Listener{
 											std::vector<SoldierNeighbourContainer> targets;
 											std::vector<SoldierNeighbourContainer> notInCone;
 											bool newTarget = false;
-											bool outOfRangeTarget = true;
+											//bool outOfRangeTarget = true;
 											soldier->meleeSwingTarget = NULL;
 											//debug("looping through enemies in melee range");
 											if(soldier->melee) {
@@ -783,7 +240,7 @@ class Model : public Listener{
 													Circle circ = *(enemy.soldier); //enemy.soldier->SoldierCircle();
 													if((targets.empty() || soldier->meleeAOE) && ConeCircleCollision(soldier->pos, soldier->rot, soldier->meleeCone, soldier->rad, &circ) && enemy.inTrueRange) {
 														soldier->meleeTarget = enemy.soldier; // in/excluding this line could significantly change how flanking works
-														outOfRangeTarget = false;
+														//outOfRangeTarget = false;
 														targets.push_back(enemy);
 														if(!soldier->meleeAOE)
 															soldier->meleeSwingTarget = enemy.soldier;
@@ -897,14 +354,14 @@ class Model : public Listener{
 						}
 					}
 
-					end = std::chrono::system_clock::now();
+					auto end = std::chrono::system_clock::now();
 					if(state != MODEL_GAME_PAUSED)
-						time_melee_combat += std::chrono::duration<double>(end - start).count();
+						time_melee_combat += std::chrono::duration<double>(end - start).count();*/
 
 					// do shooting after melee so that people with melee target cant shoot
 					// reset ranged target after every shot (so they dont have to find new target multiple times before shooting)
-					
-					start = std::chrono::system_clock::now();
+					/*
+					auto start = std::chrono::system_clock::now();
 					
 					for(auto player : players) {
 						for(auto unit : player->units) {
@@ -1000,11 +457,12 @@ class Model : public Listener{
 						}
 					}
 
-					end = std::chrono::system_clock::now();
+					auto end = std::chrono::system_clock::now();
 					if(state != MODEL_GAME_PAUSED)
 						time_ranged_target_finding += std::chrono::duration<double>(end - start).count();
-
-					start = std::chrono::system_clock::now();
+						*/
+					/*
+					auto start = std::chrono::system_clock::now();
 
 					//Projectile hit scanning
 					for(auto projectile : projectiles) {
@@ -1022,12 +480,12 @@ class Model : public Listener{
 						}
 					}
 
-					end = std::chrono::system_clock::now();
+					auto end = std::chrono::system_clock::now();
 					if(state != MODEL_GAME_PAUSED)
-						time_hitscan += std::chrono::duration<double>(end - start).count();
+						time_hitscan += std::chrono::duration<double>(end - start).count();*/
 
 					//resolving damage
-					while(!damages.empty()) {
+					/*while(!damages.empty()) {
 						DamageTick d = damages.front();
 						d.soldier->hp -= d.dmg;
 						if(d.soldier->hp <= 0) {
@@ -1035,9 +493,9 @@ class Model : public Listener{
 							em->Post(&e);
 						}
 						damages.pop();
-					}
+					}*/
 					// projectile movement and obsolescence
-					for(auto projectile : projectiles) {
+					/*for(auto projectile : projectiles) {
 						if(projectile->longDead) {
 							Projectile* tempProj = projectile;
 							std::erase(projectiles, projectile);
@@ -1049,10 +507,10 @@ class Model : public Listener{
 						else {
 							projectile->advance();
 						}
-					}
+					}*/
 
 					//cleanup
-					map->Cleangrid();	// do it later and use it for target detection? yes
+					//map->Cleangrid();	// do it later and use it for target detection? yes
 					debug("TickEvent: map - end");
 					break;}
 				}
@@ -1177,5 +635,377 @@ void Model::init() {
 
 }
 
+void Model::GameStateCheck() {
+	switch(state) {
+	case MODEL_GAME_RUNNING:
+		if(toNextState.done()) {
+			int sumLife1 = 0; 
+			int sumLife2 = 0;
+			for(auto unit : player1->units) sumLife1 += unit->nLiveSoldiers;
+			for(auto unit : player2->units) sumLife2 += unit->nLiveSoldiers;
+			if(sumLife1 == 0 || sumLife2 == 0) {
+				state = MODEL_GAME_OVER;
+				if(sumLife1 == 0) {
+					if(sumLife2 == 0) result = "Game Over: Draw";
+					else result = "Game Over: Player 2 wins";
+				}
+				else result = "Game Over: Player 1 wins";
+			}
+			else {
+				state = MODEL_GAME_PAUSED;
+				GamePausedEvent gpe;
+				em->Post(&gpe);
+				toNextState.reset();
+			}
+		}
+		else {
+			toNextState.decrement();
+		}
+		break;
+	}
+}
+
+void Model::PlaceUnits() {
+	for(auto player : players) {
+		for(auto unit : player->units) {
+			if(!unit->placed) {
+				if(!unit->orders.empty()) {
+					Order* o = unit->orders.at(0);
+					if(o->type == ORDER_MOVE) {	// this is only triggered in simulation mode, if you try to place a unit with an attack order
+						UnitPlaceRequest* pev = new UnitPlaceRequest(unit, o->pos, o->rot);
+						em->Post(pev);
+					}
+				}
+			}
+		}
+	}
+}
+
+void Model::MapSoldiersToGrid() {
+	for(auto unit : units) {
+		if(unit->placed) {
+			CollisionScrying(map, unit);
+		}
+	}
+}
+
+void Model::GiveOrdersResponse(Event* ev) {
+	switch(state) {
+	case MODEL_SIMULATION:
+	case MODEL_GAME_PAUSED: {
+		GiveOrdersRequest* oev = dynamic_cast<GiveOrdersRequest*>(ev);
+		Unit* unit = oev->unit;
+		if(unit) {
+
+			if(unit->placed) {
+				// special case for units on combat order
+				if(unit->orders.at(unit->currentOrder)->type == ORDER_ATTACK) {
+					unit->ResetCharging();
+				}
+				// deleting all future orders as well as the current one
+				while(unit->orders.size() > unit->currentOrder) unit->orders.pop_back();
+				// setting a new current order to the current unit position as starting point for the pathfinding calculation
+				if(!oev->orders.empty() && oev->orders.at(0)->type == ORDER_ATTACK)
+					unit->orders.push_back(new MoveOrder(unit->pos, unit->rot, MOVE_PASSINGTHROUGH, true, false, oev->orders.at(0)->target));
+				else
+					unit->orders.push_back(new MoveOrder(unit->pos, unit->rot, MOVE_PASSINGTHROUGH, true, false));
+			}
+			// appending the new orders
+			for(auto order : oev->orders) {
+				if(order->type == ORDER_ATTACK) {
+					order->setCombat();
+					Unit* target = dynamic_cast<AttackOrder*>(order)->target;
+					order->pos = target->pos;
+				}
+				unit->orders.push_back(order);
+			}
+
+			// preparing unplaced units
+			if(!unit->placed) unit->currentOrder = 0;
+			Order* o = unit->orders.at(unit->currentOrder);
+			for(auto row : unit->soldiers) {
+				for(auto soldier : row) {
+					if(soldier->placed && soldier->alive) {
+						if(soldier->currentOrder == unit->currentOrder) {
+							soldier->arrived = false;
+						}
+					}
+				}
+			}
+
+			unit->nSoldiersArrived = 0;
+			// reforming so that the new position targets are set
+			if(unit->placed) {
+				ReformUnit(unit);
+				unit->MoveTarget();
+			}
+		}
+		break;}
+	}
+}
+
+void Model::GiveAllOrdersResponse(Event* ev) {
+	GiveAllOrdersRequest* gaor = dynamic_cast<GiveAllOrdersRequest*>(ev);
+	for(int n_unit = 0; n_unit < gaor->orderList.size(); n_unit++) {
+		std::vector<Order*> orders = gaor->orderList.at(n_unit);
+		if(orders.size() > 0) {
+			GiveOrdersRequest gor = GiveOrdersRequest(gaor->player->units.at(n_unit), orders);
+			em->Post(&gor);
+		}
+	}
+}
+
+void Model::AppendOrdersResponse(Event* ev) {
+	switch(state) {
+	case MODEL_SIMULATION:
+	case MODEL_GAME_PAUSED: {
+		AppendOrdersRequest* oev = dynamic_cast<AppendOrdersRequest*>(ev);
+		Unit* unit = oev->unit;
+		if(unit) {
+			for(auto order : oev->orders) {
+				if(order->type == ORDER_ATTACK) {
+					Unit* target = dynamic_cast<AttackOrder*>(order)->target;
+					order->pos = target->pos;
+				}
+				unit->orders.push_back(order);
+			}
+		}
+		break;}
+	}
+}
+
+void Model::ReformResponse(Event* ev) {
+	switch(state) {
+	case MODEL_SIMULATION:
+	case MODEL_GAME_RUNNING: {
+		for(auto player : players) {
+			for(auto unit : player->units) {
+				if(unit->placed) {
+					ReformUnit(unit);
+					unit->MoveTarget();
+				}
+			}
+		}
+		break;}
+	}
+}
+
+void Model::KillResponse(Event* ev) {
+	KillEvent* kev = dynamic_cast<KillEvent*>(ev);
+	Soldier* soldier = kev->soldier;
+	if(soldier->alive) {
+		Unit* unit = soldier->unit;
+		soldier->alive = false;
+		unit->nLiveSoldiers--;
+		if(soldier->currentOrder == 0)
+			unit->nSoldiersOnFirstOrder--;
+		if(soldier->arrived && soldier->currentOrder == unit->currentOrder)
+			unit->nSoldiersArrived--;
+		std::erase(soldier->unit->liveSoldiers, soldier);
+	}
+}
+
+void Model::TickResponse(Event* ev) {
+	if(state != MODEL_GAME_PAUSED)
+		nticks++;
+
+	// determining if game over
+	auto time = TimeFunction(std::bind(&Model::GameStateCheck, this));
+	//auto time = TimeFunction([&]() {GameStateCheck();});
+	if(state != MODEL_GAME_PAUSED)
+		time_check_game_over += time;
+
+
+	switch(state) {
+	case MODEL_SIMULATION:
+	case MODEL_GAME_RUNNING: {
+
+		//placing units
+		time = TimeFunction(std::bind(&Model::PlaceUnits, this));
+		if(state != MODEL_GAME_PAUSED)
+			time_placing_units += time;
+
+		//deleting obsolete orders
+		for(auto unit: units) {
+			if(!unit->nSoldiersOnFirstOrder && unit->nLiveSoldiers) unit->DeleteObsoleteOrder();
+		}
+
+		//mapping soldiers to grid
+		time = TimeFunction(std::bind(&Model::MapSoldiersToGrid, this));
+		if(state != MODEL_GAME_PAUSED)
+			time_collision_scrying += time;
+
+		//resolving collisions between soldiers and creating enemy neighbourlists
+		auto start = std::chrono::system_clock::now();
+		CollisionResolution(map, &units, &soldiers, &soldier_locks);
+		auto end = std::chrono::system_clock::now();
+		if(state != MODEL_GAME_PAUSED)
+			time_collision_resolution += std::chrono::duration<double>(end - start).count();
+
+		//resolving collisions with map objects
+		start = std::chrono::system_clock::now();
+		MapObjectCollisionHandling(map);
+		end = std::chrono::system_clock::now();
+		if(state != MODEL_GAME_PAUSED)
+			time_map_object_collision_handling += std::chrono::duration<double>(end - start).count();
+
+		//mapping projectiles to grid
+		start = std::chrono::system_clock::now();
+		ProjectileCollisionScrying(map, projectiles);
+		end = std::chrono::system_clock::now();
+		if(state != MODEL_GAME_PAUSED)
+			time_projectile_collision_scrying += std::chrono::duration<double>(end - start).count();
+
+		//resolving projectile collisions
+		start = std::chrono::system_clock::now();
+		ProjectileCollisionHandling(map);
+		end = std::chrono::system_clock::now();
+		if(state != MODEL_GAME_PAUSED)
+			time_projectile_collision_resolution += std::chrono::duration<double>(end - start).count();
+
+		//physics step
+		start = std::chrono::system_clock::now();
+		int n_units = units.size();
+		#pragma omp parallel for default(shared)
+		for(int n_unit = 0; n_unit < n_units; n_unit++) {
+			Unit* unit = units.at(n_unit);
+			if(unit->placed) {
+				//moving unit target if combat has already started every so often to keep up with moving units
+				if(unit->orders.at(unit->currentOrder)->_combat) {
+					unit->UpdateTargetPath(map, em);
+				}
+				//advancing order
+				if(unit->CurrentOrderCompleted()) {
+					unit->AdvanceOrder(map);
+				}
+				//individual movement
+				unit->SoldierMovement(map, dt);
+				unit->UpdatePos();
+				unit->UpdateVel();
+			}
+		}
+		end = std::chrono::system_clock::now();
+		if(state != MODEL_GAME_PAUSED)
+			time_physics_step += std::chrono::duration<double>(end - start).count();
+
+		//ranged target finding
+		RangedTargetFinding();
+
+		time = TimeFunction(std::bind(&Model::MeleeCombat, this));
+		if(state != MODEL_GAME_PAUSED)
+			time_melee_combat += time;
+
+		time = TimeFunction(std::bind(&Model::Shooting, this));
+		if(state != MODEL_GAME_PAUSED)
+			time_ranged_target_finding += time;
+
+		time = TimeFunction(std::bind(&Model::ProjectileHitResolution, this));
+		if(state != MODEL_GAME_PAUSED)
+			time_hitscan += time;
+
+		DamageResolution();
+		ProjectileCleanup();
+		map->Cleangrid();	// do it later and use it for target detection? yes
+		break;}
+	}
+}
+
+void Model::RangedTargetFinding() {
+	for(auto unit: units) {
+		if(unit->placed && unit->ranged && unit->rangedTargetUpdateTimer.decrement()) {
+			unit->rangedTarget = NULL;
+			if(!unit->UseOrderTarget(map)) {
+				unit->FindRangedTarget(players);
+			}
+			unit->rangedTargetUpdateTimer.reset();
+		}
+	}
+}
+
+void Model::MeleeCombat() {
+	for(auto unit : units) {
+		if(unit->placed) {
+			for(auto row : unit->soldiers) {
+				for(auto soldier : row) {
+					if(soldier->alive) {
+						std::vector<SoldierNeighbourContainer> targets;
+						std::vector<SoldierNeighbourContainer> notInCone;
+						soldier->meleeSwingTarget = NULL;
+						if(soldier->melee) {
+							soldier->ChooseMeleeTargetsByRangeAndCone(&targets, &notInCone);
+							soldier->HandleCharging(&targets);
+							soldier->CheckIfPathToTarget(map);
+							soldier->ResolveAttacks(this, &targets);
+						}
+					}
+				}
+			}
+		}
+	}
+}
+
+
+void Model::Shooting() {
+	for(auto unit : units) {
+		if(unit->ranged) {
+			for(auto soldier : unit->liveSoldiers) {
+				if(unit->rangedTarget) {
+					soldier->GetValidTargetRangedTarget();
+					soldier->FireOrReloadIfPossible(map, em);
+				}
+				else
+					soldier->rangedTarget = NULL;
+					if(!soldier->ReloadTimer.done() && soldier->speed < soldier->maxSpeedForFiring
+						&& (soldier->MeleeTimer.done() || !soldier->melee))
+						soldier->ReloadTimer.decrement();
+			}
+		}
+	}
+}
+
+void Model::ProjectileHitResolution() {
+	for(auto projectile : projectiles) {
+		if(projectile->dead && !projectile->longDead) {
+			for(auto soldier : projectile->targets) {
+				double hitChance = settings.ranged_base_attack - 0.01*soldier->rangedDefense;
+				hitChance = std::min(std::max(settings.min_hit_chance, hitChance), settings.max_hit_chance);
+				if(std::rand()/double(RAND_MAX) < hitChance) {
+					double dmg = projectile->damage;
+					dmg = dmg * (0.01*projectile->armorPiercing + (1 - 0.01*projectile->armorPiercing) * (1 - 0.01*soldier->armor));
+					damages.push(DamageTick(soldier, dmg));
+				}
+			}
+			projectile->targets.clear();
+		}
+	}
+}
+
+void Model::DamageResolution() {
+	while(!damages.empty()) {
+		DamageTick d = damages.front();
+		d.soldier->hp -= d.dmg;
+		if(d.soldier->hp <= 0) {
+			KillEvent e(d.soldier);
+			em->Post(&e);
+		}
+		damages.pop();
+	}
+}
+
+void Model::ProjectileCleanup() {
+	for(auto projectile : projectiles) {
+		if(projectile->longDead) {
+			Projectile* tempProj = projectile;
+			std::erase(projectiles, projectile);
+			//delete tempProj;	///////// VERY IMPORTANT
+		}
+		else if(projectile->dead) {
+			projectile->longDead = true;
+		}
+		else {
+			projectile->advance();
+		}
+	}
+}
 
 #endif
