@@ -8,13 +8,13 @@
 	},
 	"custom_background": true,
 	"background_animation": {
-		"texture": "desert.bmp",
-		"size_x": 600,
-		"size_y": 337,
+		"texture": "field.bmp",
+		"size_x": 960,
+		"size_y": 960,
 		"num_frames": 1,
 		"ticks_per_frame" : 1000
 	},
-	"show_map_object_outlines": true,
+	"show_map_object_outlines": false,
 	"turn_duration": 300,
 	"simulation_mode": false,
 	"base_melee_attack": 0.35,
@@ -24,5 +24,9 @@
 	"anti_large_attack_bonus": 0.15,
 	"anti_large_damage_bonus": 0.3,
 	"anti_infantry_attack_bonus": 0.15,
-	"anti_infantry_damage_bonus": 0.3
+	"anti_infantry_damage_bonus": 0.3,
+	"auto_generate_map_grids": false,
+	"map_grids": [16,32],
+	"set_custom_omp_num_threads": true,
+	"custom_omp_num_threads": 8
 }

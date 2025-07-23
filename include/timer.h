@@ -1,5 +1,3 @@
-// screw onedrive
-
 #ifndef TIMER
 #define TIMER
 

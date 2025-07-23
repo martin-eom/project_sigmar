@@ -25,14 +25,13 @@ class Listener;
 
 class EventManager {
 	public:
-		std::list<int> noPrint = {GENERIC_EVENT, TICK_EVENT, SDL_EVENT, CHANGE_TEXTBOX_EVENT};
+		std::list<int> noPrint = {GENERIC_EVENT, TICK_EVENT, SDL_EVENT, CHANGE_TEXTBOX_EVENT, PROJECTILE_SPAWN_EVENT, KILL_EVENT};
 		std::list<Listener*> listeners;
 		std::vector<double> times;
 		int fps = 30;
 		double dt = 1./30.;
 		virtual void _polymorphism(){};	//necessary to make the class polymorphic
 
-		bool measureTime = false;
 		bool showTimes = false;
 		
 		EventManager() {};
@@ -75,14 +74,10 @@ void EventManager::Post(Event* ev) {
 		std::cout << " - posted " << ev->name << "\n";
 	}
 	for(auto listener : listeners) {
-		if(measureTime) {
-			auto start = std::chrono::system_clock::now();
-			listener->Notify(ev);
-			auto end = std::chrono::system_clock::now();
+		auto start = std::chrono::system_clock::now();
+		listener->Notify(ev);
+		auto end = std::chrono::system_clock::now();
 			times.at(std::distance(listeners.begin(), std::find(listeners.begin(), listeners.end(), listener))) += std::chrono::duration<double>(end - start).count();		
-		}
-		else
-			listener->Notify(ev);
 
 		if(showTimes) {
 			std::cout << "######### EM TIMING ###########\n";
@@ -91,8 +86,6 @@ void EventManager::Post(Event* ev) {
 			}
 			std::cout << "###############################\n";
 			showTimes = false;
-			measureTime = false;
-			//while(true) {}
 		}
 	}
 }

@@ -2,18 +2,28 @@
 	[
 		"ShieldedInfantry",
 		"ShieldedInfantry",
+		"ShieldedInfantry",
+		"Crossbows",
+		"Crossbows",
+		"Cavalry",
 		"Cavalry",
 		"Monster",
-		"Crossbows",
+		"Monster",
+		"Ballista",
 		"Ballista"
 	],
 
 	[
 		"ShieldedInfantry",
 		"ShieldedInfantry",
+		"ShieldedInfantry",
+		"Crossbows",
+		"Crossbows",
+		"Cavalry",
 		"Cavalry",
 		"Monster",
-		"Crossbows",
+		"Monster",
+		"Ballista",
 		"Ballista"
 	]
 ]

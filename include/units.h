@@ -12,16 +12,7 @@
 #include <cstdlib>
 #include <map>
 
-class Unit;
-//class Player;
-
-//void Populate(Unit* unit, std::map<std::string, SoldierInformation> classMap);
-//void Place(Unit* unit, Eigen::Vector2d pos, Eigen::Matrix2d rot);
-//void MoveTarget(Unit* unit, Eigen::Vector2d pos, Eigen::Matrix2d rot);
-//void UpdatePos(Unit* unit);
-//void UpdateVel(Unit* unit);
-//void PosInUnitByID(Unit* unit);
-
+class Map;
 
 class Unit {
 public:
@@ -34,6 +25,7 @@ public:
 	double yspacing = 0.;
 	std::string soldierType;
 	bool ranged = false;
+	bool primaryRanged = false;
 	double range = 0.;
 	double rangedAngle = 0.;
 	// generated members
@@ -55,10 +47,10 @@ public:
 	std::vector<Order*> orders;
 	Eigen::Vector2d vel;
 	bool enemyContact;
-	Timer targetUpdateTimer = Timer(60);
-	Timer rangedTargetUpdateTimer = Timer(int(80 + (rand()/RAND_MAX)*20));
+	Timer targetUpdateTimer = Timer(int(100 + (rand()/RAND_MAX)*20));
+	Timer rangedTargetUpdateTimer = Timer(int(120 + (rand()/RAND_MAX)*20));
 	Unit* rangedTarget = NULL;
-	std::vector<Unit*> targetedBy;
+	//std::vector<Unit*> targetedBy;
 	
 	void Populate(std::map<std::string, SoldierInformation> classMap);
 	void Place(Eigen::Vector2d pos, Eigen::Matrix2d rot);
@@ -66,17 +58,29 @@ public:
 	void UpdatePos();
 	void UpdateVel();
 	void PosInUnitByID();
-	bool CurrentOrderCompleted();
-	void NextOrder();
+
+	void NextOrder(Map* map);
 	void DeleteObsoleteOrder();
+	void PostCombatFormup();
+	void NextOrderPathfinding(Order* oldOrder, Order* newOrder, Map* map);
+	bool CurrentOrderCompleted();
+	void AdvanceOrder(Map* map);
+	void UpdateTargetPath(Map* map, EventManager* em);
+	bool CheckIfTargetHasRunAway();
+	void ResetCharging();
+	void SoldierMovement(Map* map, double* dt, double* time1 = NULL, double* time2 = NULL, double* time3 = NULL, double* time4 = NULL, double* timePass1 = NULL, double* timePass2 = NULL, double* timePass3 = NULL);
+	void StripTransitionOrders();
+	void RenewOrders(EventManager* em);
+	void Reform();
+
+	bool UseOrderTarget(Map* map);
+	void FindRangedTarget(std::vector<Player*> players);
 
 	void init(std::map<std::string, SoldierInformation> classMap) {
 		soldiers = std::vector<std::vector<Soldier*>>(nrows, std::vector<Soldier*>(ncols, NULL));
 		posInUnit = std::vector<std::vector<Eigen::Vector2d>>(nrows, std::vector<Eigen::Vector2d>(ncols, Eigen::Vector2d()));
 		nLiveSoldiers = 0;
-		//Populate(this, classMap);
 		Populate(classMap);
-		//PosInUnitByID(this);
 		PosInUnitByID();
 		enemyContact = false;
 	}
@@ -93,6 +97,7 @@ public:
 		ranged = info.ranged_ranged;
 		range = info.ranged_range;
 		rangedAngle = info.ranged_angle;
+		primaryRanged = info.primary_ranged;
 
 		this->player = player;
 
@@ -111,7 +116,6 @@ struct UnitSorter {
 };
 
 void Unit::Populate(std::map<std::string, SoldierInformation> classMap) {
-	//std::vector<std::vector<Soldier*>>* soldiers = &(this->soldiers);
 	std::vector<std::vector<Soldier*>>* soldiers = &(this->soldiers);
 	for(int i = 0; i < nrows; i++) {
 		for(int j = 0; j < ncols; j++) {
@@ -128,8 +132,8 @@ void Unit::Place(Eigen::Vector2d pos, Eigen::Matrix2d rot) {
 	std::vector<std::vector<Soldier*>>* soldiers = &(this->soldiers);
 	std::vector<std::vector<Eigen::Vector2d>>* posInUnit = &(this->posInUnit);
 	for(int i = 0; i < nrows; i++) {
-		for (int j = 0; j < ncols; j++) {
-			if (nSoldiers < maxSoldiers) {
+		for(int j = 0; j < ncols; j++) {
+			if(nSoldiers < maxSoldiers) {
 				Soldier* soldier = (*soldiers)[i][j];
 				soldier->pos = pos + rot * (*posInUnit)[i][j];
 				soldier->posTarget = soldier->pos;
@@ -158,34 +162,6 @@ void Unit::Place(Eigen::Vector2d pos, Eigen::Matrix2d rot) {
 	nSoldiersArrived = 0;
 	nSoldiersOnFirstOrder = nSoldiers;
 	std::cout  << "Unit placed with " << nLiveSoldiers << " live soldiers.\n";
-}
-
-
-void Unit::MoveTarget() {
-	std::vector<std::vector<Soldier*>>* soldiers = &(this->soldiers);
-	std::vector<std::vector<Eigen::Vector2d>>* posInUnit = &(this->posInUnit);
-	for(int i = 0; i < nrows; i++) {
-		for(int j = 0; j < ncols; j++) {
-			Soldier* soldier = soldiers->at(i).at(j);
-			if(soldier->placed && soldier->alive) {	//change to something like soldier->alive
-				Order* o = orders.at(soldier->currentOrder);
-				if(o->type == ORDER_MOVE ||true) {
-					//MoveOrder* mo = dynamic_cast<MoveOrder*>(o);
-					//soldier->posTarget = mo->pos + mo->rot * posInUnit->at(i).at(j);
-					soldier->posTarget = o->pos + o->rot * posInUnit->at(i).at(j);
-					soldier->rotTarget = o->rot;
-					soldier->angleTarget = o->angleTarget;
-				}
-			}
-		}
-	}
-	Order* o = orders.at(currentOrder);
-	if(o->type == ORDER_MOVE || true) {
-		//MoveOrder* mo = dynamic_cast<MoveOrder*>(o);
-		posTarget = o->pos;
-		this->rot = o->rot;
-		rotTarget = o->rot;
-	}
 }
 
 void Unit::UpdatePos() {
@@ -230,7 +206,6 @@ void Unit::UpdateVel() {
 }
 
 void Unit::PosInUnitByID() {
-	//std::vector<std::vector<Soldier*>>* soldiers = unit->soldiers();
 	std::vector<std::vector<Eigen::Vector2d>>* posInUnit = &(this->posInUnit);
 	double x0 = xspacing*(nrows - 1)/2.;
 	double y0 = yspacing*(ncols - 1)/2.;
@@ -241,65 +216,7 @@ void Unit::PosInUnitByID() {
 	}
 }
 
-bool Unit::CurrentOrderCompleted() {
-	if(placed) {
-		Order* currentOrder = orders.at(this->currentOrder);
-		switch(currentOrder->type) {
-		case ORDER_ATTACK:
-			return (dynamic_cast<AttackOrder*>(currentOrder)->target->nLiveSoldiers) <= 0; break;
-		case ORDER_TARGET:
-			return (dynamic_cast<TargetOrder*>(currentOrder)->target->nLiveSoldiers) <= 0; break;
-		case ORDER_MOVE: {
-			debug("Checking order completion...");
-			MoveOrder* mo = dynamic_cast<MoveOrder*>(currentOrder);
-			if(mo->moveType == MOVE_FORMUP) {
-				//debug("Form up:");
-				//std::cout << (unit->nSoldiersArrived >= 0.9*unit->nLiveSoldiers) << "\n";
-				return nSoldiersArrived >= 0.9*nLiveSoldiers; break;
-			}
-			else {
-				//debug("Passing through:");
-				//std::cout << (unit->nSoldiersArrived > 0) << "\n";
-				return nSoldiersArrived > 0; break;
-			}
-		}
-		default:
-			return false; break;
-		}
-	}
-}
 
-void Unit::NextOrder() {
-	Order* o = orders.at(currentOrder);
-	if(o->type == ORDER_ATTACK) {
-		std::erase(dynamic_cast<AttackOrder*>(o)->target->targetedBy, this);
-		enemyContact = false;
-	}
-	currentOrder++;
-	nSoldiersArrived = 0;
-	Order* no = orders.at(currentOrder);
-	if(!no->target || no->target != o->target)
-		enemyContact = false;
-	std::cout << "Onwards to the next order!\n";
-}
-
-void Unit::DeleteObsoleteOrder() {
-	if(orders.size() > 1) {
-		orders.erase(orders.begin());
-		currentOrder--;
-		std::vector<std::vector<Soldier*>> soldiers = this->soldiers;
-		for(auto row : soldiers) {
-			for(auto soldier: row) {
-				if(soldier->alive)
-					soldier->currentOrder--;
-				if(soldier->currentOrder == 0 && soldier->placed && soldier->alive) {
-					nSoldiersOnFirstOrder++;
-				}
-			}
-		}
-		debug("Deleted first order.");
-	}
-}
 
 void SoldierNextOrder(Soldier* soldier, Eigen::Vector2d posInUnit) {
 	if(soldier->currentOrder == 0) {soldier->unit->nSoldiersOnFirstOrder--;}
@@ -313,48 +230,80 @@ void SoldierNextOrder(Soldier* soldier, Eigen::Vector2d posInUnit) {
 	if(!o->target || (o->target != po->target)) {
 		soldier->charging = true;
 		soldier->chargeTimer.reset();
-		//soldier->chargeGapTicks = 30;
 	}
 }
 
 Rrectangle SoldierRectangle(Soldier* soldier) {
 	Unit* unit = soldier->unit;
-	double halfWidth = (unit->ncols - 1) * unit->yspacing * 0.5 + 1.*soldier->rad;
-	double halfDepth = (unit->nrows - 1) * unit->xspacing * 0.5 + 1.*soldier->rad;
 	Order* o = unit->orders.at(soldier->currentOrder);
+	switch(o->type) {
+	case ORDER_ATTACK:
+		unit = dynamic_cast<AttackOrder*>(o)->target;
+		break;
+	case ORDER_TARGET:
+		unit = dynamic_cast<TargetOrder*>(o)->target;
+		break;
+	}
+	double halfWidth, halfDepth;
+	halfWidth = (unit->ncols - 1) * unit->yspacing * 0.5 + 1.*soldier->rad;
+	halfDepth = (unit->nrows - 1) * unit->xspacing * 0.5 + 1.*soldier->rad;
 	Eigen::Vector2d pos;
 	Eigen::Matrix2d rot;
-	if(o->type == ORDER_MOVE || true) {
-		MoveOrder* mo = dynamic_cast<MoveOrder*>(o);
+	//if(o->type == ORDER_MOVE || true) {
+	//	MoveOrder* mo = dynamic_cast<MoveOrder*>(o);
 		pos = o->pos;
 		rot = o->rot;
-	}
+	//}
 	return Rrectangle(halfWidth, halfDepth, pos, rot);
 }
 
 Rrectangle UnitRectangle(Unit* unit, int orderID) {
-	double halfWidth = (unit->ncols - 1) * unit->yspacing * 0.5;
-	double halfDepth = (unit->nrows - 1) * unit->xspacing * 0.5;
 	Order* o = unit->orders.at(orderID);
+	switch(o->type) {
+	case ORDER_ATTACK:
+		unit = dynamic_cast<AttackOrder*>(o)->target;
+		break;
+	case ORDER_TARGET:
+		unit = dynamic_cast<TargetOrder*>(o)->target;
+		break;
+	}
+	double halfWidth, halfDepth;
+	if(unit->maxSoldiers == 1) {
+		halfWidth = halfDepth = unit->soldiers.at(0).at(0)->rad;
+	}
+	else {
+		halfWidth = (unit->ncols - 1) * unit->yspacing * 0.5;
+		halfDepth = (unit->nrows - 1) * unit->xspacing * 0.5;
+	}
 	Eigen::Vector2d pos;
 	Eigen::Matrix2d rot;
-	if(o->type == ORDER_MOVE) {
-		MoveOrder* mo = dynamic_cast<MoveOrder*>(o);
-		pos = mo->pos;
-		rot = mo->rot;
-	}
+	//if(o->type == ORDER_MOVE) {
+		//MoveOrder* mo = dynamic_cast<MoveOrder*>(o);
+		pos = o->pos;
+		rot = o->rot;
+	//}
 	return Rrectangle(halfWidth, halfDepth, pos, rot);
 }
 
 Rrectangle OnSpotUnitRectangle(Unit* unit) {
-	double halfWidth = (unit->ncols - 1) * unit->yspacing * 0.5;
-	double halfDepth = (unit->nrows - 1) * unit->xspacing * 0.5;
+	double halfWidth, halfDepth;
+	if(unit->maxSoldiers == 1)
+		halfWidth = halfDepth = unit->soldiers.at(0).at(0)->rad;
+	else {
+		halfWidth = (unit->ncols - 1) * unit->yspacing * 0.5;
+		halfDepth = (unit->nrows - 1) * unit->xspacing * 0.5;
+	}
 	return Rrectangle(halfWidth, halfDepth, unit->pos, unit->rot);
 };
 
 Rrectangle UnitRectangle(Unit* unit, int orderID, std::vector<Order*> orders) {
-	double halfWidth = (unit->ncols - 1) * unit->yspacing * 0.5;
-	double halfDepth = (unit->nrows - 1) * unit->xspacing * 0.5;
+	double halfWidth, halfDepth;
+	if(unit->maxSoldiers == 1)
+		halfWidth = halfDepth = unit->soldiers.at(0).at(0)->rad;
+	else {
+		halfWidth = (unit->ncols - 1) * unit->yspacing * 0.5;
+		halfDepth = (unit->nrows - 1) * unit->xspacing * 0.5;
+	}
 	Order* o = orders.at(orderID);
 	Eigen::Vector2d pos;
 	Eigen::Matrix2d rot;

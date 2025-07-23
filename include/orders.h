@@ -29,7 +29,12 @@ class Order{
 		int type;
 		bool _auto;
 		bool _transition;
+		bool _combat = false;
 		Unit* target;
+
+		void setCombat() {
+			_combat = true;
+		}
 
 		Order() {
 			type = ORDER_ORDER;
@@ -61,14 +66,14 @@ class MoveOrder : public Order {
 
 class AttackOrder : public Order {
 public:
-	//Unit* unit;
 	bool enemyContact;
 	void SetPos();
 
-	AttackOrder(Unit* unit, bool _auto = false, bool _transition = false) : Order(_auto, _transition, unit) {
+	AttackOrder(Unit* unit, Eigen::Vector2d pos, bool _auto = false, bool _transition = false) : Order(_auto, _transition, unit) {
 		type = ORDER_ATTACK;
 		this->target = unit;
 		enemyContact = false;
+		this->pos = pos;
 	}
 };
 

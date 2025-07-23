@@ -240,7 +240,8 @@ void KeyboardAndMouseController::handleMouseKeyUpEvent(SDL_Event e, GameEventMan
 				}
 			}
 			if(target) {
-				if(_shift) {
+				if(false) {}
+				/*if(selectedUnit->ranged) {
 					Eigen::Vector2d pos;
 					Eigen::Matrix2d rot;
 					if(orders.size() > 0) {
@@ -252,9 +253,9 @@ void KeyboardAndMouseController::handleMouseKeyUpEvent(SDL_Event e, GameEventMan
 						rot = selectedUnit->rot;
 					}
 					o = new TargetOrder(pos, rot, target);
-				}
+				}*/
 				else {
-					o = new AttackOrder(target);
+					o = new AttackOrder(target, target->pos);
 				}
 			}
 		}
@@ -273,7 +274,8 @@ void KeyboardAndMouseController::handleMouseKeyUpEvent(SDL_Event e, GameEventMan
 				dist = (unit->pos - mouse).norm();
 				if(dist < minDist) {
 					selectedUnit = unit;
-					em->Post(new RememberOrders(unit->orders));
+					RememberOrders ro = RememberOrders(unit->orders);
+					em->Post(&ro);
 					minDist = dist;
 				}
 			}
@@ -322,6 +324,7 @@ void KeyboardAndMouseController::handleKeyDownEvent(SDL_Event e, GameEventManage
 
 void KeyboardAndMouseController::handleKeyUpEvent(SDL_Event e, GameEventManager* gem, Model* model, GeneralView* view, Map* map) {
 	Event* nev = new Event();
+	//Event nev = Event();
 	switch(e.key.keysym.sym) {
 	case SDLK_RETURN:
 		debug(std::to_string(_state));
@@ -331,6 +334,22 @@ void KeyboardAndMouseController::handleKeyUpEvent(SDL_Event e, GameEventManager*
 		case CTRL_GIVING_ORDERS:
 			if(selectedUnit) {
 				if(orders.size() > 0) {
+					for(int i = 0; i < orders.size(); i++) {
+						Order* o = orders.at(i);
+						if(selectedUnit->primaryRanged && o->type == ORDER_ATTACK) {
+							Eigen::Vector2d newPos; Eigen::Matrix2d newRot;
+							if(i == 0) {
+								newPos = selectedUnit->orders.at(selectedUnit->currentOrder)->pos;
+								newRot = selectedUnit->orders.at(selectedUnit->currentOrder)->rot;
+								orders.at(i) = new TargetOrder(newPos, newRot, dynamic_cast<AttackOrder*>(o)->target);
+							}
+							else {
+								newPos = orders.at(i-1)->pos;
+								newRot = orders.at(i-1)->rot;
+								orders.at(i) = new TargetOrder(newPos, newRot, dynamic_cast<AttackOrder*>(o)->target);
+							}
+						}
+					}
 					switch(model->state) {
 					case MODEL_SIMULATION: {
 						if(queueingOrders) {
@@ -359,16 +378,6 @@ void KeyboardAndMouseController::handleKeyUpEvent(SDL_Event e, GameEventManager*
 			break;
 		case CTRL_ADDING_UNIT:
 			debug("unit type:" + std::to_string(newUnitType));
-			/*switch(newUnitType) {
-			case 0:
-				em->Post(new UnitAddEvent(UNIT_INFANTRY)); break;
-			case 1: case 1-4:
-				em->Post(new UnitAddEvent(UNIT_CAVALRY)); break;
-			case 2: case 2-4:
-				em->Post(new UnitAddEvent(UNIT_MONSTER)); break;
-			case 3: case 3-4:
-				em->Post(new UnitAddEvent(UNIT_LONE_RIDER)); break;
-			}*/
 			_state = CTRL_SELECTING_UNIT;
 			debug("New Unit Type: " + std::to_string(newUnitType));
 			break;
@@ -475,18 +484,21 @@ void KeyboardAndMouseController::handleKeyUpEvent(SDL_Event e, GameEventManager*
 		break;
 	case SDLK_a:
 		switch(_state) {
-		case CTRL_SELECTING_PLAYER:
-			em->Post(new PlayerAddEvent()); break;
+		case CTRL_SELECTING_PLAYER: {
+			PlayerAddEvent pae;
+			em->Post(&pae);} break;
 		case CTRL_SELECTING_UNIT:
 			_state = CTRL_ADDING_UNIT; break;
 		}
 		break;
 	case SDLK_d:
 		switch(_state) {
-		case CTRL_SELECTING_PLAYER:
-			em->Post(new PlayerDeleteEvent()); break;
-		case CTRL_SELECTING_UNIT:
-			em->Post(new UnitDeleteEvent()); break;
+		case CTRL_SELECTING_PLAYER: {
+			PlayerDeleteEvent pde;
+			em->Post(&pde);} break;
+		case CTRL_SELECTING_UNIT: {
+			UnitDeleteEvent ude;
+			em->Post(&ude);} break;
 		}
 		break;
 	case SDLK_h:
@@ -586,6 +598,7 @@ void KeyboardAndMouseController::handleKeyUpEvent(SDL_Event e, GameEventManager*
 	}
 	if(nev->type != GENERIC_EVENT) {
 		em->Post(nev);
+		delete(nev);
 	}
 }
 
@@ -637,6 +650,11 @@ enum EDITOR_STATES {
 	EDITOR_ENTERING_CIRCLE_RAD,
 	EDITOR_PLACING_WP,
 	EDITOR_ENTERING_WP_RAD,
+	EDITOR_PLACING_TRIANGLE,
+	EDITOR_ENTERING_TRI_A,
+	EDITOR_ENTERING_TRI_B,
+	EDITOR_ENTERING_TRI_GAMMA,
+	EDITOR_ROTATING_TRIANGLE,
 	EDITOR_NEWMAP,
 	EDITOR_NEWMAP_WIDTH,
 	EDITOR_NEWMAP_HEIGHT,
@@ -668,6 +686,9 @@ public:
 	bool input_confirmed;
 
 	int lastCircleRad;
+	int lastTriangleA;
+	int lastTriangleB;
+	int lastTriangleGamma;
 	int lastRecWidth;
 	int lastRecHeight;
 	Eigen::Matrix2d lastRot;
@@ -688,6 +709,9 @@ public:
 		input = "";
 		objToPlace = NULL;
 		lastCircleRad = 50;
+		lastTriangleA = 100;
+		lastTriangleB = 100;
+		lastTriangleGamma = 90;
 		lastRecWidth = 100;
 		lastRecHeight = 50;
 		lastRot << 0, -1, 1, 0;
@@ -736,7 +760,6 @@ private:
 			if(y > ymax) y = ymax;
 			newCenter << x, y;
 			center = newCenter;
-			//std::cout << state << "\n";
 			debug("ctrl : end TickEvent"); }
 			break;
 		}
@@ -761,6 +784,10 @@ void MapEditorController::handleSDLEvent(SDL_Event e, GeneralView* view) {
 void MapEditorController::handleKeyDownEvent(SDL_Event e, GeneralView* view) {
 	switch(e.key.keysym.sym) {
 	case SDLK_LCTRL:
+		// should be a nested switch statement
+		if(state == EDITOR_PLACING_TRIANGLE) {
+			state = EDITOR_ROTATING_TRIANGLE;
+		}
 		if(state == EDITOR_PLACING_RECTANGLE) {
 			state = EDITOR_ROTATING_RECTANGLE;
 		}
@@ -804,6 +831,10 @@ void MapEditorController::handleKeyUpEvent(SDL_Event e, GeneralView* view) {
 		shift = false;
 		break;
 	case SDLK_LCTRL:
+		// should be a nested switch
+		if(state == EDITOR_ROTATING_TRIANGLE) {
+			state = EDITOR_PLACING_TRIANGLE;
+		}
 		if(state == EDITOR_ROTATING_RECTANGLE) {
 			state = EDITOR_PLACING_RECTANGLE;
 		}
@@ -849,6 +880,10 @@ void MapEditorController::handleKeyUpEvent(SDL_Event e, GeneralView* view) {
 						MapCircle* ref = dynamic_cast<MapCircle*>(selectedObj);
 						objToPlace = new MapCircle(ref->pos, ref->rad);
 						}break;
+					case MAP_TRIANGLE: {
+						MapTriangle* ref = dynamic_cast<MapTriangle*>(selectedObj);
+						objToPlace = new MapTriangle(ref->a, ref->b, ref->gamma, ref->pos, ref->rot);
+						}break;
 					case MAP_BORDER:
 					case MAP_RECTANGLE: {
 						MapRectangle* ref = dynamic_cast<MapRectangle*>(selectedObj);
@@ -892,11 +927,31 @@ void MapEditorController::handleKeyUpEvent(SDL_Event e, GeneralView* view) {
 		}
 		else {
 			switch(state) {
+			case EDITOR_PLACING_TRIANGLE: state = EDITOR_ENTERING_TRI_B; break;
 			case EDITOR_PLACING_RECTANGLE: state = EDITOR_ENTERING_REC_HEIGHT; break;
-			case EDITOR_PLACING_DP_ZONE: state = EDITOR_ENTERING_DP_ZONE_HEIGHT; std::cout << "this line should not be called when pressing d\n"; break;
+			case EDITOR_PLACING_DP_ZONE: state = EDITOR_ENTERING_DP_ZONE_HEIGHT; break;
 			}
 		}
 		break;
+	case SDLK_f:
+		if(shift) {
+		}
+		else {
+			switch(state) {
+			case EDITOR_PLACING_CIRCLE:
+			case EDITOR_PLACING_TRIANGLE:
+			case EDITOR_PLACING_RECTANGLE:
+				objToPlace->toggle_high();
+			}
+		}
+		break;
+	case SDLK_g:
+		if(shift) {}
+		else {
+			switch(state) {
+			case EDITOR_PLACING_TRIANGLE: state = EDITOR_ENTERING_TRI_GAMMA; break;
+			}
+		}
 	case SDLK_h:
 		help = !help;
 		break;
@@ -926,6 +981,10 @@ void MapEditorController::handleKeyUpEvent(SDL_Event e, GeneralView* view) {
 					case MAP_CIRCLE: {
 						MapCircle* ref = dynamic_cast<MapCircle*>(selectedObj);
 						objToPlace = new MapCircle(ref->pos, ref->rad);
+						}break;
+					case MAP_TRIANGLE: {
+						MapTriangle* ref = dynamic_cast<MapTriangle*>(selectedObj);
+						objToPlace = new MapTriangle(ref->a, ref->b, ref->gamma, ref->pos, ref->rot);
 						}break;
 					case MAP_BORDER:
 					case MAP_RECTANGLE: {
@@ -995,6 +1054,16 @@ void MapEditorController::handleKeyUpEvent(SDL_Event e, GeneralView* view) {
 			}
 		}
 		break;
+	case SDLK_t:
+		if(shift) {}
+		else {
+			switch(state) {
+			case EDITOR_IDLE:
+				objToPlace = new MapTriangle(lastTriangleA, lastTriangleB, lastTriangleGamma, mousePos, rot);
+				state = EDITOR_PLACING_TRIANGLE;
+				break;
+			}
+		}break;
 	case SDLK_w:
 		if(shift) {}
 		else {
@@ -1004,6 +1073,7 @@ void MapEditorController::handleKeyUpEvent(SDL_Event e, GeneralView* view) {
 				state = EDITOR_PLACING_WP;
 				break;
 			case EDITOR_PLACING_CIRCLE: state = EDITOR_ENTERING_CIRCLE_RAD; break;
+			case EDITOR_PLACING_TRIANGLE: state = EDITOR_ENTERING_TRI_A; break;
 			case EDITOR_PLACING_RECTANGLE: state = EDITOR_ENTERING_REC_WIDTH; break;
 			case EDITOR_PLACING_DP_ZONE: state = EDITOR_ENTERING_DP_ZONE_WIDTH; break;
 			case EDITOR_PLACING_WP: state = EDITOR_ENTERING_WP_RAD; break;
@@ -1042,6 +1112,9 @@ void MapEditorController::handleKeyUpEvent(SDL_Event e, GeneralView* view) {
 		case EDITOR_ENTERING_DP_ZONE_ID:
 		case EDITOR_ENTERING_WP_RAD:
 		case EDITOR_ENTERING_AUTO_WP_RAD:
+		case EDITOR_ENTERING_TRI_A:
+		case EDITOR_ENTERING_TRI_B:
+		case EDITOR_ENTERING_TRI_GAMMA:
 		case EDITOR_SAVING:
 		case EDITOR_LOADING:
 			input_confirmed = true;
@@ -1051,6 +1124,9 @@ void MapEditorController::handleKeyUpEvent(SDL_Event e, GeneralView* view) {
 	case SDLK_ESCAPE:
 		switch(state) {
 		case EDITOR_ENTERING_CIRCLE_RAD: state = EDITOR_PLACING_CIRCLE; break;
+		case EDITOR_ENTERING_TRI_A:
+		case EDITOR_ENTERING_TRI_B:
+		case EDITOR_ENTERING_TRI_GAMMA: state = EDITOR_PLACING_TRIANGLE; break;
 		case EDITOR_ENTERING_REC_WIDTH:
 		case EDITOR_ENTERING_REC_HEIGHT: state = EDITOR_PLACING_RECTANGLE; break;
 		case EDITOR_ENTERING_DP_ZONE_WIDTH:
@@ -1059,6 +1135,7 @@ void MapEditorController::handleKeyUpEvent(SDL_Event e, GeneralView* view) {
 			state = EDITOR_PLACING_DP_ZONE; break;
 		case EDITOR_ENTERING_WP_RAD: state = EDITOR_PLACING_WP; break;
 		case EDITOR_PLACING_CIRCLE:
+		case EDITOR_PLACING_TRIANGLE:
 		case EDITOR_PLACING_RECTANGLE:
 		case EDITOR_PLACING_DP_ZONE:
 		case EDITOR_PLACING_WP:
@@ -1091,6 +1168,7 @@ void MapEditorController::handleKeyUpEvent(SDL_Event e, GeneralView* view) {
 void MapEditorController::handleMouseKeyUpEvent(SDL_Event e, GeneralView* view) {
 	switch(state) {
 	case EDITOR_PLACING_CIRCLE:
+	case EDITOR_PLACING_TRIANGLE:
 	case EDITOR_PLACING_RECTANGLE:
 	case EDITOR_PLACING_DP_ZONE:
 	case EDITOR_PLACING_WP:
@@ -1124,11 +1202,16 @@ void MapEditorController::handleMouseKeyUpEvent(SDL_Event e, GeneralView* view) 
 				Circle* circ = dynamic_cast<Circle*>(currentObj);
 				dist = (circ->pos - mousePos).norm();
 				break;}
+			/*case MAP_TRIANGLE: {
+				Triangle* tri = dynamic_cast<Triangle*>(currentObj);
+				dist = (tri->pos - mousePos).norm();
+				}break;*/
+			case MAP_TRIANGLE:
 			case MAP_BORDER:
 			case MAP_RECTANGLE:
 			case MAP_DEPLOYMENT_ZONE: {
-				Rrectangle* rec = dynamic_cast<Rrectangle*>(currentObj);
-				dist = (rec->pos - mousePos).norm();
+				Ppolygon* pol = dynamic_cast<Ppolygon*>(currentObj);
+				dist = (pol->pos - mousePos).norm();
 				break;}
 			}
 			if(dist < minDist) {

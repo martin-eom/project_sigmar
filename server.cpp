@@ -1,6 +1,10 @@
 #define NOMINMAX
 #include <Windows.h>	// this line is very dangerous, moving this statement to a different location causes all sorts of problems
 
+#ifndef EIGEN_DONT_PARALLELIZE
+#define EIGEN_DONT_PARALLELIZE
+#endif
+
 #include <server.h>
 #include <shapes.h>
 #include <view.h>
@@ -41,22 +45,17 @@ void OpenWindow(Map* map) {
 	em = new GameEventManager(30);
 	dynamic_cast<GameEventManager*>(em)->map = map;
 	model = new Model(em, map);
-	//model->loadSoldierTypes("config/templates/classes.json");
-	//model->loadUnitTypes("config/templates/units.json");
-	//model->loadDamageInfo();
-	//model->loadSettings("config/game_settings.json");
 	model->init();
 	dynamic_cast<GameEventManager*>(em)->model = model;
-	// #### set up players with units from armylist.json
 	Player* player1 = new Player(true);
 	model->players.push_back(player1);
 	model->player1 = player1;
+	model->player1->model = model;
 	Player* player2 = new Player(false);
 	model->players.push_back(player2);
 	model->player2 = player2;
+	model->player2->model = model;
 	model->loadArmyLists("config/templates/armylist.json");
-	//ctrl->SetPlayer();
-	//ctrl->SetUnit();
 	ctrl = new KeyboardAndMouseController(em, SCREEN_WIDTH, SCREEN_HEIGHT, map);
 	dynamic_cast<GameEventManager*>(em)->ctrl = ctrl;
 
@@ -103,6 +102,8 @@ int main(int argc, char* argv[1]) {
 	freopen("CONOUT$", "w", stdout);
 	freopen("CONOUT$", "w", stderr);
 
+	//omp_set_num_threads(std::max(1, omp_get_max_threads() - 1));
+	//omp_set_num_threads(8);
 	// Initializing SDL
 	if(SDL_Init(SDL_INIT_EVERYTHING) != 0) {
 		std::cout << "Failed to initialize SDL!\n";
@@ -114,11 +115,13 @@ int main(int argc, char* argv[1]) {
 	}
 	SDL_StopTextInput();
 
+	//map = new Map("maps/pillars2.json");
+	map = new Map("maps/field.json");
 	//map = new Map("maps/testmap.json");
-	map = new Map("maps/pillars2.json");
+	//map = new Map("maps/debug.json");
 	OpenWindow(map);
 
-	// Extra Debug section
+	/*// Extra Debug section
 	Eigen::Vector2d start_pos;
 	start_pos << 20, 90;
 	Eigen::Vector2d vel;
@@ -132,7 +135,7 @@ int main(int argc, char* argv[1]) {
 	//Event ume = UnitRosterModifiedEvent();
 	//em->Post(&ume);
 	//UnitPlaceRequest placeTurret(turret, start_pos, rot);
-	//em->Post(&placeTurret);
+	//em->Post(&placeTurret);*/
 
 	// Main loop
 	bool quit = false;
@@ -145,8 +148,8 @@ int main(int argc, char* argv[1]) {
 	T_OF_NEXT_REFORM = CURRENT_TICK + 2000;
 	TICKS_SINCE_LAST_REFORM = 0;
 	while (!quit) {
-		while (SDL_PollEvent(&e)) {
-			if (e.type == SDL_QUIT) {
+ 		while (SDL_PollEvent(&e)) {
+			if(e.type == SDL_QUIT) {
 				quit = true;
 			}
 			else if((e.type == SDL_MOUSEBUTTONUP) || (e.type == SDL_KEYUP) || (e.type == SDL_KEYDOWN) ||(e.type == SDL_TEXTINPUT) || (e.type == SDL_MOUSEMOTION)) {
@@ -160,19 +163,22 @@ int main(int argc, char* argv[1]) {
 			//debug("Tick");
 			TickEvent ev;
 			em->Post(&ev);
-			T_OF_NEXT_TICK = CURRENT_TICK + em->dt * 1000;
+			//T_OF_NEXT_TICK = CURRENT_TICK + em->dt * 1000;
+			T_OF_NEXT_TICK += em->dt * 1000;
 			TICKS_SINCE_LAST_FPS_UPDATE++;
 		}
 		if (CURRENT_TICK >= T_OF_NEXT_FPS_UPDATE) {
 			std::cout << 0.5 * TICKS_SINCE_LAST_FPS_UPDATE << " fps\n";
 			TICKS_SINCE_LAST_FPS_UPDATE = 0;
-			T_OF_NEXT_FPS_UPDATE = CURRENT_TICK + 2000;
+			//T_OF_NEXT_FPS_UPDATE = CURRENT_TICK + 2000;
+			T_OF_NEXT_FPS_UPDATE += 2000;
 		}
 		if (CURRENT_TICK >= T_OF_NEXT_REFORM) {
 			ReformEvent ev;
 			em->Post(&ev);
 			TICKS_SINCE_LAST_REFORM = 0;
-			T_OF_NEXT_REFORM = CURRENT_TICK + 5000;
+			//T_OF_NEXT_REFORM = CURRENT_TICK + 5000;
+			T_OF_NEXT_REFORM += 5003;
 		}
 		Event* ev = NULL;
 		switch(ctrl->state()) {

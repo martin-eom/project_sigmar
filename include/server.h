@@ -5,8 +5,13 @@
 #include <units.h>
 #include <physics.h>
 #include <map.h>
+#include <pathfinding.h>
 #include <model.h>
-#include <player.h>
+#include <soldier_functions.h>
+#include <unit_functions.h>
+#include <model_functions.h>
+#include <advanced_pathfinding.h>
+//#include <player.h>
 
 #include <cstdio>
 

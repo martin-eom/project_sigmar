@@ -12,7 +12,8 @@
 		"ranged_stats": {
 			"ranged": false,
 			"range": 400.0,
-			"angle": 1.0
+			"angle": 1.0,
+			"primary_ranged": false
 		}
 	},
 	{
@@ -28,7 +29,8 @@
 		"ranged_stats": {
 			"ranged": false,
 			"range": 400.0,
-			"angle": 1.0
+			"angle": 1.0,
+			"primary_ranged": false
 		}
 	},
 	{
@@ -44,7 +46,8 @@
 		"ranged_stats": {
 			"ranged": false,
 			"range": 400.0,
-			"angle": 1.0
+			"angle": 1.0,
+			"primary_ranged": false
 		}
 	},
 	{
@@ -60,7 +63,8 @@
 		"ranged_stats": {
 			"ranged": true,
 			"range": 400.0,
-			"angle": 1.0
+			"angle": 1.0,
+			"primary_ranged": true
 		}
 	},
 	{
@@ -76,7 +80,8 @@
 		"ranged_stats": {
 			"ranged": true,
 			"range": 800.0,
-			"angle": 0.5
+			"angle": 0.5,
+			"primary_ranged": true
 		}
 	}
 ]]

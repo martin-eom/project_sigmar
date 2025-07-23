@@ -15,6 +15,7 @@
 
 enum MAP_OBJECT_TYPES {
 	MAP_NONE,
+	MAP_TRIANGLE,
 	MAP_RECTANGLE,
 	MAP_BORDER,
 	MAP_DEPLOYMENT_ZONE,
@@ -22,12 +23,25 @@ enum MAP_OBJECT_TYPES {
 	MAP_WAYPOINT
 };
 
+int legalizeIndex(int ind, int bound) {
+	if(ind < 0)
+		return 0;
+	if(ind > bound - 1)
+		return bound - 1;
+	return ind;
+}
+
 class Map;
 
 class MapObject {
 public:
 	int type;
+	int ID;
+	bool high = true;
 	virtual void AutoWaypoints(double rad, Map* map) {}
+	void toggle_high() {
+		high = !high;
+	};
 	MapObject() {type = MAP_NONE;}
 };
 
@@ -41,6 +55,12 @@ class MapWaypoint : public MapCircle {
 public:
 	bool _auto;
 	MapWaypoint(Eigen::Vector2d pos, double rad) : MapCircle(pos, rad) {_auto = false; type = MAP_WAYPOINT;}
+};
+
+class MapTriangle : public MapObject, public Triangle {
+public:
+	MapTriangle(double a, double b, double gamma, Eigen::Vector2d pos, Eigen::Matrix2d rot) : MapObject(), Triangle(a, b, gamma, pos, rot) {type = MAP_TRIANGLE;}
+	void AutoWaypoints(double rad, Map* map);
 };
 
 class MapRectangle : public MapObject, public Rrectangle {
@@ -70,20 +90,27 @@ public:
 	std::vector<Soldier*> p2Soldiers;
 	std::vector<MapObject*> mapObjects;
 	std::vector<Projectile*> projectiles;
-	std::vector<gridpiece*> neighbours;
-	std::vector<gridpiece*> redundantNeighbours;
+	std::vector<std::vector<gridpiece*>> neighbours;
+	std::vector<std::vector<gridpiece*>> redundantNeighbours;
 	Rrectangle* rec;
+	int nrow;
+	int ncol;
+};
+
+class grid_container{
+public:
+	int tilesize;
+	int nrows;
+	int ncols;
+	std::vector<std::vector<gridpiece*>> grid;
 };
 
 class Map {
 public:
 	const static int optimalTileSize = 31;
-	int tilesize;
 	int width;
 	int height;
-	int nrows;
-	int ncols;
-	std::vector<std::vector<gridpiece*>> tiles;
+	std::vector<grid_container*> grids;
 	std::vector<MapObject*> mapObjects;
 	std::vector<MapWaypoint*> waypoints;
 	std::vector<MapBorder*> borders;
@@ -92,17 +119,24 @@ public:
 	std::vector<std::vector<int>> wp_path_next;
 		
 	void Cleangrid();
-	void Assign(Soldier* soldier, int i, int j);
-	void ProjectileAssign(Projectile* projectile, int i, int j);
-	void AddMapObject(MapObject* obj);
+	void Assign(Soldier* soldier, int i, int j, grid_container* grid);
+	void ProjectileAssign(Projectile* projectile, int i, int j, grid_container* grid);
+	void AddMapObject(MapObject* obj, bool update = false);
+	void UpdateGridsWithMapObjects();
 	void RemoveMapObject(MapObject* obj);
 	bool Borders();
 	void toggelBorders();
+	void initGrids(std::vector<int> tilesizes);
+	std::string neighbourFileStr();
+	bool searchNeighbourFile(std::string filename);
+	void readNeighbourFile(std::string filename);
+	void writeNeighbourFile(std::string filename);
+	void setAllNeighbours();
+	grid_container* getGrid(int tilesize);
 
 private:
-	void initGridPieces();
-	void setNeighbours();
-	void setRedundantNeighbours();
+	void setNeighbours(grid_container* grid, int n_grid);
+	void setRedundantNeighbours(grid_container* grid, int n_grid);
 	void createBorders();
 	void init();
 		
@@ -110,7 +144,6 @@ public:
 	Map(int width, int height, int tilesize) {
 		this->width = width;
 		this->height = height;
-		this->tilesize = tilesize;
 		init();
 	}
 
@@ -119,56 +152,147 @@ public:
 };
 
 void Map::init() {
-	nrows = height / tilesize + bool(height % tilesize);
-	ncols = width / tilesize + bool(width % tilesize);
-	tiles = std::vector<std::vector<gridpiece*>>(nrows, std::vector<gridpiece*>(ncols, NULL));
-	initGridPieces();
-	setNeighbours();
-	setRedundantNeighbours();
 	//creating map borders, but not adding them to objects yet
 	createBorders();
 }
 
-void Map::initGridPieces() {
-	for(int i = 0; i < nrows; i++) {
-		for(int j = 0; j < ncols; j++) {
-			tiles.at(i).at(j) = new gridpiece();
-			Eigen::Vector2d center;
-			center << tilesize/2. + j*tilesize, tilesize/2. + i*tilesize;
-			Eigen::Matrix2d rot;
-			rot << 1., 0., 0., 1.;
-			tiles.at(i).at(j)->rec = new Rrectangle(tilesize / 2., tilesize / 2., center, rot);		
-		}
-	}
-}
-
-void Map::setNeighbours() {
-	for(int i = 0; i < nrows - 1; i++) {
-		for(int j = 0; j < ncols - 1; j++) {
-			tiles.at(i).at(j)->neighbours.push_back(tiles.at(i+1).at(j));
-			tiles.at(i).at(j)->neighbours.push_back(tiles.at(i).at(j+1));
-			tiles.at(i).at(j)->neighbours.push_back(tiles.at(i+1).at(j+1));
-			if(i == 0) {
-				tiles.at(nrows-1).at(j)->neighbours.push_back(tiles.at(nrows-1).at(j+1));
+void Map::initGrids(std::vector<int> tilesizes) {
+	for(int size: tilesizes) {
+		grid_container* container = new grid_container();
+		container->tilesize = size;
+		container->nrows = height / size + bool(height % size);
+		container->ncols = width / size + bool(width % size);
+		for(int i = 0; i < container->nrows; i++) {
+			container->grid.push_back(std::vector<gridpiece*>());
+			for(int j = 0; j < container->ncols; j++) {
+				container->grid.at(i).push_back(new gridpiece());
+				container->grid.at(i).at(j)->nrow = i;
+				container->grid.at(i).at(j)->ncol = j;
+				Eigen::Vector2d center;
+				center << size/2. + j*size, size/2. + i*size;
+				Eigen::Matrix2d rot;
+				rot << 1., 0., 0., 1.;
+				container->grid.at(i).at(j)->rec = new Rrectangle(size / 2., size / 2., center, rot);
+				for(auto size: tilesizes) {
+					container->grid.at(i).at(j)->neighbours.push_back(std::vector<gridpiece*>());
+					container->grid.at(i).at(j)->redundantNeighbours.push_back(std::vector<gridpiece*>());
+				}
 			}
 		}
-		tiles.at(i).at(ncols-1)->neighbours.push_back(tiles.at(i+1).at(ncols-1));
+		grids.push_back(container);
 	}
 }
 
-void Map::setRedundantNeighbours() {
-	for(int i = 1; i < nrows; i++) {
-		for(int j = 1; j < ncols; j++) {
-			if(i+1 < nrows && j-1 > 0)
-				tiles.at(i).at(j)->redundantNeighbours.push_back(tiles.at(i+1).at(j-1));
-			if(j-1 > 0)
-				tiles.at(i).at(j)->redundantNeighbours.push_back(tiles.at(i).at(j-1));
+grid_container* Map::getGrid(int tilesize) {
+	for(auto container: grids) {
+		if(tilesize == container->tilesize) {
+			return container;
+		}
+	}
+}
+
+void Map::setNeighbours(grid_container* grid, int n_grid) {
+	for(int i = 0; i < grid->nrows - 1; i++) {
+		for(int j = 0; j < grid->ncols - 1; j++) {
+			grid->grid.at(i).at(j)->neighbours[n_grid].push_back(grid->grid.at(i+1).at(j));
+			grid->grid.at(i).at(j)->neighbours[n_grid].push_back(grid->grid.at(i).at(j+1));
+			grid->grid.at(i).at(j)->neighbours[n_grid].push_back(grid->grid.at(i+1).at(j+1));
+			if(i == 0) {
+				grid->grid.at(grid->nrows-1).at(j)->neighbours[n_grid].push_back(grid->grid.at(grid->nrows-1).at(j+1));
+			}
+			if(j > 0) {
+				grid->grid.at(i).at(j)->neighbours[n_grid].push_back(grid->grid.at(i+1).at(j-1));
+			}
+		}
+		grid->grid.at(i).at(grid->ncols-1)->neighbours[n_grid].push_back(grid->grid.at(i+1).at(grid->ncols-1));
+	}	
+}
+
+void Map::setRedundantNeighbours(grid_container* grid, int n_grid) {
+	for(int i = 1; i < grid->nrows; i++) {
+		for(int j = 1; j < grid->ncols; j++) {
+			if(i+1 < grid->nrows && j-1 > 0)
+				grid->grid.at(i).at(j)->redundantNeighbours[n_grid].push_back(grid->grid.at(i+1).at(j-1));
+			//if(j-1 > 0)
+			//	grid->grid.at(i).at(j)->redundantNeighbours2[n_grid].push_back(grid->grid.at(i).at(j-1));
 			if(i-1 > 0 && j-1 > 0)
-				tiles.at(i).at(j)->redundantNeighbours.push_back(tiles.at(i-1).at(j-1));
+				grid->grid.at(i).at(j)->redundantNeighbours[n_grid].push_back(grid->grid.at(i-1).at(j-1));
 			if(i-1 > 0)
-				tiles.at(i).at(j)->redundantNeighbours.push_back(tiles.at(i-1).at(j));
-			if(i-1 > 0 && j+1 < ncols)
-				tiles.at(i).at(j)->redundantNeighbours.push_back(tiles.at(i-1).at(j+1));
+				grid->grid.at(i).at(j)->redundantNeighbours[n_grid].push_back(grid->grid.at(i-1).at(j));
+			if(i-1 > 0 && j+1 < grid->ncols)
+				grid->grid.at(i).at(j)->redundantNeighbours[n_grid].push_back(grid->grid.at(i-1).at(j+1));
+		}
+	}
+}
+
+void Map::setAllNeighbours() {
+	std::cout << "mapping grids to each other (this may take a while)\n";
+	std::vector<grid_container*>::iterator it;
+	for(it = grids.begin(); it < grids.end(); it++) {
+		std::vector<grid_container*>::iterator it2;
+		for(it2 = it; it2 < grids.end(); it2++) {
+			std::cout << "grid sizes: " << (*it)->tilesize << " " << (*it2)->tilesize << "\n";
+			if(it == it2) {
+				setNeighbours(*it, it - grids.begin());
+				setRedundantNeighbours(*it, it - grids.begin());
+			}
+			else {
+				double hw = ((*it2)->tilesize + 2*(*it)->tilesize) * 0.5;
+				double exclusion_dist = pow(2, 0.5) * hw + (*it2)->tilesize / pow(2, 0.5) * 1.1;
+				int cntr = 0;
+				for(auto row1: (*it)->grid) {
+					cntr++;
+					for(auto tile: row1) {
+						Rrectangle collisionBox(hw, hw, tile->rec->pos, tile->rec->rot);
+						// finding surrounding tile
+						int i = (int) (tile->rec->pos.coeff(1) / (*it2)->tilesize);
+						if(i < 0) i = 0;
+						if(i > (*it2)->nrows - 1) i = (*it2)->nrows - 1;
+						int j = (int) (tile->rec->pos.coeff(0) / (*it2)->tilesize);
+						if(j < 0) j = 0;
+						if(j > (*it2)->ncols - 1) j = (*it2)->ncols - 1;
+						// reducing number tiles to check for collision
+						int up, down, left, right;
+						up = down = left = right = 0;
+						while(true) {
+							if(i - down <= 0) break;
+							if(tile->rec->pos.coeff(1) - (*it2)->grid.at(i - down).at(j)->rec->pos.coeff(1) > exclusion_dist)
+								break;
+							down++;
+						}
+						while(true) {
+							if(i + up >= (*it2)->nrows - 1) break;
+							if((*it2)->grid.at(i + up).at(j)->rec->pos.coeff(1) - tile->rec->pos.coeff(1) > exclusion_dist)
+								break;
+							up++;
+						}
+						while(true) {
+							if(j - left <= 0) break;
+							if(tile->rec->pos.coeff(0) - (*it2)->grid.at(i).at(j - left)->rec->pos.coeff(0) > exclusion_dist)
+								break;
+							left++;
+						}
+						while(true) {
+							if(j + right >= (*it2)->ncols - 1) break;
+							if((*it2)->grid.at(i).at(j + right)->rec->pos.coeff(0) - tile->rec->pos.coeff(0) > exclusion_dist)
+								break;
+							right++;
+						}
+						// checking the remaining tiles for neighbours
+						for(int m = i - down; m <= i + up; m++) {
+							for(int n = j - left; n <= j + right; n++) {
+								gridpiece* largerTile = (*it2)->grid.at(m).at(n);
+								if((tile->rec->pos - largerTile->rec->pos).norm() <= exclusion_dist) {
+									if(RectangleRectangleCollision(&collisionBox, largerTile->rec)) {
+										tile->neighbours.at(it2 - grids.begin()).push_back(largerTile);
+										largerTile->redundantNeighbours.at(it - grids.begin()).push_back(tile);
+									}
+								}
+							}
+						}
+					}
+				}
+			}
 		}
 	}
 }
@@ -176,7 +300,7 @@ void Map::setRedundantNeighbours() {
 void Map::createBorders() {
 	double hw = 0.5*width;
 	double hl = 0.5*height;
-	double ht = 0.5*tilesize;
+	double ht = 0.5*optimalTileSize;
 	Eigen::Vector2d pos;
 	Eigen::Matrix2d rot; rot << 1, 0, 0, 1;
 	pos << hw, height + ht;
@@ -190,72 +314,106 @@ void Map::createBorders() {
 }
 
 void Map::Cleangrid() {
-	for(int i = 0; i < nrows; i++) {
-		for(int j = 0; j < ncols; j++) {
-			tiles.at(i).at(j)->soldiers.clear();
-			tiles.at(i).at(j)->p1Soldiers.clear();
-			tiles.at(i).at(j)->p2Soldiers.clear();
-			tiles.at(i).at(j)->projectiles.clear();
+	for(auto grid: grids) {
+		for(auto row: grid->grid) {
+			for(auto tile: row) {
+				tile->soldiers.clear();
+				tile->p1Soldiers.clear();
+				tile->p2Soldiers.clear();
+				tile->projectiles.clear();
+			}
 		}
 	}
 }
 
-void Map::Assign(Soldier* soldier, int i, int j) {
-	tiles.at(i).at(j)->soldiers.push_back(soldier);
-	soldier->tile_index = tiles.at(i).at(j)->soldiers.size() - 1;
+void Map::Assign(Soldier* soldier, int i, int j, grid_container* grid) {
+	grid->grid.at(i).at(j)->soldiers.push_back(soldier);
+	soldier->tile_index = grid->grid.at(i).at(j)->soldiers.size() - 1;
 	if(soldier->unit->player->player1)
-		tiles.at(i).at(j)->p1Soldiers.push_back(soldier);
+		grid->grid.at(i).at(j)->p1Soldiers.push_back(soldier);
 	else
-		tiles.at(i).at(j)->p2Soldiers.push_back(soldier);
+		grid->grid.at(i).at(j)->p2Soldiers.push_back(soldier);
 }
 
-void Map::ProjectileAssign(Projectile* projectile, int i, int j) {
-	tiles.at(i).at(j)->projectiles.push_back(projectile);		
+void Map::ProjectileAssign(Projectile* projectile, int i, int j, grid_container* grid) {
+	grid->grid.at(i).at(j)->projectiles.push_back(projectile);
 }
 
-void Map::AddMapObject(MapObject* obj) {
+void Map::AddMapObject(MapObject* obj, bool update) {
 	switch(obj->type) {
 	case MAP_CIRCLE: {
 		Circle* circ = dynamic_cast<Circle*>(obj);
-		Circle extended = Circle(circ->pos, circ->rad + 0.5*tilesize);
-		for(auto row : tiles) {
-			for(auto tile : row) {
-				if(CircleRectangleCollision(&extended, tile->rec)) {
-					tile->mapObjects.push_back(obj);
+		for(auto grid: grids) {
+			Circle extended = Circle(circ->pos, circ->rad + 0.5*grid->tilesize);
+			for(auto row: grid->grid) {
+				for(auto tile: row) {
+					if(CircleRectangleCollision(&extended, tile->rec)) {
+						tile->mapObjects.push_back(obj);
+					}
 				}
 			}
 		}
 		break;}
+	case MAP_TRIANGLE: {
+		Triangle* tri = dynamic_cast<Triangle*>(obj);
+		for(auto grid: grids) {
+			for(auto row: grid->grid) {
+				for(auto tile: row) {
+					Rrectangle extended = Rrectangle(tile->rec->hl*2, tile->rec->hw*2, tile->rec->pos, tile->rec->rot);
+					if(PolygonPolygonCollision(tri, &extended)) {
+						tile->mapObjects.push_back(obj);
+					}
+				}
+			}
+		}
+		}break;
 	case MAP_BORDER:
 	case MAP_RECTANGLE: {
 		Rrectangle* rec = dynamic_cast<Rrectangle*>(obj);
-		Rrectangle extended = Rrectangle(rec->hl + 0.5*tilesize, rec->hw + 0.5*tilesize, rec->pos, rec->rot);
-		for(auto row : tiles) {
-			for(auto tile : row) {
-				if(RectangleRectangleCollision(&extended, tile->rec)) {
-					tile->mapObjects.push_back(obj);
+		for(auto grid: grids) {
+			Rrectangle extended = Rrectangle(rec->hl + 0.5*grid->tilesize, rec->hw + 0.5*grid->tilesize, rec->pos, rec->rot);
+			for(auto row: grid->grid) {
+				for(auto tile: row) {
+					if(RectangleRectangleCollision(&extended, tile->rec)) {
+						tile->mapObjects.push_back(obj);
+					}
 				}
 			}
 		}
 		}break;
 	case MAP_DEPLOYMENT_ZONE:
-		deploymentZones.push_back(dynamic_cast<DeploymentZone*>(obj));
+		if(!update)
+			deploymentZones.push_back(dynamic_cast<DeploymentZone*>(obj));
 		break;
 	case MAP_WAYPOINT:
-		waypoints.push_back(dynamic_cast<MapWaypoint*>(obj));
+		if(!update)
+			waypoints.push_back(dynamic_cast<MapWaypoint*>(obj));
 		break;
 	}
-	mapObjects.push_back(obj);
+	if(!update) {
+		mapObjects.push_back(obj);
+		obj->ID = std::size(mapObjects);
+	}
+}
+
+void Map::UpdateGridsWithMapObjects() {
+	std::cout << "mapping map objects to grid tiles (this may take a while)\n";
+	for(auto obj: mapObjects) {
+		AddMapObject(obj, true);
+	}
 }
 
 void Map::RemoveMapObject(MapObject* obj) {
 	std::erase(mapObjects, obj);
 	switch(obj->type) {
 	case MAP_CIRCLE:
+	case MAP_TRIANGLE:
 	case MAP_RECTANGLE:
-		for(auto row : tiles) {
-			for(auto tile : row) {
-				std::erase(tile->mapObjects, obj);
+		for(auto grid: grids) {
+			for(auto row: grid->grid) {
+				for(auto tile: row) {
+					std::erase(tile->mapObjects, obj);
+				}
 			}
 		}
 		break;
@@ -281,9 +439,11 @@ void Map::toggelBorders() {
 		for(auto obj : reference) {
 			if(obj->type == MAP_BORDER) {
 				std::erase(mapObjects, obj);
-				for(auto row : tiles) {
-					for(auto tile : row) {
-						std::erase(tile->mapObjects, obj);
+				for(auto grid: grids) {
+					for(auto row: grid->grid) {
+						for(auto tile: row) {
+							std::erase(tile->mapObjects, obj);
+						}
 					}
 				}
 			}
@@ -323,128 +483,91 @@ void SoldierCircleCollision(Soldier* soldier, Circle* circle) {
 	}
 }
 
-void SoldierRectangleCollision(Soldier* soldier, Rrectangle* rec) {
-	Eigen::Vector2d knockVel;
-	knockVel << 0., 0.;
-	Eigen::Vector2d normPos = soldier->pos - rec->pos;
-	Eigen::Vector2d rotPos = rec->rot.transpose() * (soldier->pos - rec->pos);
-	Eigen::Vector2d soldierPosCorrection;
-	soldierPosCorrection << 0., 0.;
-	bool _long, _wide;
-	_long = (-rec->hw <= rotPos.coeff(0) && rotPos.coeff(0) <= rec->hw && -rec->hl - soldier->rad <= rotPos.coeff(1) && rotPos.coeff(1) <= rec->hl + soldier->rad);
-	_wide = (-rec->hw - soldier->rad <= rotPos.coeff(0) && rotPos.coeff(0) <= rec->hw + soldier->rad && -rec->hl <= rotPos.coeff(1) && rotPos.coeff(1) <= rec->hl);
-	double dl;
-	double dw;
-	if(rotPos.coeff(1) < 0) {dl = -(rec->hl + soldier->rad) - rotPos.coeff(1);}
-	else {dl = rec->hl + soldier->rad - rotPos.coeff(1);}
-	if(rotPos.coeff(0) < 0) {dw = -(rec->hw + soldier->rad) - rotPos.coeff(0);}
-	else {dw = rec->hw + soldier->rad - rotPos.coeff(0);}
-	int edge;
-	if(_long) {
-		if(_wide) {
-			if(dl < 0) {
-				if(dw < 0) {
-					if(dw < dl) {edge = 3;}
-					else {edge = 4;}
-				}
-				else {
-					if(-dl < dw) {edge = 3;}
-					else {edge = 2;}
-				}
-			}
-			else {
-				if(dw < 0) {
-					if(dl < -dw) {edge = 1;}
-					else {edge = 4;}
-				}
-				else {
-					if(dl < dw) {edge = 1;}
-					else {edge = 2;}
-				}
-			}		
-		}
-		else {
-			if(dl < 0) {edge = 3;}
-			else {edge = 1;}
+enum COLLISION_TYPES {
+	COLLISION_EDGE,
+	COLLISION_CORNER
+};
+
+void SoldierPolygonCollision(Soldier* soldier, Ppolygon* pol) {
+	// find closest edge
+	int closestEdge = 0;
+	int collision_type = COLLISION_CORNER;
+	double minEdgeDist; minEdgeDist = std::numeric_limits<float>::infinity();
+	Eigen::Vector2d edge;
+	double len;
+	Eigen::Matrix2d rot; Eigen::Matrix2d reversedRot;
+	Eigen::Vector2d solPos;
+	for(int i = 0; i < pol->corners.size(); i++) {
+		edge = pol->corners.at((i + 1)%pol->corners.size())->pos
+			- pol->corners.at(i)->pos;
+		len = edge.norm();
+		rot = Rotation(Angle(edge.coeff(1) / len, edge.coeff(0) / len));
+		reversedRot = rot.transpose();
+		solPos = reversedRot * (soldier->pos - pol->corners.at(i)->pos);
+		if(0 <= solPos.coeff(0) && solPos.coeff(0) <= len && 0 <= solPos.coeff(1)) {
+			minEdgeDist = abs(solPos.coeff(1));
+			closestEdge = i;
+			collision_type = COLLISION_EDGE;
 		}
 	}
-	else {
-		if(_wide) {
-			if(dw < 0) {edge = 4;}
-			else {edge = 2;}
-		}
-		else {
-			edge = 0;
-		}
-	}
-	Eigen::Vector2d rotVel = rec->rot.transpose() * soldier->vel;
-	double collisionStrength = 2.;	//2. is physical
-	switch(edge) {
-	case 1:
-		if(rotVel.coeff(1) < 0) {
-			rotVel(0) = 0;
-			rotVel(1) *= -collisionStrength;
-			rotVel = rec->rot * rotVel;
-			knockVel = rotVel;
-			soldierPosCorrection(1) += dl;
-			soldierPosCorrection = rec->rot * soldierPosCorrection;
-		}
-		break;
-	case 2:
-		if(rotVel.coeff(0) < 0) {
-			rotVel(0) *= -collisionStrength;
-			rotVel(1) = 0;
-			rotVel = rec->rot * rotVel;
-			knockVel = rotVel;
-			soldierPosCorrection(0) += dw;
-			soldierPosCorrection = rec->rot * soldierPosCorrection;
-		}
-		break;
-	case 3:
-		if(rotVel.coeff(1) > 0) {
-			rotVel(0) = 0;
-			rotVel(1) *= -collisionStrength;
-			rotVel = rec->rot * rotVel;
-			knockVel = rotVel;
-			soldierPosCorrection(1) += dl;
-			soldierPosCorrection = rec->rot * soldierPosCorrection;
-		}
-		break;
-	case 4:
-		if(rotVel.coeff(0) > 0) {
-			rotVel(0) *= -collisionStrength;
-			rotVel(1) = 0;
-			rotVel = rec->rot * rotVel;
-			knockVel = rotVel;
-			soldierPosCorrection(0) += dw;
-			soldierPosCorrection = rec->rot * soldierPosCorrection;
-		}
-		break;
-	case 0:
-		for(int i = 0; i < 4; i++) {
-			Corner* corner = rec->corners.at(i);
-			Eigen::Vector2d dist = soldier->pos - corner->pos;
-			double d = dist.norm();
-			if(d <= soldier->rad) {
-				double sin = dist.coeff(1) / d;
-				double cos = dist.coeff(0) / d;
-				Eigen::Matrix2d rot;
-				rot << cos, -sin, sin, cos;
-				Eigen::Vector2d rotVel = rot.transpose() * soldier->vel;
-				if(rotVel.coeff(0) < 0) {
-					rotVel(0) *= -collisionStrength;
-					rotVel(1) = 0;
-					rotVel = rot * rotVel;
-					knockVel = rotVel;
-					soldierPosCorrection(0) += soldier->rad - d;
-					soldierPosCorrection = rot * soldierPosCorrection;
-				}
+	// find closest corner
+	int closestCorner = 0;
+	if(collision_type == COLLISION_CORNER) {
+		double minCornerDist; minCornerDist = std::numeric_limits<float>::infinity();
+		for(int i = 0; i < pol->corners.size(); i++) {
+			Eigen::Vector2d diff = soldier->pos - pol->corners.at(i)->pos;
+			double dist = diff.coeff(0)*diff.coeff(0) + diff.coeff(1)*diff.coeff(1);
+			if(dist < minCornerDist) {
+				minCornerDist = dist;
+				closestCorner = i;
 			}
 		}
 	}
-	//knockVel << 0., 0.;
+	// compute speed and position changes
+	Eigen::Vector2d rotVel, knockVel; 
+	rotVel << 0., 0.; knockVel << 0., 0.;
+	Eigen::Vector2d soldierPosCorrection; soldierPosCorrection << 0., 0.;
+	switch(collision_type) {
+	case COLLISION_EDGE: {
+		edge = pol->corners.at((closestEdge + 1)%pol->corners.size())->pos
+			- pol->corners.at(closestEdge)->pos;
+		len = edge.norm();
+		rot = Rotation(Angle(edge.coeff(1) / len, edge.coeff(0) / len));
+		reversedRot = rot.transpose();
+		solPos = reversedRot * (soldier->pos - pol->corners.at(closestEdge)->pos);
+		rotVel = reversedRot * soldier->vel;
+		if(rotVel.coeff(1) < 0 && solPos.coeff(1) < soldier->rad) {
+			rotVel(0) = 0;
+			rotVel(1) *= -2;
+			rotVel = rot * rotVel;
+			knockVel = rotVel;
+			soldierPosCorrection(1) = soldier->rad - solPos.coeff(1);
+			soldierPosCorrection = rot * soldierPosCorrection;
+		}
+	}break;
+	case COLLISION_CORNER: {
+		solPos = soldier->pos - pol->corners.at(closestCorner)->pos;
+		len = solPos.norm();
+		rot = Rotation(Angle(solPos.coeff(1) / len, solPos.coeff(0) / len));
+		reversedRot = rot.transpose();
+		rotVel = reversedRot * soldier->vel;
+		if(rotVel.coeff(0) < 0 && len < soldier->rad) {
+			rotVel(1) = 0;
+			rotVel(0) *= -2;
+			rotVel = rot * rotVel;
+			soldierPosCorrection(0) = soldier->rad - len;
+			soldierPosCorrection = rot * soldierPosCorrection;
+		}
+	}break;
+	}
+	// apply computed values
 	soldier->knockVel += knockVel;
 	soldier->pos += soldierPosCorrection;
+}
+
+void SoldierRectangleCollision(Soldier* soldier, Rrectangle* rec) {
+	//deprecated
+	SoldierPolygonCollision(soldier, rec);
 }
 
 void MapCircle::AutoWaypoints(double rad, Map* map) {
@@ -462,6 +585,55 @@ void MapCircle::AutoWaypoints(double rad, Map* map) {
 		w->_auto = true;
 		map->AddMapObject(w);
 	}
+}
+
+/*void PolygonAutoWaypoints(Polygon* pol, double rad, Map* map) {
+	
+}*/
+
+void MapTriangle::AutoWaypoints(double rad, Map* map) {
+	for(int i = 0; i < corners.size(); i++) {
+		Eigen::Vector2d pos;
+		Corner* c1 = corners.at(i);
+		Corner* c2 = corners.at((i+1)%corners.size());
+		Corner* c3 = corners.at((i+2)%corners.size());
+		Eigen::Vector2d p1 = c1->pos - c2->pos;
+		Eigen::Vector2d p3 = c3->pos - c2->pos;
+		Eigen::Matrix2d rot1 = Rotation(Angle(-p1.coeff(1)/p1.norm(), -p1.coeff(0)/p1.norm()));
+		p3 = rot1.transpose() * p3;
+		double cornerAngle = Angle(-p3.coeff(1) / p3.norm(), -p3.coeff(0) / p3.norm());
+		std::cout << "angle: " << cornerAngle * 180 / M_PI << "\n";
+		MapWaypoint* w;
+		if(cornerAngle == M_PI/2) {
+			pos << rad, rad;
+			w = new MapWaypoint(rot1 * pos + c2->pos, rad);
+			w->_auto = true;
+			map->AddMapObject(w);
+			std::cout << w->pos << "\n";
+		}
+		else if(cornerAngle > M_PI/2) {
+			pos << rad / p3.coeff(1) * (p3.coeff(0) - p3.norm() / std::sqrt(2)), rad;
+			w = new MapWaypoint(rot1 * pos + c2->pos, rad);
+			w->_auto = true;
+			map->AddMapObject(w);
+			std::cout << w->pos << "\n";
+		}
+		else {
+			pos << rad, rad;
+			w = new MapWaypoint(rot1 * pos + c2->pos, rad);
+			w->_auto = true;
+			map->AddMapObject(w);
+			std::cout << w->pos << "\n";
+			p3 = c3->pos - c2->pos;
+			Eigen::Matrix2d rot3 = Rotation(Angle(-p3.coeff(1)/p3.norm(), -p3.coeff(0)/p3.norm()));
+			pos << rad, -rad;
+			w = new MapWaypoint(rot3 * pos + c2->pos, rad);
+			w->_auto = true;
+			map->AddMapObject(w);
+			std::cout << w->pos << "\n";
+		}
+	}
+	std::cout << "mapwaypoint size: " << map->waypoints.size() << "\n";
 }
 
 void MapRectangle::AutoWaypoints(double rad, Map* map) {
@@ -488,10 +660,14 @@ void AutoWaypoints(double rad, Map* map) {
 	}
 	//creating new automatic waypoints
 	std::vector<MapObject*> objreference = map->mapObjects;
+	// this should access the virtual method instead of needing a switch
 	for(auto obj : objreference) {
 		switch(obj->type) {
 		case MAP_CIRCLE:
 			dynamic_cast<MapCircle*>(obj)->AutoWaypoints(rad, map);
+			break;
+		case MAP_TRIANGLE:
+			dynamic_cast<MapTriangle*>(obj)->AutoWaypoints(rad, map);
 			break;
 		case MAP_RECTANGLE:
 			dynamic_cast<MapRectangle*>(obj)->AutoWaypoints(rad, map);
@@ -505,13 +681,20 @@ void AutoWaypoints(double rad, Map* map) {
 		for(auto obj : objreference) {
 			switch(obj->type) {
 			case MAP_CIRCLE:
-				if(LenientCircleCircleCollision(dynamic_cast<Circle*>(obj), dynamic_cast<Circle*>(wp)))
+				if(LenientCircleCircleCollision(dynamic_cast<Circle*>(obj), dynamic_cast<Circle*>(wp))) {
 					collision = true;
+				}
+				break;
+			case MAP_TRIANGLE:
+				if(CirclePolygonCollision(dynamic_cast<Circle*>(wp), dynamic_cast<Triangle*>(obj))) {
+					collision = true;
+				}
 				break;
 			case MAP_RECTANGLE:
 			case MAP_BORDER:
-				if(CircleRectangleCollision(dynamic_cast<Circle*>(wp), dynamic_cast<Rrectangle*>(obj)))
+				if(CircleRectangleCollision(dynamic_cast<Circle*>(wp), dynamic_cast<Rrectangle*>(obj))) {
 					collision = true;
+				}
 				break;
 			}
 			if(collision) {

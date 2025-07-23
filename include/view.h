@@ -9,6 +9,7 @@
 #include <input.h>
 #include <textures.h>
 #include <animations.h>
+#include <pathfinding.h>
 
 #include <SDL.h>
 #include <SDL_ttf.h>
@@ -24,6 +25,7 @@ Color* darkGreen = new Color(0x2e, 0x43, 0x28, 0xff);
 Color* colorPurple = new Color(0xff, 0x00, 0xff, 0xff);
 Color* colorRed = new Color(0xff, 0x00, 0x00, 0xff);
 Color* colorBlue = new Color(0x00, 0x00, 0xff, 0xff);
+Color* lightBlue = new Color(0x00, 0xc8, 0xff, 0xff);
 Color* colorGrey = new Color(0x88, 0x88, 0x88, 0xff);
 Color* darkGrey = new Color(0x50, 0x50, 0x50, 0xff);
 Color* colorOrange = new Color(0xff, 0xa5, 0x00, 0x99);
@@ -112,7 +114,8 @@ private:
 		void createAnimations();
 		void animateBackground(Animation* anime, ZoomableGUIController* ctrl);
 		void animateSelectionCircle(SoldierAnimation* anime, ZoomableGUIController* ctrl);
-		void animateSoldier(SoldierAnimation* anime, ZoomableGUIController* ctrl, bool hpAlpha = true);
+		void animateSoldier(SoldierAnimation* anime, ZoomableGUIController* ctrl, bool hpAlpha = true, 
+			bool customCoords = false, Eigen::Vector2d customPos = Eigen::Vector2d(), Eigen::Matrix2d customRot = Eigen::Matrix2d());
 		void animateProjectile(ProjectileAnimation* anime, ZoomableGUIController* ctrl);
 		void drawMapObjects(KeyboardAndMouseController* ctrl, Model* model);
 		void drawTileObjectCollision(KeyboardAndMouseController* ctrl);
@@ -122,6 +125,8 @@ private:
 		void drawOrders(KeyboardAndMouseController* ctrl, Model* model);
 		void drawGameObjects(KeyboardAndMouseController* ctrl);
 		void drawUI(KeyboardAndMouseController* ctrl, Model* model);
+		void drawDebugInfo(KeyboardAndMouseController* ctrl, Model* model);
+		void drawTileWalker(ZoomableGUIController* ctrl);
 
 		View(EventManager* em, Map* map, SDL_Window* window, SDL_Renderer* renderer) : GeneralView(em, window, renderer) {
 			this->map = map;
@@ -158,10 +163,12 @@ private:
 
 			animateBackground(background, ctrl);
 			drawMapObjects(ctrl, model);
+			drawTileWalker(ctrl);
 			drawTileObjectCollision(ctrl);
 			drawProposedOrders1(ctrl, model);	
 			drawOrders(ctrl, model);
 			drawGameObjects(ctrl);
+			drawDebugInfo(ctrl, model);
 			drawUI(ctrl, model);
 
 			SDL_RenderPresent(renderer);
@@ -211,8 +218,12 @@ class MapEditorView : public GeneralView {
 	std::string _wp			= "w           - select waypoint";
 	std::string _wprad		= "w           - change radius";
 	std::string _pf			= "p           - update pathfinding";
+	std::string _tri		= "t           - select triangle";
+	std::string _ta			= "w           - change a";
+	std::string _tb			= "e           - change b";
+	std::string _tg         = "g           - change gamma";
 	std::string _rec		= "r           - select rectangle";
-	std::string _rrot		= "hold ctrl   - rotate rectangle";
+	std::string _rrot		= "hold ctrl   - rotate";
 	std::string _rw			= "w           - change width";
 	std::string _rh			= "e           - change height";
 	std::string _pesc		= "esc         - aboart placement";
@@ -231,13 +242,15 @@ class MapEditorView : public GeneralView {
 	std::string _zoom		= "+/-         - zoom";
 	std::string _zoomMove	= "i/j/k/l     - move zoomed area";
 	std::string _awp		= "a           - automatically place waypoints";
+	std::string _toggleHigh = "f           - toggle object flatness";
 
 
 	std::string _options_menu =	_new_map + "\n" + _save_map + "\n" + _load_map + "\n"+ _quit;
-	std::string _control_scheme = _circle + "\n" + _rec + "\n" + _dpZone + "\n" + _wp + "\n" + _select + "\n" + _pf + + "\n" + _awp + "\n" + _zoom + "\n" + _zoomMove + "\n" + _lshift;
-	std::string _rplace = _rrot + "\n" + _rw + "\n" + _rh + "\n" + _zoom + "\n" + _zoomMove + "\n" + _pesc + "\n" + _lshift;
+	std::string _control_scheme = _circle + "\n" + _tri + "\n" + _rec + "\n" + _dpZone + "\n" + _wp + "\n" + _select + "\n" + _pf + + "\n" + _awp + "\n" + _zoom + "\n" + _zoomMove + "\n" + _lshift;
+	std::string _tplace = _rrot + "\n" + _ta + "\n" + _tb + "\n" + _tg + "\n" + _toggleHigh + "\n" + _zoom + "\n" + _zoomMove + "\n" + _pesc + "\n" + _lshift;
+	std::string _rplace = _rrot + "\n" + _rw + "\n" + _rh + "\n" + _toggleHigh + "\n" + _zoom + "\n" + _zoomMove + "\n" + _pesc + "\n" + _lshift;
 	std::string _dzplace = _rplace + "\n" + _dzPlayer;
-	std::string _cplace = _crad + "\n" + _zoom + "\n" + _zoomMove + "\n" + _pesc + "\n" + _lshift;
+	std::string _cplace = _crad + "\n" + _toggleHigh + "\n" + _zoom + "\n" + _zoomMove + "\n" + _pesc + "\n" + _lshift;
 	std::string _select_scheme = _sarrow + "\n" + _sclick + "\n" + _smove + "\n" + _scopy + "\n" + _sdel + "\n" + _zoom + "\n" + _zoomMove + "\n" + _sesc + "\n" + _lshift;
 	std::string _move_scheme =  _zoom + "\n" + _zoomMove + "\n" + _smesc + "\n" + _lshift;
 	std::string _copy_scheme =  _zoom + "\n" + _zoomMove + "\n" + _scesc + "\n" + _lshift;
@@ -293,7 +306,7 @@ private:
 		Eigen::Matrix2d rot; rot << 1, 0, 0, 1;
 		Eigen::Vector2d map_center; map_center << map->width / 2, map->height / 2;
 		Rrectangle map_bg(map->height / 2 - 1, map->width / 2 - 1, map_center, rot);
-		DrawRectangle(&map_bg, renderer, darkGrey, SCREEN_WIDTH, SCREEN_HEIGHT, ctrl->zoom, ctrl->center);
+		DrawPolygon(&map_bg, renderer, darkGrey, SCREEN_WIDTH, SCREEN_HEIGHT, ctrl->zoom, ctrl->center);
 
 		drawPlacedObjects(ctrl);
 		drawMenu(ctrl);
@@ -304,7 +317,9 @@ private:
 	}
 	void Notify(Event* ev) {
 		if(ev->type == TICK_EVENT) {
+			debug("[view: TICK EVENT]\n");
 			Update();
+			debug("[view: end Tick]\n");
 		}
 	}
 };
@@ -322,6 +337,7 @@ void View::createAnimations() {
 					else
 						leg->texture = redLegTextures.at(soldier->tag);
 					legs.push_back(leg);
+					soldier->legs = leg;
 					if(soldier->melee) {
 						MeleeAnimation* mele = new MeleeAnimation(soldier, model->SoldierTypes.at(soldier->tag).anime_melee_information);
 						if(player->player1)
@@ -329,6 +345,7 @@ void View::createAnimations() {
 						else
 							mele->texture = redMeleeTextures.at(soldier->tag);
 						melee.push_back(mele);
+						soldier->arms = mele;
 					}
 					if(soldier->ranged) {
 						RangedAnimation* range = new RangedAnimation(soldier, model->SoldierTypes.at(soldier->tag).anime_ranged_information);
@@ -337,6 +354,7 @@ void View::createAnimations() {
 						else
 							range->texture = redRangedTextures.at(soldier->tag);
 						ranged.push_back(range);
+						soldier->armsRanged = range;
 					}
 					SoldierAnimation* body = new SoldierAnimation(soldier, model->SoldierTypes.at(soldier->tag).anime_body_information);
 					if(player->player1)
@@ -344,6 +362,7 @@ void View::createAnimations() {
 					else
 						body->texture = redBodyTextures.at(soldier->tag);
 					bodies.push_back(body);
+					soldier->body = body;
 					DamageAnimation* dmg = new DamageAnimation(soldier, model->settings.damageInfo);
 					dmg->texture = damage;
 					damages.push_back(dmg);
@@ -357,16 +376,25 @@ void View::createAnimations() {
 void View::drawMapObjects(KeyboardAndMouseController* ctrl, Model* model) {
 	if(model->settings.show_map_object_outlines) {
 		for(auto obj : map->mapObjects) {
+			Color* drawColor = colorPurple;
+			if(!obj->high)
+				drawColor = lightBlue;
 			switch(obj->type) {
 			case MAP_CIRCLE: {
 				Circle* circ = dynamic_cast<Circle*>(obj);
+				if(obj->high)
+					SDL_SetTextureAlphaMod(objCircle->texture, 255);
+				else
+					SDL_SetTextureAlphaMod(objCircle->texture, 50);
 				objCircle->renderZoomed(circ->pos.coeff(0), circ->pos.coeff(1), circ->rad, 32, 32, 0, 0,
 					SCREEN_WIDTH, SCREEN_HEIGHT, ctrl->zoom, ctrl->center);
 				break;}
+			case MAP_TRIANGLE:
 			case MAP_BORDER:
 			case MAP_RECTANGLE: {
-				Rrectangle* rec = dynamic_cast<Rrectangle*>(obj);
-				DrawRectangle(rec, renderer, colorPurple, SCREEN_WIDTH, SCREEN_HEIGHT, ctrl->zoom, ctrl->center);
+				//Rrectangle* rec = dynamic_cast<Rrectangle*>(obj);
+				Ppolygon* pol = dynamic_cast<Ppolygon*>(obj);
+				DrawPolygon(pol, renderer, drawColor, SCREEN_WIDTH, SCREEN_HEIGHT, ctrl->zoom, ctrl->center);
 				break;}
 			}
 		}
@@ -375,7 +403,7 @@ void View::drawMapObjects(KeyboardAndMouseController* ctrl, Model* model) {
 		Color* drawColor = colorRed;
 		if(obj->player_id == 0) drawColor = colorBlue;
 		Rrectangle* rec = dynamic_cast<Rrectangle*>(obj);
-		DrawRectangle(rec, renderer, drawColor, SCREEN_WIDTH, SCREEN_HEIGHT, ctrl->zoom, ctrl->center);
+		DrawPolygon(rec, renderer, drawColor, SCREEN_WIDTH, SCREEN_HEIGHT, ctrl->zoom, ctrl->center);
 	}
 	if(ddebug::_showDebugGraphics) {
 		for(auto obj : map->waypoints) {
@@ -385,16 +413,21 @@ void View::drawMapObjects(KeyboardAndMouseController* ctrl, Model* model) {
 	}
 }
 
+void View::drawTileWalker(ZoomableGUIController* ctrl) {
+	if(model->hasWalker) {
+		for(auto tile: model->displayWalker) {
+			Rrectangle* rec = dynamic_cast<Rrectangle*>(tile->rec);
+			DrawPolygon(rec, renderer, colorWhite, SCREEN_WIDTH, SCREEN_HEIGHT, ctrl->zoom, ctrl->center);
+		}
+		DrawPolygon(dynamic_cast<Rrectangle*>(model->walkerStart->rec), renderer, colorBlue, SCREEN_WIDTH, SCREEN_HEIGHT, ctrl->zoom, ctrl->center);
+		DrawPolygon(dynamic_cast<Rrectangle*>(model->walkerEnd->rec), renderer, colorRed, SCREEN_WIDTH, SCREEN_HEIGHT, ctrl->zoom, ctrl->center);
+		DrawPolygon(&model->walkerRec, renderer, colorGrey, SCREEN_WIDTH, SCREEN_HEIGHT, ctrl->zoom, ctrl->center);
+	}
+}
+
 void View::drawTileObjectCollision(KeyboardAndMouseController* ctrl) {
 	if(ddebug::_showDebugGraphics) {
-		for(auto row : map->tiles) {
-			for(auto tile : row) {
-				if(!tile->mapObjects.empty()) {
-					Rrectangle* rec = tile->rec;
-					DrawRectangle(rec, renderer, colorGreen, SCREEN_WIDTH, SCREEN_HEIGHT, ctrl->zoom, ctrl->center);
-				}
-			}
-		}
+
 	}
 }
 
@@ -403,16 +436,14 @@ void View::drawProposedOrders1(KeyboardAndMouseController* ctrl, Model* model) {
 	auto drawOrderList = [&](std::vector<Order*> orders, Unit* unit, Color* drawColor) {
 		for(int n_order = 0; n_order < orders.size(); n_order++) {
 			Order* o = orders.at(n_order);
-			if(o->type == ORDER_MOVE) {
-				MoveOrder* mo = dynamic_cast<MoveOrder*>(o);
-				if(n_order > 0) {
-					Order* prevo = orders.at(n_order-1);
-					if(prevo->type == ORDER_MOVE) {
-						MoveOrder* prevmo = dynamic_cast<MoveOrder*>(prevo);
-						Point p1(mo->pos); Point p2(prevmo->pos);
-						DrawLine(&p1, &p2, renderer, drawColor, SCREEN_WIDTH, SCREEN_HEIGHT, ctrl->zoom, ctrl->center);
-					}
-				}
+			if(unit->placed && n_order == 0) {
+				Point p1(o->pos); Point p2(unit->pos);
+				DrawLine(&p1, &p2, renderer, drawColor, SCREEN_WIDTH, SCREEN_HEIGHT, ctrl->zoom, ctrl->center);
+			}
+			if(n_order > 0) {
+				Order* prevo = orders.at(n_order-1);
+				Point p1(o->pos); Point p2(prevo->pos);
+				DrawLine(&p1, &p2, renderer, drawColor, SCREEN_WIDTH, SCREEN_HEIGHT, ctrl->zoom, ctrl->center);
 			}
 			Color* recColor = drawColor;
 			Rrectangle rec = UnitRectangle(unit, n_order, orders);
@@ -421,7 +452,7 @@ void View::drawProposedOrders1(KeyboardAndMouseController* ctrl, Model* model) {
 				rec = UnitRectangle(ao->target, ao->target->currentOrder);
 				recColor = colorOrange;
 			}
-			DrawRectangle(&rec, renderer, recColor, SCREEN_WIDTH, SCREEN_HEIGHT, ctrl->zoom, ctrl->center);
+			DrawPolygon(&rec, renderer, recColor, SCREEN_WIDTH, SCREEN_HEIGHT, ctrl->zoom, ctrl->center);
 		}
 	};
 
@@ -441,7 +472,9 @@ void View::drawProposedOrders1(KeyboardAndMouseController* ctrl, Model* model) {
 			}
 			Unit* unit = ctrl->selectedPlayer->units.at(n_unit);
 			std::vector<Order*> orders = ctrl->orderList.at(n_unit);
-			drawOrderList(orders, unit, drawColor);
+			if(orders.size() == 0) orders = unit->orders;
+			if(unit->nLiveSoldiers > 0)
+				drawOrderList(orders, unit, drawColor);
 		}
 	}			
 	debug("view : drew orders when ordering");
@@ -460,8 +493,12 @@ void View::drawProposedOrders2(KeyboardAndMouseController* ctrl, Model* model, U
 						Soldier* soldier = soldiers->at(i).at(j);
 						if(soldier->alive) {
 							Eigen::Vector2d pos = ctrl->rot * posInUnit.at(i).at(j) + ctrl->p0;
-							DrawCircle(pos.coeff(0), pos.coeff(1), soldier->rad, renderer, colorGrey, SCREEN_WIDTH, SCREEN_HEIGHT, ctrl->zoom, ctrl->center);
-							DrawFacingArrowhead(pos, ctrl->rot, soldier->rad, renderer, colorWhite, SCREEN_WIDTH, SCREEN_HEIGHT, ctrl->zoom, ctrl->center);
+							animateSoldier(soldier->legs, ctrl, false, true, pos, ctrl->rot);
+							if(soldier->melee)
+								animateSoldier(soldier->arms, ctrl, false, true, pos, ctrl->rot);
+							if(soldier->ranged)
+								animateSoldier(soldier->armsRanged, ctrl, false, true, pos, ctrl->rot);
+							animateSoldier(soldier->body, ctrl, false, true, pos, ctrl->rot);
 						}
 					}
 				}
@@ -475,13 +512,13 @@ void View::drawProposedOrders2(KeyboardAndMouseController* ctrl, Model* model, U
 void View::drawCurrentOrders(KeyboardAndMouseController* ctrl, Model* model, Unit* unit) {
 	std::vector<std::vector<Soldier*>>* soldiers = &(unit->soldiers);
 	GameEventManager* gem = Gem();
-	if(unit->placed) {
-		if(ddebug::_showDebugGraphics || true) {
+	if(unit->placed && unit->nLiveSoldiers > 0) {
+		if(ddebug::_showDebugGraphics) {
 			Circle circ = Circle(unit->pos, 30);
 			//DrawCircle(&circ, renderer, colorGrey, SCREEN_WIDTH, SCREEN_HEIGHT, ctrl->zoom, ctrl->center);
 			if(unit->rangedTarget && unit == ctrl->selectedUnit) {
 				Rrectangle rec = OnSpotUnitRectangle(unit->rangedTarget);//, unit->rangedTarget->currentOrder);
-				DrawRectangle(&rec, renderer, colorPurple, SCREEN_WIDTH, SCREEN_HEIGHT, ctrl->zoom, ctrl->center);
+				DrawPolygon(&rec, renderer, colorPurple, SCREEN_WIDTH, SCREEN_HEIGHT, ctrl->zoom, ctrl->center);
 			}
 		}
 						
@@ -494,17 +531,21 @@ void View::drawCurrentOrders(KeyboardAndMouseController* ctrl, Model* model, Uni
 					Order* o = unit->orders.at(i);
 					if(o->type == ORDER_MOVE) {
 						Rrectangle rec = UnitRectangle(unit, i);
-						DrawRectangle(&rec, renderer, colorGreen, SCREEN_WIDTH, SCREEN_HEIGHT, ctrl->zoom, ctrl->center);
+						DrawPolygon(&rec, renderer, colorGreen, SCREEN_WIDTH, SCREEN_HEIGHT, ctrl->zoom, ctrl->center);
 					}
 					else if(o->type == ORDER_ATTACK) {
 						AttackOrder* ao = dynamic_cast<AttackOrder*>(o);
 						Rrectangle rec = UnitRectangle(ao->target, ao->target->currentOrder);
-						DrawRectangle(&rec, renderer, colorOrange, SCREEN_WIDTH, SCREEN_HEIGHT, ctrl->zoom, ctrl->center);
+						DrawPolygon(&rec, renderer, colorOrange, SCREEN_WIDTH, SCREEN_HEIGHT, ctrl->zoom, ctrl->center);
 					}
 					else if(o->type == ORDER_TARGET) {
 						TargetOrder* to = dynamic_cast<TargetOrder*>(o);
 						Rrectangle rec = UnitRectangle(to->target, to->target->currentOrder);
-						DrawRectangle(&rec, renderer, colorOrange, SCREEN_WIDTH, SCREEN_HEIGHT, ctrl->zoom, ctrl->center);
+						DrawPolygon(&rec, renderer, colorOrange, SCREEN_WIDTH, SCREEN_HEIGHT, ctrl->zoom, ctrl->center);
+					}
+					if(i == 0 && unit->placed) {
+						Point p1(o->pos); Point p2(unit->pos);
+						DrawLine(&p1, &p2, renderer, colorGreen, SCREEN_WIDTH, SCREEN_HEIGHT, ctrl->zoom, ctrl->center);
 					}
 					if(i > 0) {
 						Order* prevo = unit->orders.at(i-1);
@@ -674,7 +715,6 @@ void View::loadBackground() {
 		backgroundTexture = new ImgTexture(renderer);
 		backgroundTexture->loadFromImage(("textures/" + model->settings.backgroundInfo.texture).c_str());
 		background->texture = backgroundTexture;
-		//std::cout << "################ " << ("textures/" + model->settings.backgroundInfo.texture).c_str();
 	}
 }
 
@@ -777,24 +817,33 @@ void MapEditorView::animateBackground(Animation* anime, ZoomableGUIController* c
 	}
 }
 
-void View::animateSoldier(SoldierAnimation* anime, ZoomableGUIController* ctrl, bool hpAlpha) {
+void View::animateSoldier(SoldierAnimation* anime, ZoomableGUIController* ctrl, bool hpAlpha, 
+	bool customCoords, Eigen::Vector2d customPos, Eigen::Matrix2d customRot) {
 	Soldier* soldier = anime->soldier;
-	if((soldier->alive && soldier->placed) || !hpAlpha) {
+	if((soldier->alive && soldier->placed) || !hpAlpha || customCoords) {
 		double ang;
 		if(hpAlpha) ang = soldier->angle * 180 / M_PI + 90;
+		else if(customCoords) {
+			ang = Angle(customRot.coeff(0,1), customRot.coeff(0,0)) * 180 / M_PI + 90;
+		}
 		else ang = 0.;
 		SDL_Rect clip;
 		clip.x = 0 + anime->stage * anime->info.size_x;
 		clip.y = 0;
 		clip.w = anime->info.size_x;
 		clip.h = anime->info.size_y;
-		if(hpAlpha)
-			SDL_SetTextureAlphaMod(anime->texture->texture, 255*std::min(double(soldier->hp) / soldier->maxHP, 1.));		
-		anime->texture->renderZoomed(soldier->pos.coeff(0), soldier->pos.coeff(1), soldier->rad, 
+		if(hpAlpha || customCoords)
+			SDL_SetTextureAlphaMod(anime->texture->texture, 255*std::min(double(soldier->hp) / soldier->maxHP, 1.));
+		Eigen::Vector2d pos;
+		if(customCoords)
+			pos = customPos;
+		else
+			pos = soldier->pos;
+		anime->texture->renderZoomed(pos.coeff(0), pos.coeff(1), soldier->rad, 
 			anime->info.frame_size_x, anime->info.frame_size_y, anime->info.frame_origin_x, anime->info.frame_origin_y,
 			SCREEN_WIDTH, SCREEN_HEIGHT, ctrl->zoom, ctrl->center,
 			ang, NULL, &clip);
-		if(hpAlpha)
+		if(hpAlpha || customCoords)
 			SDL_SetTextureAlphaMod(anime->texture->texture, 255);
 		switch(model->state) {
 		case MODEL_SIMULATION:
@@ -839,12 +888,19 @@ void MapEditorView::drawPlacedObjects(MapEditorController* ctrl) {
 				objColor = colorGreen; break;
 			}
 		}
+		else if(!object->high)
+			objColor = lightBlue;
 		switch(object->type) {
 		case MAP_WAYPOINT:
 			if(object != ctrl->selectedObj) objColor = colorGrey;
+			break;//this line prevents drawing of waypoints
 		case MAP_CIRCLE: {
 			Circle* circ = dynamic_cast<Circle*>(object);
 			DrawCircle(circ, renderer, objColor, SCREEN_WIDTH, SCREEN_HEIGHT, ctrl->zoom, ctrl->center);
+			break;}
+		case MAP_TRIANGLE: {
+			Triangle* tri = dynamic_cast<Triangle*>(object);
+			DrawPolygon(tri, renderer, objColor, SCREEN_WIDTH, SCREEN_HEIGHT, ctrl->zoom, ctrl->center);
 			break;}
 		case MAP_DEPLOYMENT_ZONE:
 			// here go the color selection rules
@@ -855,7 +911,22 @@ void MapEditorView::drawPlacedObjects(MapEditorController* ctrl) {
 		case MAP_BORDER:
 		case MAP_RECTANGLE: {
 			Rrectangle* rec = dynamic_cast<Rrectangle*>(object);
-			DrawRectangle(rec, renderer, objColor, SCREEN_WIDTH, SCREEN_HEIGHT, ctrl->zoom, ctrl->center);
+			if(ddebug::_showDebugGraphics) {
+				Color* corCol = colorWhite;
+				for(int nc = 0; nc < rec->corners.size(); nc++) {
+					if(nc == 1) corCol = colorGrey;
+					if(nc == 2) corCol = darkGrey;
+					if(nc == 3) corCol = darkGreen;
+					Corner* corner = rec->corners.at(nc);
+					Circle circ(corner->pos, rec->hdiag*0.25);
+					DrawCircle(&circ, renderer, corCol, SCREEN_WIDTH, SCREEN_HEIGHT, ctrl->zoom, ctrl->center);
+				}
+			}
+			/*for(auto corner: rec->corners) {
+				Circle circ(corner.pos, rec->hdiag*0.25);
+				DrawCircle(&circ, renderer, colorWhite, SCREEN_WIDTH, SCREEN_HEIGHT, ctrl->zoom, ctrl->center);
+			}*/
+			DrawPolygon(rec, renderer, objColor, SCREEN_WIDTH, SCREEN_HEIGHT, ctrl->zoom, ctrl->center);
 			break;}
 		}
 	}
@@ -863,7 +934,7 @@ void MapEditorView::drawPlacedObjects(MapEditorController* ctrl) {
 		for(int j = i+1; j < map->wp_path_next.at(i).size(); j++) {
 			if(i != j && map->wp_path_next.at(i).at(j) == j && map->waypoints.size() > std::max(i,j)){
 				Point p1(map->waypoints.at(i)->pos); Point p2(map->waypoints.at(j)->pos);
-				DrawLine(&p1, &p2, renderer, colorBlue, SCREEN_WIDTH, SCREEN_HEIGHT, ctrl->zoom, ctrl->center);
+				//DrawLine(&p1, &p2, renderer, colorBlue, SCREEN_WIDTH, SCREEN_HEIGHT, ctrl->zoom, ctrl->center);
 
 			}
 		}
@@ -883,6 +954,8 @@ void MapEditorView::drawMenu(MapEditorController* ctrl) {
 		case EDITOR_PLACING_CIRCLE:
 		case EDITOR_PLACING_WP:
 			text = _cplace; break;
+		case EDITOR_PLACING_TRIANGLE:
+			text = _tplace; break;
 		case EDITOR_PLACING_DP_ZONE:
 			text = _dzplace; break;
 		case EDITOR_PLACING_RECTANGLE:
@@ -922,19 +995,27 @@ void MapEditorView::drawInputTextbox(MapEditorController* ctrl) {
 
 void MapEditorView::drawPlacingObject(MapEditorController* ctrl) {
 	if(ctrl->objToPlace) {
+		std::string highStat = "flat";
+		if(ctrl->objToPlace->high) highStat = "high";
 		switch(ctrl->objToPlace->type) {
 		case MAP_CIRCLE:
 		case MAP_WAYPOINT: {
 			Circle* circ = dynamic_cast<Circle*>(ctrl->objToPlace);
 			DrawCircle(circ, renderer, colorGreen, SCREEN_WIDTH, SCREEN_HEIGHT, ctrl->zoom, ctrl->center);
-			objDimensions->loadFromString(std::format("rectangle\nradius: {}", circ->rad), font, colorText, textwidth);
+			objDimensions->loadFromString(std::format("rectangle\nradius: {}\n{}", circ->rad, highStat), font, colorText, textwidth);
 			break;}
+		case MAP_TRIANGLE: {
+			Triangle* tri = dynamic_cast<Triangle*>(ctrl->objToPlace);
+			DrawPolygon(tri, renderer, colorGreen, SCREEN_WIDTH, SCREEN_HEIGHT, ctrl->zoom, ctrl->center);
+			objDimensions->loadFromString(std::format("triangle\na: {}\nb: {}\ngamma: {}", tri->a, tri->b, tri->gamma, highStat), font, colorText, textwidth);
+		}break;
 		case MAP_BORDER:
 		case MAP_RECTANGLE:
 		case MAP_DEPLOYMENT_ZONE: {
 			Rrectangle* rec = dynamic_cast<Rrectangle*>(ctrl->objToPlace);
-			DrawRectangle(rec, renderer, colorGreen, SCREEN_WIDTH, SCREEN_HEIGHT, ctrl->zoom, ctrl->center);
-			objDimensions->loadFromString(std::format("rectangle\nwidth: {}\nheight: {}", rec->hl*2, rec->hw*2), font, colorText, textwidth);
+			DrawPolygon(rec, renderer, colorGreen, SCREEN_WIDTH, SCREEN_HEIGHT, ctrl->zoom, ctrl->center);
+			//DrawRectangle(rec, renderer, colorGreen, SCREEN_WIDTH, SCREEN_HEIGHT, ctrl->zoom, ctrl->center);
+			objDimensions->loadFromString(std::format("rectangle\nwidth: {}\nheight: {}\n{}", rec->hl*2, rec->hw*2, highStat), font, colorText, textwidth);
 			break;}
 		}
 		if(objDimensions->texture) {
@@ -944,5 +1025,16 @@ void MapEditorView::drawPlacingObject(MapEditorController* ctrl) {
 	}
 }
 
+
+void View::drawDebugInfo(KeyboardAndMouseController* ctrl, Model* model) {
+	if(ddebug::_showDebugGraphics) {
+		for(auto soldier : model->soldiers) {
+			if(soldier->ranged && soldier->rangedTarget) {
+				Point p1(soldier->pos); Point p2(soldier->rangedTarget->pos);
+				DrawLine(&p1, &p2, renderer, colorPurple, SCREEN_WIDTH, SCREEN_HEIGHT, ctrl->zoom, ctrl->center);
+			}
+		}
+	}
+}
 
 #endif

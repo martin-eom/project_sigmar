@@ -10,6 +10,8 @@
 #include <iostream>
 #include <fstream>
 #include <list>
+#include <algorithm>
+#include <random>
 
 using json = nlohmann::json;
 
@@ -27,7 +29,6 @@ json MapToJson(Map* map) {
 	json j;
 	j["width"] = map->width;
 	j["height"] = map->height;
-	j["tilesize"] = map->tilesize;
 	getMapObjects(&j, map);
 	getPathInfo(&j, map);
 	return j;
@@ -40,7 +41,6 @@ Map::Map(std::string filename) {
 	json j = fromFile(filename);
 	width = j["width"];
 	height = j["height"];
-	tilesize = j["tilesize"];
 	init();
 	readMapObjectsFromJSON(&j, this);
 	readPathInfoFromJSON(&j, this);
@@ -48,6 +48,7 @@ Map::Map(std::string filename) {
 
 void getMapObjects(json* j, Map* map) {
 	json circles = json::array();
+	json triangles = json::array();
 	json rectangles = json::array();
 	json waypoints = json::array();
 	json deployment_zones = json::array();
@@ -58,7 +59,19 @@ void getMapObjects(json* j, Map* map) {
 			json jcirc;
 			jcirc["pos"] = {circ->pos.coeff(0), circ->pos.coeff(1)};
 			jcirc["rad"] = circ->rad;
+			jcirc["high"] = obj->high;
 			circles.push_back(jcirc);
+			break;}
+		case MAP_TRIANGLE: {
+			Triangle* tri = dynamic_cast<Triangle*>(obj);
+			json jtri;
+			jtri["a"] = tri->a;
+			jtri["b"] = tri->b;
+			jtri["gamma"] = tri->gamma;
+			jtri["pos"] = {tri->pos.coeff(0), tri->pos.coeff(1)};
+			jtri["rot"] = {tri->rot.coeff(0,0), tri->rot.coeff(0,1), tri->rot.coeff(1,0), tri->rot.coeff(1,1)};
+			jtri["high"] = obj->high;
+			triangles.push_back(jtri);
 			break;}
 		case MAP_RECTANGLE:
 		case MAP_BORDER: {
@@ -70,6 +83,7 @@ void getMapObjects(json* j, Map* map) {
 			jrec["rot"] = {rec->rot.coeff(0,0), rec->rot.coeff(0,1), rec->rot.coeff(1,0), rec->rot.coeff(1,1)};
 			if(obj->type == MAP_BORDER) jrec["b"] = 1;
 			else jrec["b"] = 0;
+			jrec["high"] = obj->high;
 			rectangles.push_back(jrec);
 			break;}
 		case MAP_WAYPOINT: {
@@ -79,6 +93,7 @@ void getMapObjects(json* j, Map* map) {
 			jcirc["rad"] = circ->rad;
 			if(dynamic_cast<MapWaypoint*>(obj)->_auto) jcirc["auto"] = 1;
 			else jcirc["auto"] = 0;
+			jcirc["high"] = obj->high;
 			waypoints.push_back(jcirc);
 			break;}
 		}
@@ -93,6 +108,7 @@ void getMapObjects(json* j, Map* map) {
 		deployment_zones.push_back(jdz);
 	}
 	(*j)["circles"] = circles;
+	(*j)["triangles"] = triangles;
 	(*j)["rectangles"] = rectangles;
 	(*j)["waypoints"] = waypoints;
 	(*j)["deployment_zones"] = deployment_zones;
@@ -123,7 +139,19 @@ void readMapObjectsFromJSON(json* j, Map* map) {
 	for(auto jcirc : (*j)["circles"]) {
 		Eigen::Vector2d pos; pos << jcirc["pos"][0], jcirc["pos"][1];
 		MapCircle* circ = new MapCircle(pos, jcirc["rad"]);
+		if(jcirc.contains("high"))
+			circ->high = jcirc["high"];
 		map->AddMapObject(circ);
+	}
+	if(j->contains("triangles")) {
+		for(auto jtri : (*j)["triangles"]) {
+			Eigen::Vector2d pos; pos << jtri["pos"][0], jtri["pos"][1];
+			Eigen::Matrix2d rot; rot << jtri["rot"][0], jtri["rot"][1], jtri["rot"][2], jtri["rot"][3];
+			MapObject* tri = new MapTriangle(jtri["a"], jtri["b"], jtri["gamma"], pos, rot);
+			if(jtri.contains("high"))
+				tri->high = jtri["high"];
+			map->AddMapObject(tri);
+		}
 	}
 	for(auto jrec : (*j)["rectangles"]) {
 		Eigen::Vector2d pos; pos << jrec["pos"][0], jrec["pos"][1];
@@ -134,6 +162,8 @@ void readMapObjectsFromJSON(json* j, Map* map) {
 			else rec = new MapRectangle(jrec["hl"], jrec["hw"], pos, rot);
 		}
 		else rec = new MapRectangle(jrec["hl"], jrec["hw"], pos, rot);
+		if(jrec.contains("high"))
+			rec->high = jrec["high"];
 		map->AddMapObject(rec);
 	}
 	if((*j).contains("deployment_zones")){
@@ -278,6 +308,7 @@ UnitInformation::UnitInformation(json input) {
 	ranged_ranged = input["ranged_stats"]["ranged"];
 	ranged_range = input["ranged_stats"]["range"];
 	ranged_angle = input["ranged_stats"]["angle"];
+	primary_ranged = input["ranged_stats"]["primary_ranged"];
 }
 
 SettingsInformation::SettingsInformation(json input) {
@@ -296,6 +327,11 @@ SettingsInformation::SettingsInformation(json input) {
 	anti_large_damage_bonus = input["anti_large_damage_bonus"];
 	anti_infantry_attack_bonus = input["anti_infantry_attack_bonus"];
 	anti_infantry_damage_bonus = input["anti_infantry_damage_bonus"];
+	auto_generate_map_grids = input["auto_generate_map_grids"];
+	for(auto size: input["map_grids"])
+		map_grids.push_back(size);
+	set_custom_omp_num_threads = input["set_custom_omp_num_threads"];
+	custom_omp_num_threads = input["custom_omp_num_threads"];
 }
 
 MapEditorSettingsInformation::MapEditorSettingsInformation(json input) {
@@ -342,9 +378,9 @@ void Model::loadArmyLists(std::string filename) {
 	}
 	std::sort(units.begin(), units.end(), UnitSorter());
 	std::reverse(units.begin(), units.end());
-	for(auto unit : units) {
-		std::cout << unit->nLiveSoldiers << "\n";
-	}
+	unsigned seed = std::chrono::system_clock::now().time_since_epoch().count();
+	auto rng = std::default_random_engine(seed);
+	std::ranges::shuffle(soldiers,  rng);
 }
 
 void Model::loadDamageInfo() {
@@ -363,6 +399,84 @@ void Model::loadSettings(std::string filename) {
 void MapEditorModel::loadSettings(std::string filename) {
 	json input = fromFile(filename);
 	settings = MapEditorSettingsInformation(input);
+}
+
+std::string Map::neighbourFileStr() {
+	std::string filename = "temp/";
+	filename += std::to_string(width) + "_" + std::to_string(height) + "-";
+	if(grids.size() > 0) {
+		filename += std::to_string(grids.at(0)->tilesize);
+		for(int n_grid = 1; n_grid < grids.size(); n_grid++) {
+			filename += "_" + std::to_string(grids.at(n_grid)->tilesize);
+		}
+	}
+	filename += ".nm";
+	return filename;
+}
+
+bool Map::searchNeighbourFile(std::string filename) {
+	return std::filesystem::exists(filename);
+}
+
+void Map::writeNeighbourFile(std::string filename) {
+	std::ofstream out(filename);
+	for(int ngrid = 0; ngrid < grids.size(); ngrid++) {
+		for(int nrow = 0; nrow < grids.at(ngrid)->nrows; nrow++) {
+			for(int ncol = 0; ncol < grids.at(ngrid)->ncols; ncol++) {
+				auto tile = grids.at(ngrid)->grid.at(nrow).at(ncol);
+				for(int ngrid2 = 0; ngrid2 < grids.size(); ngrid2++) {
+					int nneighbours = tile->neighbours.at(ngrid2).size();
+					out << nneighbours << "\n";
+					for(int nn = 0; nn < nneighbours; nn++) {
+						out << tile->neighbours.at(ngrid2).at(nn)->nrow * grids.at(ngrid2)->ncols 
+							+ tile->neighbours.at(ngrid2).at(nn)->ncol << "\n";
+					}
+					int nRedNeighbours = tile->redundantNeighbours.at(ngrid2).size();
+					out << nRedNeighbours << "\n";
+					for(int nrn = 0; nrn < nRedNeighbours; nrn++) {
+						out << tile->redundantNeighbours.at(ngrid2).at(nrn)->nrow * grids.at(ngrid2)->ncols
+							+ tile->redundantNeighbours.at(ngrid2).at(nrn)->ncol << "\n";
+					}
+				}
+			}
+		}
+	}
+	out.close();
+}
+
+void Map::readNeighbourFile(std::string filename) {
+	std::string line;
+	int nentries, val;
+	std::ifstream in(filename);
+	for(int ngrid = 0; ngrid < grids.size(); ngrid++) {
+		for(int nrow = 0; nrow < grids.at(ngrid)->nrows; nrow++) {
+			for(int ncol = 0; ncol < grids.at(ngrid)->ncols; ncol++) {
+				auto tile = grids.at(ngrid)->grid.at(nrow).at(ncol);
+				for(int ngrid2 = 0; ngrid2 < grids.size(); ngrid2++) {
+					std::getline(in, line);
+					nentries = atoi(line.c_str());
+					int nrow2, ncol2;
+					for(int nentry = 0; nentry < nentries; nentry++) {
+						std::getline(in, line);
+						val = atoi(line.c_str());
+						nrow2 = val / grids.at(ngrid2)->ncols;
+						ncol2 = val % grids.at(ngrid2)->ncols;
+						tile->neighbours.at(ngrid2).push_back(grids.at(ngrid2)->grid.at(nrow2).at(ncol2));
+					}
+					std::getline(in, line);
+					nentries = atoi(line.c_str());
+					for(int nentry = 0; nentry < nentries; nentry++) {
+						std::getline(in, line);
+						val = atoi(line.c_str());
+						nrow2 = val / grids.at(ngrid2)->ncols;
+						ncol2 = val % grids.at(ngrid2)->ncols;
+						tile->redundantNeighbours.at(ngrid2).push_back(grids.at(ngrid2)->grid.at(nrow2).at(ncol2));
+					}
+				}
+			}
+		}
+	}
+	in.close();
 }
 
 #endif

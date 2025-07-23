@@ -1,10 +1,10 @@
-#ifndef SOLDIERS2
-#define SOLDIERS2
-
+#ifndef SOLDIERS
+#define SOLDIERS
 #include <extra_math.h>
 #include <timer.h>
 #include <debug.h>
 #include <information.h>
+#include <orders.h>
 //#include <projectiles.h>
 
 #ifndef _USE_MATH_DEFINES
@@ -21,6 +21,10 @@
 
 class Soldier;
 class Unit;
+class Map;
+//class Model;
+//class Order;
+//class EventManager;
 
 class SoldierNeighbourContainer {
 public:
@@ -46,10 +50,12 @@ struct compareContainers {
 };
 
 
+class SoldierAnimation;
+
 class Soldier : public Circle{
 	public:
 		// general stats
-		//double rad;
+		//double rad // handled by inheriting from circle;
 		double mass;
 		double defaultMaxSpeed;
 		double maxSpeed;
@@ -95,6 +101,8 @@ class Soldier : public Circle{
 		bool shielded = false;
 
 		// computed members
+		int tilesize;
+		int projectileTilesize;
 		double linearDamp;	//coefficient for linear dampening (with regard to velocity)
 		double squareDamp;	//coefficient for square dampening
 		double Force, damp, defaultDamp;
@@ -119,7 +127,6 @@ class Soldier : public Circle{
 		Eigen::Matrix2d rotTarget;
 		double angleTarget;
 		Unit* unit;
-		//std::vector<Soldier*> enemiesInMeleeRange;
 		std::priority_queue<SoldierNeighbourContainer, std::vector<SoldierNeighbourContainer>, compareContainers> enemiesInMeleeRange;
 		double hp;
 		bool alive;
@@ -132,6 +139,11 @@ class Soldier : public Circle{
 		std::vector<Eigen::Vector2d> indivPath;	// individual pathfinding when los to original next target is lost
 		Timer indivPathTimer = Timer(60);
 		double tans;
+
+		SoldierAnimation* legs;
+		SoldierAnimation* arms;
+		SoldierAnimation* armsRanged;
+		SoldierAnimation* body;
 
 		bool debugFlag1;
 		bool debugFlag2;
@@ -169,6 +181,8 @@ class Soldier : public Circle{
 		Soldier(SoldierInformation info, Unit* unit) : Soldier(){
 			tag = info.tag;
 			rad = info.radius;
+			tilesize = info.tilesize;
+			projectileTilesize = info.projectile_tilesize;
 			mass = info.mass;
 			defaultMaxSpeed = info.max_speed;
 			maxSpeed = defaultMaxSpeed;
@@ -217,9 +231,20 @@ class Soldier : public Circle{
 			damp = Force / pow(maxSpeed, 2);
 		};
 
-		/*Circle SoldierCircle() {
-			return Circle(pos, rad);
-		}*/
+		void IndivPathProgression(Map* map, double* time1 = NULL, double* time2 = NULL, double* timePass1 = NULL);
+		void ChooseMeleeTargetsByRangeAndCone(std::vector<SoldierNeighbourContainer>* targets, std::vector<SoldierNeighbourContainer>* notInCone);
+		bool OnAttackOrder();
+		void HandleCharging(std::vector<SoldierNeighbourContainer>* targets);
+		void UpdateChargingStatus(std::vector<SoldierNeighbourContainer>* targets, Order* o);
+		void FindTargetIfNoneInRange(Order* o);
+		void CheckIfPathToTarget(Map* map);
+		void ResolveAttacks(Model* model, std::vector<SoldierNeighbourContainer>* targets);
+		void GetValidTargetRangedTarget();
+		bool TargetInRangedCone();
+		bool HasLOSToPointOfImpact(Eigen::Vector2d pointOfImpact, Map* map);
+		bool AllyTooCloseToTarget(Eigen::Vector2d pointOfImpact, double flightTime);
+		void FireOrReloadIfPossible(Map* map, EventManager* em);
+		bool CanReload();
 };
 
 
