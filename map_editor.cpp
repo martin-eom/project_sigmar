@@ -3,8 +3,10 @@
 #include <Windows.h>	// this line is very dangerous, moving this statement to a different location causes all sorts of problems
 
 #include <map.h>
+#include <pathfinding.h>
 #include <view.h>
 #include <input.h>
+#include <server.h>
 
 #include <SDL.h>
 #include <stdio.h>
@@ -12,7 +14,6 @@
 #include <SDL_ttf.h>
 #include <string.h>
 #include <fileio.h>
-#include <pathfinding.h>
 
 Uint32 CURRENT_TICK;
 Uint32 T_OF_NEXT_TICK;

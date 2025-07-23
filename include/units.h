@@ -68,9 +68,10 @@ public:
 	void UpdateTargetPath(Map* map, EventManager* em);
 	bool CheckIfTargetHasRunAway();
 	void ResetCharging();
-	void SoldierMovement(Map* map, double* dt);
+	void SoldierMovement(Map* map, double* dt, double* time1 = NULL, double* time2 = NULL, double* time3 = NULL, double* time4 = NULL, double* timePass1 = NULL, double* timePass2 = NULL, double* timePass3 = NULL);
 	void StripTransitionOrders();
 	void RenewOrders(EventManager* em);
+	void Reform();
 
 	bool UseOrderTarget(Map* map);
 	void FindRangedTarget(std::vector<Player*> players);
@@ -161,34 +162,6 @@ void Unit::Place(Eigen::Vector2d pos, Eigen::Matrix2d rot) {
 	nSoldiersArrived = 0;
 	nSoldiersOnFirstOrder = nSoldiers;
 	std::cout  << "Unit placed with " << nLiveSoldiers << " live soldiers.\n";
-}
-
-
-void Unit::MoveTarget() {
-	std::vector<std::vector<Soldier*>>* soldiers = &(this->soldiers);
-	std::vector<std::vector<Eigen::Vector2d>>* posInUnit = &(this->posInUnit);
-	for(int i = 0; i < nrows; i++) {
-		for(int j = 0; j < ncols; j++) {
-			Soldier* soldier = soldiers->at(i).at(j);
-			if(soldier->placed && soldier->alive) {	//change to something like soldier->alive
-				Order* o = orders.at(soldier->currentOrder);
-				if(o->type == ORDER_MOVE ||true) {
-					//MoveOrder* mo = dynamic_cast<MoveOrder*>(o);
-					//soldier->posTarget = mo->pos + mo->rot * posInUnit->at(i).at(j);
-					soldier->posTarget = o->pos + o->rot * posInUnit->at(i).at(j);
-					soldier->rotTarget = o->rot;
-					soldier->angleTarget = o->angleTarget;
-				}
-			}
-		}
-	}
-	Order* o = orders.at(currentOrder);
-	if(o->type == ORDER_MOVE || true) {
-		//MoveOrder* mo = dynamic_cast<MoveOrder*>(o);
-		posTarget = o->pos;
-		this->rot = o->rot;
-		rotTarget = o->rot;
-	}
 }
 
 void Unit::UpdatePos() {

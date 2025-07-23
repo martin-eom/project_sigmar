@@ -9,6 +9,7 @@
 #include <input.h>
 #include <textures.h>
 #include <animations.h>
+#include <pathfinding.h>
 
 #include <SDL.h>
 #include <SDL_ttf.h>
@@ -125,6 +126,7 @@ private:
 		void drawGameObjects(KeyboardAndMouseController* ctrl);
 		void drawUI(KeyboardAndMouseController* ctrl, Model* model);
 		void drawDebugInfo(KeyboardAndMouseController* ctrl, Model* model);
+		void drawTileWalker(ZoomableGUIController* ctrl);
 
 		View(EventManager* em, Map* map, SDL_Window* window, SDL_Renderer* renderer) : GeneralView(em, window, renderer) {
 			this->map = map;
@@ -161,6 +163,7 @@ private:
 
 			animateBackground(background, ctrl);
 			drawMapObjects(ctrl, model);
+			drawTileWalker(ctrl);
 			drawTileObjectCollision(ctrl);
 			drawProposedOrders1(ctrl, model);	
 			drawOrders(ctrl, model);
@@ -407,6 +410,18 @@ void View::drawMapObjects(KeyboardAndMouseController* ctrl, Model* model) {
 			Circle* circ = dynamic_cast<Circle*>(obj);
 			//DrawCircle(circ, renderer, colorGrey, SCREEN_WIDTH, SCREEN_HEIGHT, ctrl->zoom, ctrl->center);
 		}
+	}
+}
+
+void View::drawTileWalker(ZoomableGUIController* ctrl) {
+	if(model->hasWalker) {
+		for(auto tile: model->displayWalker) {
+			Rrectangle* rec = dynamic_cast<Rrectangle*>(tile->rec);
+			DrawPolygon(rec, renderer, colorWhite, SCREEN_WIDTH, SCREEN_HEIGHT, ctrl->zoom, ctrl->center);
+		}
+		DrawPolygon(dynamic_cast<Rrectangle*>(model->walkerStart->rec), renderer, colorBlue, SCREEN_WIDTH, SCREEN_HEIGHT, ctrl->zoom, ctrl->center);
+		DrawPolygon(dynamic_cast<Rrectangle*>(model->walkerEnd->rec), renderer, colorRed, SCREEN_WIDTH, SCREEN_HEIGHT, ctrl->zoom, ctrl->center);
+		DrawPolygon(&model->walkerRec, renderer, colorGrey, SCREEN_WIDTH, SCREEN_HEIGHT, ctrl->zoom, ctrl->center);
 	}
 }
 

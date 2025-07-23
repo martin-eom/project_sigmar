@@ -51,18 +51,38 @@ class Straight {
 public:
 	bool vertical = false;
 	double vertical_x = false;
+	bool vertical_down = false;
 	double a = 1;
 	double b = 0;
 
+	Straight() {
+		a = 0;
+		b = 0;
+	}
 	Straight(Point* p1, Point* p2) {
 		if(p2->x() == p1->x()) {
 			vertical = true;
 			vertical_x = p1->x();
+			vertical_down = p1->y() > p2->y();
 		}
 		else {
 			a = (p2->y() - p1->y()) / (p2->x() - p1->x());
 			b = p1->y() - a*p1->x();
 		}
+	}
+
+	double y(double x) {
+		if(vertical)
+			return 0;
+		return a*x + b;
+	}
+
+	double x(double y) {
+		if(vertical)
+			return vertical_x;
+		//if(a == 0)
+		//	return 0;
+		return (y - b)/a;
 	}
 };
 
@@ -181,6 +201,7 @@ public:
 	//std::vector<Corner> corners;
 
 	Rrectangle(double hl, double hw, Eigen::Vector2d pos, Eigen::Matrix2d rot);
+	Rrectangle() : Rrectangle(1, 1, Eigen::Vector2d(1.,1.), Eigen::Matrix2d::Identity()) {}
 
 	//void Reposition(Eigen::Vector2d pos);
 	//void Rotate(Eigen::Matrix2d rot);

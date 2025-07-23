@@ -5,11 +5,13 @@
 #include <vector>
 
 class Unit;
+class Model;
 
 class Player {
 	public:
 		bool player1;
 		std::vector<Unit*> units;
+		Model* model;
 		
 		Player(bool player1) {
 			this->player1 = player1;

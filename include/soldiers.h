@@ -1,10 +1,10 @@
-#ifndef SOLDIERS2
-#define SOLDIERS2
-
+#ifndef SOLDIERS
+#define SOLDIERS
 #include <extra_math.h>
 #include <timer.h>
 #include <debug.h>
 #include <information.h>
+#include <orders.h>
 //#include <projectiles.h>
 
 #ifndef _USE_MATH_DEFINES
@@ -22,6 +22,9 @@
 class Soldier;
 class Unit;
 class Map;
+//class Model;
+//class Order;
+//class EventManager;
 
 class SoldierNeighbourContainer {
 public:
@@ -228,7 +231,7 @@ class Soldier : public Circle{
 			damp = Force / pow(maxSpeed, 2);
 		};
 
-		void IndivPathProgression(Map* map);
+		void IndivPathProgression(Map* map, double* time1 = NULL, double* time2 = NULL, double* timePass1 = NULL);
 		void ChooseMeleeTargetsByRangeAndCone(std::vector<SoldierNeighbourContainer>* targets, std::vector<SoldierNeighbourContainer>* notInCone);
 		bool OnAttackOrder();
 		void HandleCharging(std::vector<SoldierNeighbourContainer>* targets);
@@ -241,6 +244,7 @@ class Soldier : public Circle{
 		bool HasLOSToPointOfImpact(Eigen::Vector2d pointOfImpact, Map* map);
 		bool AllyTooCloseToTarget(Eigen::Vector2d pointOfImpact, double flightTime);
 		void FireOrReloadIfPossible(Map* map, EventManager* em);
+		bool CanReload();
 };
 
 

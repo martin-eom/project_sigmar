@@ -20,7 +20,7 @@
 
 
 
-void ReformUnit(Unit* unit) {
+void Unit::Reform() {
 	struct RebasedSoldier {
 		Soldier* soldier;
 		Eigen::Vector2d rebasedPos;
@@ -31,27 +31,27 @@ void ReformUnit(Unit* unit) {
 		}
 	};
 
-	std::vector<std::vector<Soldier*>>* soldiers = &(unit->soldiers);
+	//std::vector<std::vector<Soldier*>>* soldiers = soldiers;
 	std::deque<RebasedSoldier*> temp1;
 	std::deque<RebasedSoldier*> temp2;
 	// Sorting soldiers by new "y coordinate" (front-back in formation)
-	for(int i = 0; i < unit->nrows; i++) {
-		for(int j = 0; j < unit->ncols; j++) {
-			Soldier* soldier = soldiers->at(i).at(j);
+	for(int i = 0; i < nrows; i++) {
+		for(int j = 0; j < ncols; j++) {
+			Soldier* soldier = soldiers.at(i).at(j);
 			if(soldier) {
 				Eigen::Matrix2d rot;
 				Order* o;
 				if(soldier->alive)
-					o = unit->orders.at(soldier->currentOrder);
+					o = orders.at(soldier->currentOrder);
 				else
-					o = unit->orders.at(unit->currentOrder);
+					o = orders.at(currentOrder);
 				if(o->type == ORDER_MOVE) {
 					MoveOrder* mo = dynamic_cast<MoveOrder*>(o);
 					rot = mo->rot;
 				}
 				else {rot = o->rot;}
-				Eigen::Matrix2d rotDiff = rot.transpose() * unit->rot;
-				RebasedSoldier* r = new RebasedSoldier(soldier, rotDiff, rot.transpose() * (soldier->pos - unit->pos));
+				Eigen::Matrix2d rotDiff = rot.transpose() * rot;
+				RebasedSoldier* r = new RebasedSoldier(soldier, rotDiff, rot.transpose() * (soldier->pos - pos));
 				auto current = temp1.begin();
 				while(current != temp1.end()) {
 					if(!(*current)->soldier->alive) break;
@@ -72,7 +72,7 @@ void ReformUnit(Unit* unit) {
 	while(!temp1.empty()) {
 		std::deque<RebasedSoldier*> tempRow;
 		// Filling tempRow
-		while((!temp1.empty()) && tempRow.size() < unit->ncols) {
+		while((!temp1.empty()) && tempRow.size() < ncols) {
 			RebasedSoldier* node = temp1.at(0); temp1.pop_front();
 			auto current = tempRow.begin();
 			int n = 0;
@@ -93,17 +93,17 @@ void ReformUnit(Unit* unit) {
 		}
 	}
 	// Pasting the new order into unit
-	for(int i = 0; i < unit->nrows; i++) {
-		for(int j = 0; j < unit->ncols; j++) {
+	for(int i = 0; i < nrows; i++) {
+		for(int j = 0; j < ncols; j++) {
 			if(!temp2.empty()) {
 				RebasedSoldier* r = temp2.at(0); temp2.pop_front();
-				(*soldiers).at(i).at(j) = r->soldier;
+				soldiers.at(i).at(j) = r->soldier;
 				delete r;
 			}
 		}
 	}
 	//PosInUnitByID(unit);
-	unit->PosInUnitByID();
+	PosInUnitByID();
 	debug("Reforming unit succeeded");
 }
 

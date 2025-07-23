@@ -50,9 +50,11 @@ void OpenWindow(Map* map) {
 	Player* player1 = new Player(true);
 	model->players.push_back(player1);
 	model->player1 = player1;
+	model->player1->model = model;
 	Player* player2 = new Player(false);
 	model->players.push_back(player2);
 	model->player2 = player2;
+	model->player2->model = model;
 	model->loadArmyLists("config/templates/armylist.json");
 	ctrl = new KeyboardAndMouseController(em, SCREEN_WIDTH, SCREEN_HEIGHT, map);
 	dynamic_cast<GameEventManager*>(em)->ctrl = ctrl;
@@ -113,10 +115,10 @@ int main(int argc, char* argv[1]) {
 	}
 	SDL_StopTextInput();
 
-	//map = new Map("maps/testmap.json");
 	//map = new Map("maps/pillars2.json");
 	map = new Map("maps/field.json");
 	//map = new Map("maps/testmap.json");
+	//map = new Map("maps/debug.json");
 	OpenWindow(map);
 
 	/*// Extra Debug section
@@ -146,8 +148,8 @@ int main(int argc, char* argv[1]) {
 	T_OF_NEXT_REFORM = CURRENT_TICK + 2000;
 	TICKS_SINCE_LAST_REFORM = 0;
 	while (!quit) {
-		while (SDL_PollEvent(&e)) {
-			if (e.type == SDL_QUIT) {
+ 		while (SDL_PollEvent(&e)) {
+			if(e.type == SDL_QUIT) {
 				quit = true;
 			}
 			else if((e.type == SDL_MOUSEBUTTONUP) || (e.type == SDL_KEYUP) || (e.type == SDL_KEYDOWN) ||(e.type == SDL_TEXTINPUT) || (e.type == SDL_MOUSEMOTION)) {

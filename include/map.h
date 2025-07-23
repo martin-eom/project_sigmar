@@ -23,11 +23,20 @@ enum MAP_OBJECT_TYPES {
 	MAP_WAYPOINT
 };
 
+int legalizeIndex(int ind, int bound) {
+	if(ind < 0)
+		return 0;
+	if(ind > bound - 1)
+		return bound - 1;
+	return ind;
+}
+
 class Map;
 
 class MapObject {
 public:
 	int type;
+	int ID;
 	bool high = true;
 	virtual void AutoWaypoints(double rad, Map* map) {}
 	void toggle_high() {
@@ -381,7 +390,10 @@ void Map::AddMapObject(MapObject* obj, bool update) {
 			waypoints.push_back(dynamic_cast<MapWaypoint*>(obj));
 		break;
 	}
-	if(!update) mapObjects.push_back(obj);
+	if(!update) {
+		mapObjects.push_back(obj);
+		obj->ID = std::size(mapObjects);
+	}
 }
 
 void Map::UpdateGridsWithMapObjects() {

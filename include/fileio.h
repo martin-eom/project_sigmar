@@ -10,6 +10,8 @@
 #include <iostream>
 #include <fstream>
 #include <list>
+#include <algorithm>
+#include <random>
 
 using json = nlohmann::json;
 
@@ -376,6 +378,9 @@ void Model::loadArmyLists(std::string filename) {
 	}
 	std::sort(units.begin(), units.end(), UnitSorter());
 	std::reverse(units.begin(), units.end());
+	unsigned seed = std::chrono::system_clock::now().time_since_epoch().count();
+	auto rng = std::default_random_engine(seed);
+	std::ranges::shuffle(soldiers,  rng);
 }
 
 void Model::loadDamageInfo() {
