@@ -8,7 +8,7 @@ The turn-based element will be facilitated by having one player give orders too 
 During their first turn each player has to deploy all their units within their own deployment zone.
 Victory is achieved in a death-match style by defeating all enemy soldiers.
 ## Tools and some credit
-Since I've never worked on a complex piece of software before, the basic structure of the game is following a wonderful tutorial in basic game design with [pygame](https://www.pygame.org) found [here](http://ezide.com/games/writing-games.html).
+The basic structure of the game is following a wonderful tutorial in basic game design with [pygame](https://www.pygame.org) found [here](http://ezide.com/games/writing-games.html).
 Originally the project was written entirely in Python. However, due to major performance problems the entire project was ported to C++. The handling of input and graphics rendering is performed by [SDL2](https://www.libsdl.org/), including text rendering with [SDL_ttf](https://github.com/libsdl-org/SDL_ttf/releases).
 Simple vector operations are done using the [Eigen3](https://eigen.tuxfamily.org/index.php?title=Main_Page) library.
 Storing maps in json format is done using the [nlohmann/json](https://github.com/nlohmann/json) class.
@@ -16,17 +16,19 @@ Some elements are parallelized using OpenMP.
 ## Current state
 The game can be run in a hot seat mode right now. There was a server-client architecture during the Python-phase of development and it is planned to return in the C++ version.
 
-The soldiers within a unit will try to keep a proper formation. They are subject to collision physics with other soldiers and map objects. All soldiers are treated as circular objects. 
-A simple form of pathfinding is implemented for units. Given a well designed map they will choose the shortest path between any 2 points while not running directly into map objects.
+The game rules are essentially fully implemented. The soldiers within a unit will try to keep a proper formation. They are subject to collision physics with other soldiers and map objects. All soldiers are treated as circular objects. 
+Pathfinding is implemented for units. Given a well designed map they will choose the shortest path between any 2 points while not running directly into map objects.
 The shortest paths are computed during map creation using the [Floyd-Warshall algorithm](https://en.wikipedia.org/wiki/Floyd%E2%80%93Warshall_algorithm).
-There is a map editor to create and modify maps, which can be loaded into the main game.
+There is a map editor to create and modify maps, which can be loaded into the main game. Additionally the soldier classes, units and army compositions can be freely customized from the config files. Custom pixelart can easily be added if you can draw it.
 
 Melee and ranged combat systems inspired by those of the Total War games (Melee Attack/Defense stats, unit traits) are implemented. Units can be ordered to hold a point, which will only make them attack enemies if they get within range, or they can be ordered to attack a unit.
 
-The soldiers are animated with simple pixelart.
+The soldiers are animated with simple self-made pixelart. There is a single drawn map available.
+
+At the moment the game runs at its smooth 30fps with over 2000 soldiers on an AMD Ryzen 5 3600.
 
 ## major to-do list
-* refactoring and optimization
+* some more refactoring
 * server-client architecture
 * ai to play against
 
