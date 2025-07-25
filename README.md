@@ -4,7 +4,7 @@ This is a passion project. It is not intended to lead to a deep video game with 
 The main goal is to create a basic ruleset that has some depth and balance in order to train a neural network in playing it.
 You could say it is a machine-learning exercise preceded by a rather longer exercise in software development and coding.
 ## Modified ruleset
-The turn-based element will be facilitated by having one player give orders too his units, then running the simulation for a certain time, then having the other player give orders and running the simulation for the same time (and so on).
+The turn-based element will be facilitated by having one player give orders to his units, then running the simulation for a certain time, then having the other player give orders and running the simulation for the same time (and so on).
 During their first turn each player has to deploy all their units within their own deployment zone.
 Victory is achieved in a death-match style by defeating all enemy soldiers.
 ## Tools and some credit
