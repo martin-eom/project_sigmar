@@ -3,7 +3,6 @@
 
 
 #include <events.h>
-//#include <units.h>
 #include <debug.h>
 
 #ifndef _USE_MATH_DEFINES
@@ -27,12 +26,9 @@ class EventManager {
 	public:
 		std::list<int> noPrint = {GENERIC_EVENT, TICK_EVENT, SDL_EVENT, CHANGE_TEXTBOX_EVENT, PROJECTILE_SPAWN_EVENT, KILL_EVENT};
 		std::list<Listener*> listeners;
-		std::vector<double> times;
 		int fps = 30;
 		double dt = 1./30.;
-		virtual void _polymorphism(){};	//necessary to make the class polymorphic
-
-		bool showTimes = false;
+		virtual void _polymorphism(){};
 		
 		EventManager() {};
 		EventManager(int fps){
@@ -42,13 +38,11 @@ class EventManager {
 				
 		void RegisterListener(Listener* listener) {
 			listeners.push_back(listener);
-			times.push_back(0);
 		}
 		
 		void UnregisterListener(Listener* listener) {
 			int n_listener = std::distance(listeners.begin(), std::find(listeners.begin(), listeners.end(), listener));
 			listeners.remove(listener);
-			times.erase(std::next(times.begin(), n_listener));
 		}
 		
 		void Post(Event* ev);
@@ -74,19 +68,19 @@ void EventManager::Post(Event* ev) {
 		std::cout << " - posted " << ev->name << "\n";
 	}
 	for(auto listener : listeners) {
-		auto start = std::chrono::system_clock::now();
+		//auto start = std::chrono::system_clock::now();
 		listener->Notify(ev);
-		auto end = std::chrono::system_clock::now();
-			times.at(std::distance(listeners.begin(), std::find(listeners.begin(), listeners.end(), listener))) += std::chrono::duration<double>(end - start).count();		
+		//auto end = std::chrono::system_clock::now();
+		//	times.at(std::distance(listeners.begin(), std::find(listeners.begin(), listeners.end(), listener))) += std::chrono::duration<double>(end - start).count();		
 
-		if(showTimes) {
-			std::cout << "######### EM TIMING ###########\n";
-			for(auto time : times) {
-				std::cout << time << "\n";
-			}
-			std::cout << "###############################\n";
-			showTimes = false;
-		}
+		//if(showTimes) {
+		//	//std::cout << "######### EM TIMING ###########\n";
+		//	for(auto time : times) {
+		//		std::cout << time << "\n";
+		//	}
+		//	//std::cout << "###############################\n";
+		//	showTimes = false;
+		//}
 	}
 }
 

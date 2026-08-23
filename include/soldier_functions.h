@@ -232,7 +232,7 @@ bool Soldier::CanReload() {
 	return speed < maxSpeedForFiring && (MeleeTimer.done() || !melee);
 }
 
-void Soldier::IndivPathProgression(Map* map, double* time1, double* time2, double* timePass1) {
+void Soldier::IndivPathProgression(Map* map) {//, double* time1, double* time2, double* timePass1) {
 	indivPathTimer.decrement();
 	auto start = std::chrono::system_clock::now();
 	auto end = std::chrono::system_clock::now();
@@ -244,17 +244,17 @@ void Soldier::IndivPathProgression(Map* map, double* time1, double* time2, doubl
 			start = std::chrono::system_clock::now();
 			condition = FreePath(&c1, &c2, map, false); // set the last one to true
 			end = std::chrono::system_clock::now();
-			if(time1)
-				*time1 += std::chrono::duration<double>(end - start).count();
+			//if(time1)
+			//	*time1 += std::chrono::duration<double>(end - start).count();
 			if(!condition) {
 				//do indiv pathfinding
-				start = std::chrono::system_clock::now();
+				//start = std::chrono::system_clock::now();
 				//std::cout << "Soldier::IndivPathProgression findPath 1 start...\n";
-				indivPath = findPath(&c2, &c1, map, timePass1);
+				indivPath = findPath(&c2, &c1, map);
 				//std::cout << "Soldier::IndivPathProgression findPath 1 done.\n";
-				end = std::chrono::system_clock::now();
-				if(time2)
-					*time2 += std::chrono::duration<double>(end - start).count();
+				//end = std::chrono::system_clock::now();
+				//if(time2)
+				//	*time2 += std::chrono::duration<double>(end - start).count();
 			}
 		}
 		else {
@@ -266,16 +266,16 @@ void Soldier::IndivPathProgression(Map* map, double* time1, double* time2, doubl
 				start = std::chrono::system_clock::now();
 				condition = FreePath(&c1, &c3, map);
 				end = std::chrono::system_clock::now();
-				if(time1)
-					*time1 += std::chrono::duration<double>(end - start).count();
+				//if(time1)
+				//	*time1 += std::chrono::duration<double>(end - start).count();
 				if(condition) {
 					if(indivPath.size() > 1) {
 						Circle c4(indivPath.at(1), rad);
 						start = std::chrono::system_clock::now();
 						condition = FreePath(&c1, &c4, map);
 						end = std::chrono::system_clock::now();
-						if(time1)
-							*time1 += std::chrono::duration<double>(end - start).count();
+						//if(time1)
+						//	*time1 += std::chrono::duration<double>(end - start).count();
 						if(condition)
 							std::erase(indivPath, indivPath.at(0));
 					}
@@ -287,12 +287,12 @@ void Soldier::IndivPathProgression(Map* map, double* time1, double* time2, doubl
 				else {
 					//redo indiv pathfinding
 					start = std::chrono::system_clock::now();
-					std::cout << "Soldier::IndivPathProgression findPath 2 start...\n";
-					indivPath = findPath(&c2, &c1, map, timePass1);
-					std::cout << "Soldier::IndivPathProgression findPath 2 done.\n";
+					//std::cout << "Soldier::IndivPathProgression findPath 2 start...\n";
+					indivPath = findPath(&c2, &c1, map);
+					//std::cout << "Soldier::IndivPathProgression findPath 2 done.\n";
 					end = std::chrono::system_clock::now();
-					if(time2)
-						*time2 += std::chrono::duration<double>(end - start).count();
+					//if(time2)
+					//	*time2 += std::chrono::duration<double>(end - start).count();
 				}
 			}
 		}

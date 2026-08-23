@@ -9,7 +9,6 @@ namespace ddebug {
 	bool _showDebugGraphics = false;
 }
 
-
 void debug(std::string text) {
 	if(ddebug::_showDebugMessages) {
 		std::cout << "[DEBUG:] " << text << "\n";

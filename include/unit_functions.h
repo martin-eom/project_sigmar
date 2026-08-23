@@ -65,7 +65,10 @@ void Unit::NextOrder(Map* map) {
 
 void Unit::RenewOrders(EventManager* em) {
 	std::vector<Order*> newOrders(orders.begin() + currentOrder, orders.end());
-	em->Post(new GiveOrdersRequest(this, newOrders));
+	std::cout << "GiveOrdersRequest with " << newOrders.size() << " orders.\n";
+	GiveOrdersRequest gor(this, newOrders, true);
+	//em->Post(new GiveOrdersRequest(this, newOrders));
+	em->Post(&gor);
 }
 
 void Unit::DeleteObsoleteOrder() {
@@ -163,9 +166,10 @@ void Unit::NextOrderPathfinding(Order* oldOrder, Order* newOrder, Map* map) {
 	for(auto row: soldiers) {
 		for(auto soldier: row) {
 			if(soldier->currentOrder == currentOrder && currentOrder < orders.size() - 1) {
+				Eigen::Vector2d nextPos = orders.at(currentOrder+1)->pos;
 				MapWaypoint w1(soldier->pos, soldier->rad);
-				MapWaypoint w2(orders.at(currentOrder+1)->pos, soldier->rad);
-				if(FreePath(&w1, &w2, map)) {
+				MapWaypoint w2(nextPos, soldier->rad);
+				if((nextPos - soldier->pos).norm() <= 50 && FreePath(&w1, &w2, map)) {
 					soldier->arrived = true;
 					nSoldiersArrived++;
 				}
@@ -303,7 +307,7 @@ void Unit::FindRangedTarget(std::vector<Player*> players) {
 	}
 }
 
-void Unit::SoldierMovement(Map* map, double* dt, double* time1, double* time2, double* time3, double* time4, double* timePass1, double* timePass2, double* timePass3) {
+void Unit::SoldierMovement(Map* map, double* dt) {//, double* time1, double* time2, double* time3, double* time4, double* timePass1, double* timePass2, double* timePass3) {
 	for(int i = 0; i < nrows; i++) {
 		for(int j = 0; j < ncols; j++) {
 			Soldier* soldier = soldiers.at(i).at(j);
@@ -314,17 +318,18 @@ void Unit::SoldierMovement(Map* map, double* dt, double* time1, double* time2, d
 
 				//possibly advancing soldier order during combat
 				int co = soldier->currentOrder;
-				auto start = std::chrono::system_clock::now();
-				auto end = std::chrono::system_clock::now();
-				start = std::chrono::system_clock::now();
-				if(!soldier->charging && orders.at(co)->type != ORDER_ATTACK && orders.size() > (co + 1) && enemyContact) { // I don't get this line, should it be type == ORDER_ATTACK?
+				//auto start = std::chrono::system_clock::now();
+				//auto end = std::chrono::system_clock::now();
+				//start = std::chrono::system_clock::now();
+				if(!soldier->charging && orders.at(co)->type != ORDER_ATTACK && orders.size() > (co + 1) && enemyContact) {
 					Order* no = orders.at(co + 1);
 					if(orders.at(co)->target && no->target) {
 						Circle c1(soldier->pos, soldier->rad);
 						Eigen::Vector2d nextPos = no->pos + no->rot * posInUnit.at(i).at(j);
 						Circle c2(nextPos, soldier->rad);
 						if(!soldier->arrived) {
-							if(FreePath(&c1,&c2,map)) {
+							//if(FreePath(&c1,&c2,map)) {
+							if((nextPos - soldier->pos).norm() <= 50 && FreePath(&c1,&c2,map)) {
 								soldier->arrived = true;
 								if(soldier->currentOrder == currentOrder)
 									nSoldiersArrived++;
@@ -332,34 +337,34 @@ void Unit::SoldierMovement(Map* map, double* dt, double* time1, double* time2, d
 						}
 					}
 				}
-				end = std::chrono::system_clock::now();
-				if(time1)
-					*time1 += std::chrono::duration<double>(end - start).count();
+				//end = std::chrono::system_clock::now();
+				//if(time1)
+				//	*time1 += std::chrono::duration<double>(end - start).count();
 
-				start = std::chrono::system_clock::now();
+				//start = std::chrono::system_clock::now();
 				//check if need to do indiv pathfinding, but only do this every second or so!
-				soldier->IndivPathProgression(map, timePass1, timePass2, timePass3);
-				end = std::chrono::system_clock::now();
-				if(time2)
-					*time2 += std::chrono::duration<double>(end - start).count();
+				soldier->IndivPathProgression(map);//, timePass1, timePass2, timePass3);
+				//end = std::chrono::system_clock::now();
+				//if(time2)
+				//	*time2 += std::chrono::duration<double>(end - start).count();
 
-				start = std::chrono::system_clock::now();
+				//start = std::chrono::system_clock::now();
 				//physics step
 				if(soldier->placed && soldier->alive) {
 					TimeStep(soldier, *dt);
 				}
-				end = std::chrono::system_clock::now();
-				if(time3)
-					*time3 += std::chrono::duration<double>(end - start).count();
+				//end = std::chrono::system_clock::now();
+				//if(time3)
+				//	*time3 += std::chrono::duration<double>(end - start).count();
 
-				start = std::chrono::system_clock::now();
+				//start = std::chrono::system_clock::now();
 				//advancing soldier order
 				if(soldier->alive && soldier->arrived) {
 					if(soldier->currentOrder < currentOrder) {
 						SoldierNextOrder(soldier, posInUnit.at(i).at(j));
 					}
 				}
-				end = std::chrono::system_clock::now();
+				//end = std::chrono::system_clock::now();
 			}
 		}
 	}

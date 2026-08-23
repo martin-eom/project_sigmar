@@ -460,7 +460,7 @@ void View::drawProposedOrders1(KeyboardAndMouseController* ctrl, Model* model) {
 	if(ctrl->state() == CTRL_GIVING_ORDERS && ctrl->selectedUnit) {
 		drawOrderList(ctrl->orders, ctrl->selectedUnit, colorGrey);
 	}
-	if(model->state == MODEL_GAME_PAUSED) {
+	if(model->state == MODEL_GAME_PAUSED || model->state == MODEL_GAME_READY_TO_START) {
 		for(int n_unit = 0; n_unit < ctrl->selectedPlayer->units.size(); n_unit++) {
 			Color* drawColor;
 			if(ctrl->selectedPlayer->units.at(n_unit) == ctrl->selectedUnit)
@@ -689,6 +689,7 @@ void View::drawUI(KeyboardAndMouseController* ctrl, Model* model) {
 	//	gameState = ""; break;
 	case MODEL_GAME_RUNNING:
 		gameState = _running; break;
+	case MODEL_GAME_READY_TO_START:
 	case MODEL_GAME_PAUSED:
 		if(ctrl->selectedPlayer == model->player1) gameState = _p1Order;
 		else gameState = _p2Order;
@@ -698,6 +699,7 @@ void View::drawUI(KeyboardAndMouseController* ctrl, Model* model) {
 	}
 	switch(model->state) {
 	case MODEL_GAME_RUNNING:
+	case MODEL_GAME_READY_TO_START:
 	case MODEL_GAME_PAUSED:
 	case MODEL_GAME_OVER:
 		gameInstructions->loadFromString(gameState, fontLarge, colorText, textwidth);

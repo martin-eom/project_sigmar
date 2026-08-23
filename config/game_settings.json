@@ -14,7 +14,7 @@
 		"num_frames": 1,
 		"ticks_per_frame" : 1000
 	},
-	"show_map_object_outlines": false,
+	"show_map_object_outlines": true,
 	"turn_duration": 300,
 	"simulation_mode": false,
 	"base_melee_attack": 0.35,
@@ -27,6 +27,8 @@
 	"anti_infantry_damage_bonus": 0.3,
 	"auto_generate_map_grids": false,
 	"map_grids": [16,32],
-	"set_custom_omp_num_threads": true,
-	"custom_omp_num_threads": 8
+	"set_custom_omp_num_threads": false,
+	"custom_omp_num_threads": 1,
+	"player1_type": "simpleai",
+	"player2_type": "simpleai"
 }

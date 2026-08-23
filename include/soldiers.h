@@ -231,7 +231,7 @@ class Soldier : public Circle{
 			damp = Force / pow(maxSpeed, 2);
 		};
 
-		void IndivPathProgression(Map* map, double* time1 = NULL, double* time2 = NULL, double* timePass1 = NULL);
+		void IndivPathProgression(Map* map);//, double* time1 = NULL, double* time2 = NULL, double* timePass1 = NULL);
 		void ChooseMeleeTargetsByRangeAndCone(std::vector<SoldierNeighbourContainer>* targets, std::vector<SoldierNeighbourContainer>* notInCone);
 		bool OnAttackOrder();
 		void HandleCharging(std::vector<SoldierNeighbourContainer>* targets);

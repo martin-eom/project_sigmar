@@ -32,7 +32,7 @@ public:
 
 class SoldierInformation {
 public:
-	// #### GENERAL STATS
+	//general stats
 	std::string tag;
 	double radius;
 	int tilesize;
@@ -43,7 +43,7 @@ public:
 	double on_target_dampening;
 	int max_hp;
 	int armor;
-	// #### MELEE STATS
+	//melee stats
 	bool melee_melee;
 	double melee_range;
 	double melee_angle;
@@ -53,7 +53,7 @@ public:
 	int melee_defense;
 	int melee_armor_piercing;
 	int melee_damage;
-	// #### RANGED STATS
+	//ranged stats
 	bool ranged_ranged;
 	double ranged_range;
 	double ranged_min_range;
@@ -69,12 +69,12 @@ public:
 	double ranged_aoe;
 	int projectile_tilesize;
 	int ranged_damage;
-	// #### KEYWORDS
+	//keywords
 	bool kw_infantry;
 	bool kw_large;
 	bool kw_anti_infantry;
 	bool kw_anti_large;
-	// #### ANIMATION INFORMATION
+	//animation information
 	AnimationInformation anime_legs_information;
 	AnimationInformation anime_melee_information;
 	AnimationInformation anime_ranged_information;
@@ -88,16 +88,16 @@ public:
 
 class UnitInformation {
 public:
-	// #### GENERAL STATS
+	//general stats
 	std::string tag;
 	std::string soldier_type;
-	// #### FORMATION STATS
+	//formation stats
 	int formation_max_soldiers;
 	int formation_rows;
 	int formation_columns;
 	double formation_x_spacing;
 	double formation_y_spacing;
-	// #### RANGED STATS
+	//ranged stats
 	bool ranged_ranged;
 	double ranged_range;
 	double ranged_angle;
@@ -127,6 +127,8 @@ public:
 	std::vector<int> map_grids;
 	bool set_custom_omp_num_threads;
 	int custom_omp_num_threads;
+	int player1_type;
+	int player2_type;
 
 	SettingsInformation() {}
 	SettingsInformation(json input);

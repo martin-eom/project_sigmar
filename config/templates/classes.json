@@ -88,7 +88,7 @@
 		"general_stats": {
 			"radius": 7.0,
 			"mass": 4.0,
-			"max_speed": 40.0,
+			"max_speed": 45.0,
 			"acceleration": 6.0,
 			"turn_speed": 0.33,
 			"on_target_dampening": 2.0,
@@ -171,7 +171,7 @@
 		"general_stats": {
 			"radius": 15.0,
 			"mass": 20.0,
-			"max_speed": 40.0,
+			"max_speed": 30.0,
 			"acceleration": 2.8,
 			"turn_speed": 0.25,
 			"on_target_dampening": 3.2,

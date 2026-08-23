@@ -98,7 +98,6 @@ private:
 			_input = "";
 			break;
 		case REMEMBER_ORDERS: {
-			debug("Remembered Orders!");
 			RememberOrders* rem = dynamic_cast<RememberOrders*>(ev);
 			orders = rem->orders; }
 			break;
@@ -107,19 +106,19 @@ private:
 			handleSDLEvent(e, gem, model, view, map);
 			break;
 		case GAME_PAUSED_EVENT:
-			if(!selectedPlayer) SetPlayer();
-			else {
+			selectedPlayer = model->currentPlayer;
+			//if(!selectedPlayer) SetPlayer();
+			/*else {
 				selectedPlayer = model->players.at(
 					(std::find(model->players.begin(), model->players.end(), selectedPlayer)
 					- model->players.begin() + 1)
 					% model->players.size()
 				);
-			}
+			}*/
 			newOrderList(selectedPlayer);
 			SetUnit();
 			break;
 		case TICK_EVENT:
-			debug("TickEvent: ctrl - begin");
 			double oldZoom = zoom;
 			zoom = zoom * std::pow(maxZoom, em->dt/1*(zoomSpeedIn - zoomSpeedOut));
 			if(zoom < minZoom) zoom = minZoom;
@@ -138,7 +137,6 @@ private:
 			if(y > ymax) y = ymax;
 			newCenter << x, y;
 			center = newCenter;
-			debug("TickEvent: ctrl - end");
 			break;
 		}
 	}
@@ -146,6 +144,7 @@ private:
 
 void KeyboardAndMouseController::SetPlayer() {
 	selectedPlayer = NULL;
+	selectedPlayer = model->currentPlayer;
 	if(model->players.size() > 0) {
 		selectedPlayer = model->players.at(0);
 	}
@@ -168,7 +167,6 @@ void KeyboardAndMouseController::newOrderList(Player* player) {
 	for(auto unit: player->units) {
 		orderList.push_back(std::vector<Order*>());
 	}
-	//add sublists for every unit of player
 }
 
 void KeyboardAndMouseController::handleSDLEvent(SDL_Event e, GameEventManager* gem, Model* model, GeneralView* view, Map* map) {
@@ -212,7 +210,7 @@ void KeyboardAndMouseController::handleMouseKeyUpEvent(SDL_Event e, GameEventMan
 					if(passingThrough) {mo->moveType = MOVE_PASSINGTHROUGH; dynamic_cast<MoveOrder*>(o)->moveType = MOVE_PASSINGTHROUGH;}
 				}
 				else {
-					std::cout << "First and second point are identical, can't get angel.\n";
+					std::cout << "First and second point are identical, can't get angle.\n";
 				}
 			}
 			else {
@@ -324,7 +322,6 @@ void KeyboardAndMouseController::handleKeyDownEvent(SDL_Event e, GameEventManage
 
 void KeyboardAndMouseController::handleKeyUpEvent(SDL_Event e, GameEventManager* gem, Model* model, GeneralView* view, Map* map) {
 	Event* nev = new Event();
-	//Event nev = Event();
 	switch(e.key.keysym.sym) {
 	case SDLK_RETURN:
 		debug(std::to_string(_state));
@@ -359,6 +356,7 @@ void KeyboardAndMouseController::handleKeyUpEvent(SDL_Event e, GameEventManager*
 							nev = new GiveOrdersRequest(selectedUnit, orders);
 						}
 						}break;
+					case MODEL_GAME_READY_TO_START:
 					case MODEL_GAME_PAUSED:
 						orderList.at(selectedPlayer->getUnitID(selectedUnit)) = orders;
 					}
@@ -411,7 +409,8 @@ void KeyboardAndMouseController::handleKeyUpEvent(SDL_Event e, GameEventManager*
 	case SDLK_LEFT:
 		switch(_state) {
 		case CTRL_SELECTING_UNIT:
-			if(!selectedPlayer) SetPlayer();
+			selectedPlayer = model->currentPlayer;
+			//if(!selectedPlayer) SetPlayer();
 			if(selectedPlayer) {
 				auto it = std::find(selectedPlayer->units.begin(), selectedPlayer->units.end(), selectedUnit);
 				if(it == selectedPlayer->units.begin()) selectedUnit = *(--selectedPlayer->units.end());
@@ -423,8 +422,11 @@ void KeyboardAndMouseController::handleKeyUpEvent(SDL_Event e, GameEventManager*
 	case SDLK_RIGHT:
 		switch(_state) {
 		case CTRL_SELECTING_UNIT:
-			if(!selectedPlayer) SetPlayer();
+			selectedPlayer = model->currentPlayer;
+			std::cout << "Selecting Unit...\n";
+			//if(!selectedPlayer) SetPlayer();
 			if(selectedPlayer) {
+				std::cout << "should be working.\n";
 				auto it = std::find(selectedPlayer->units.begin(), selectedPlayer->units.end(), selectedUnit);
 				if(it == (--selectedPlayer->units.end())) selectedUnit = *(selectedPlayer->units.begin());
 				else selectedUnit = *std::next(it);
@@ -444,6 +446,7 @@ void KeyboardAndMouseController::handleKeyUpEvent(SDL_Event e, GameEventManager*
 					newOrderList(selectedPlayer);
 					SetUnit();
 				}
+				model->currentPlayer = selectedPlayer;
 			}
 			break;
 		case CTRL_ADDING_UNIT:
@@ -462,6 +465,7 @@ void KeyboardAndMouseController::handleKeyUpEvent(SDL_Event e, GameEventManager*
 					newOrderList(selectedPlayer);
 					SetUnit();
 				}
+				model->currentPlayer = selectedPlayer;
 			}
 			break;
 		case CTRL_ADDING_UNIT:
@@ -543,7 +547,7 @@ void KeyboardAndMouseController::handleKeyUpEvent(SDL_Event e, GameEventManager*
 		else {
 			switch(_state) {
 			case CTRL_IDLE: {
-				if(model->state == MODEL_GAME_PAUSED) {
+				if(model->state == MODEL_GAME_PAUSED || model->state == MODEL_GAME_READY_TO_START) {
 					bool allowedDeployment = true;
 					/* check if deployment follows all rules
 					* every unit that is not yet placed must
@@ -741,7 +745,6 @@ private:
 			handleSDLEvent(e, view); }
 			break;
 		case TICK_EVENT: {
-			debug("ctrl : TickEvent");
 			double oldZoom = zoom;
 			zoom = zoom * std::pow(maxZoom, em->dt/1*(zoomSpeedIn - zoomSpeedOut));
 			if(zoom < minZoom) zoom = minZoom;
@@ -760,8 +763,8 @@ private:
 			if(y > ymax) y = ymax;
 			newCenter << x, y;
 			center = newCenter;
-			debug("ctrl : end TickEvent"); }
 			break;
+		}
 		}
 	}
 };

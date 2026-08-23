@@ -68,7 +68,7 @@ public:
 	void UpdateTargetPath(Map* map, EventManager* em);
 	bool CheckIfTargetHasRunAway();
 	void ResetCharging();
-	void SoldierMovement(Map* map, double* dt, double* time1 = NULL, double* time2 = NULL, double* time3 = NULL, double* time4 = NULL, double* timePass1 = NULL, double* timePass2 = NULL, double* timePass3 = NULL);
+	void SoldierMovement(Map* map, double* dt);//, double* time1 = NULL, double* time2 = NULL, double* time3 = NULL, double* time4 = NULL, double* timePass1 = NULL, double* timePass2 = NULL, double* timePass3 = NULL);
 	void StripTransitionOrders();
 	void RenewOrders(EventManager* em);
 	void Reform();

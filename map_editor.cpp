@@ -1,6 +1,7 @@
 #define _CRT_SECURE_NO_WARNINGS
 #define NOMINMAX
-#include <Windows.h>	// this line is very dangerous, moving this statement to a different location causes all sorts of problems
+
+#include <Windows.h>
 
 #include <map.h>
 #include <pathfinding.h>
@@ -47,22 +48,12 @@ void OpenWindow(Map* new_map) {
 		std::cout << "Could not create renderer: " << SDL_GetError() << "\n";
 	}
 	em = new GameEventManager(30);
-	debug("Created GameEventManager");
 	model = new MapEditorModel();
-	debug("Created MapEditorModel");
 	model->init();
-	debug("Initialized MapEditorModel");
 	ctrl = new MapEditorController(em, initial_SCREEN_WIDTH, initial_SCREEN_HEIGHT, new_map);
-	debug("Created MapEditorController");
-	debug("zoom: " + std::to_string(ctrl->zoom));
 	dynamic_cast<GameEventManager*>(em)->ctrl = ctrl;
-	debug("Assigned MapEditorController to GameEventManager.");
-	std::cout << ctrl << "\n" << dynamic_cast<GameEventManager*>(em)->ctrl << "\n";
 	view = new MapEditorView(em, window, renderer, new_map, model);
-	debug("Created MapEditorView");
 	dynamic_cast<GameEventManager*>(em)->view = view;
-	debug("Assigned MapEditorView to GameEventManager.");
-	std::cout << view << "\n" << dynamic_cast<GameEventManager*>(em)->view << "\n";
 }
 
 void OpenWindow(int SCREEN_WIDTH, int SCREEN_HEIGHT) {
@@ -335,36 +326,12 @@ int main(int argc, char* argv[1]) {
 				}
 				break;}
 			case EDITOR_ENTERING_REC_WIDTH:
-				/*if(!SDL_IsTextInputActive()) {
-					ResetTextbox("enter new rectangle width: ", true, ctrl, view);
-				}
-				if(ctrl->input_confirmed) {
-					ctrl->input_confirmed = false;
-					if(Isdouble(ctrl->input)) {
-						ctrl->lastRecWidth = stod(ctrl->input);
-						Rrectangle* rec = dynamic_cast<Rrectangle*>(ctrl->objToPlace);
-						rec->Reshape(stod(ctrl->input)/2, rec->hw);
-					}
-					ctrl->state = EDITOR_PLACING_RECTANGLE;
-				}*/
 				reshapingRectangle(REC_AXIS_WIDTH, EDITOR_PLACING_RECTANGLE);
 				break;
 			case EDITOR_ENTERING_DP_ZONE_WIDTH:
 				reshapingRectangle(REC_AXIS_WIDTH, EDITOR_PLACING_DP_ZONE);
 				break;
 			case EDITOR_ENTERING_REC_HEIGHT:
-				/*if(!SDL_IsTextInputActive()) {
-					ResetTextbox("enter new rectangle height: ", true, ctrl, view);
-				}
-				if(ctrl->input_confirmed) {
-					ctrl->input_confirmed = false;
-					if(Isdouble(ctrl->input)) {
-						ctrl->lastRecHeight = stod(ctrl->input);
-						Rrectangle* rec = dynamic_cast<Rrectangle*>(ctrl->objToPlace);
-						rec->Reshape(rec->hl, stod(ctrl->input)/2);
-					}
-					ctrl->state = EDITOR_PLACING_RECTANGLE;
-				}*/
 				reshapingRectangle(REC_AXIS_HEIGHT, EDITOR_PLACING_RECTANGLE);
 				break;
 			case EDITOR_ENTERING_DP_ZONE_HEIGHT:

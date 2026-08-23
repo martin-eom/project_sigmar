@@ -48,8 +48,6 @@ public:
 		_dontShow = dontShow;
 		CreateRectangle(w1, w2);
 		grid = map->grids.back();
-		//std::cout << "grid dimensions: " << grid->nrows << " " << grid->ncols << "\n";
-		//std::cout << "tilesize: " << grid->tilesize << "\n";
 		SetLines();
 		SetStartPoint();
 		SetEndPoint();
@@ -450,20 +448,20 @@ std::vector<Eigen::Vector2d> findExplicitPath(int start, int end, Map* map) {
 	return positions;
 }
 
-std::vector<Eigen::Vector2d> findPath(Circle* w1, Circle* w2, Map* map, double* time = NULL, Model* model = NULL) {
-	auto startTime = std::chrono::system_clock::now();
-	auto endTime = std::chrono::system_clock::now();
+std::vector<Eigen::Vector2d> findPath(Circle* w1, Circle* w2, Map* map, Model* model = NULL) {
+	//auto startTime = std::chrono::system_clock::now();
+	//auto endTime = std::chrono::system_clock::now();
 	// finding waypoints with line of sight to start and goal
 	std::vector<int> visibleStart = std::vector<int>();
 	std::vector<int> visibleEnd = std::vector<int>();
 	//std::cout << "there are " << map->waypoints.size() << " wps to check.\n";
 	for(int j = 0; j < map->waypoints.size(); j++) {
-		startTime = std::chrono::system_clock::now();
+		//startTime = std::chrono::system_clock::now();
 		if(FreePath(w2, map->waypoints.at(j), map)) {visibleStart.push_back(j);}
 		if(FreePath(w1, map->waypoints.at(j), map)) {visibleEnd.push_back(j);}
-		endTime = std::chrono::system_clock::now();
-		if(time)
-			*time += std::chrono::duration<double>(endTime - startTime).count();
+		//endTime = std::chrono::system_clock::now();
+		//if(time)
+		//	*time += std::chrono::duration<double>(endTime - startTime).count();
 		//std::cout << "checked wp " << j << "\n";
 	}
 	// finding shortest-total-path combination

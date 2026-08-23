@@ -18,18 +18,15 @@ void OrderPathfinding(Unit* unit, Map* map, std::vector<Order*> nos = std::vecto
 		if((nos.at(i)->type == ORDER_MOVE && nos.at(i-1)->type == ORDER_MOVE) || true) {
 			Order* mo = nos.at(i);
 			Order* pmo = nos.at(i-1);
-			// checking if line of sight between orders
+			//checking if line of sight between orders
 			double rad = unit->ncols*(unit->yspacing - 1);
 			MapWaypoint w1 = MapWaypoint(mo->pos, rad);
 			MapWaypoint w2 = MapWaypoint(pmo->pos, rad);
 			Eigen::Matrix2d Rot;
 			if(!FreePath(&w1, &w2, map)) {
-				std::cout << "OrderPathfinding findPath start...\n";
 				std::vector<Eigen::Vector2d> positions = findPath(&w1, &w2, map);
-				std::cout << "OrderPathfinding findPath done.\n";
-				// translating waypoints to orders
+				//translating waypoints to orders
 				for(int k = 1; k < positions.size(); k++) {
-					//Eigen::Matrix2d Rot;
 					Eigen::Vector2d diff = positions.at(k) - positions.at(k-1);
 					double d = diff.norm();
 					double cos = diff.coeff(0)/d;

@@ -1,5 +1,6 @@
 #define NOMINMAX
-#include <Windows.h>	// this line is very dangerous, moving this statement to a different location causes all sorts of problems
+
+#include <Windows.h>
 
 #ifndef EIGEN_DONT_PARALLELIZE
 #define EIGEN_DONT_PARALLELIZE
@@ -9,6 +10,7 @@
 #include <shapes.h>
 #include <view.h>
 #include <input.h>
+#include <simple_ai.h>
 
 #include <SDL.h>
 #include <stdio.h>
@@ -16,7 +18,6 @@
 //#include <omp.h>
 
 
-// Declaring variables
 SDL_Window* window = NULL;
 SDL_Renderer* renderer = NULL;
 Uint32 CURRENT_TICK;
@@ -47,20 +48,21 @@ void OpenWindow(Map* map) {
 	model = new Model(em, map);
 	model->init();
 	dynamic_cast<GameEventManager*>(em)->model = model;
-	Player* player1 = new Player(true);
+	/*Player* player1 = new Player(true);
 	model->players.push_back(player1);
 	model->player1 = player1;
 	model->player1->model = model;
+	model->currentPlayer = model->player1;
 	Player* player2 = new Player(false);
 	model->players.push_back(player2);
 	model->player2 = player2;
-	model->player2->model = model;
-	model->loadArmyLists("config/templates/armylist.json");
+	model->player2->model = model;*/
+	model->LoadArmyLists("config/templates/armylist.json");
 	ctrl = new KeyboardAndMouseController(em, SCREEN_WIDTH, SCREEN_HEIGHT, map);
+	//SimpleAI* sai = new SimpleAI(model, em);
 	dynamic_cast<GameEventManager*>(em)->ctrl = ctrl;
 
-	// Creating Window and Renderer
-	//	Creating window to get screen size
+	//Creating window to get screen size
 	window = SDL_CreateWindow("Game",
 			SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED, 
 			SCREEN_WIDTH, SCREEN_HEIGHT, SDL_WINDOW_SHOWN);
@@ -68,7 +70,7 @@ void OpenWindow(Map* map) {
 	int displayIndex = SDL_GetWindowDisplayIndex(window);
 	SDL_DestroyWindow(window);
 	SDL_GetDesktopDisplayMode(displayIndex, &mode);
-	//  Creating actual game window small enough so that console can be viewed
+	//Creating actual game window small enough so that console can be viewed
 	window = SDL_CreateWindow("Game", SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED,
 	int((&mode)->w * 0.9), int((&mode)->h * 0.9), SDL_WINDOW_SHOWN);
 	if(!window) {
@@ -102,8 +104,6 @@ int main(int argc, char* argv[1]) {
 	freopen("CONOUT$", "w", stdout);
 	freopen("CONOUT$", "w", stderr);
 
-	//omp_set_num_threads(std::max(1, omp_get_max_threads() - 1));
-	//omp_set_num_threads(8);
 	// Initializing SDL
 	if(SDL_Init(SDL_INIT_EVERYTHING) != 0) {
 		std::cout << "Failed to initialize SDL!\n";
@@ -115,27 +115,8 @@ int main(int argc, char* argv[1]) {
 	}
 	SDL_StopTextInput();
 
-	//map = new Map("maps/pillars2.json");
 	map = new Map("maps/field.json");
-	//map = new Map("maps/testmap.json");
-	//map = new Map("maps/debug.json");
 	OpenWindow(map);
-
-	/*// Extra Debug section
-	Eigen::Vector2d start_pos;
-	start_pos << 20, 90;
-	Eigen::Vector2d vel;
-	vel << 77*2/3, 77*2/3;
-	//Projectile* proj = new Projectile(start_pos, vel, 225, *model->dt);
-	//model->projectiles.push_back(proj);
-
-	start_pos << 200, 200;
-	Eigen::Matrix2d rot;
-	rot << 1, 0, 0, 1;
-	//Event ume = UnitRosterModifiedEvent();
-	//em->Post(&ume);
-	//UnitPlaceRequest placeTurret(turret, start_pos, rot);
-	//em->Post(&placeTurret);*/
 
 	// Main loop
 	bool quit = false;
@@ -160,24 +141,20 @@ int main(int argc, char* argv[1]) {
 		t = (t+1)%SCREEN_WIDTH;
 		CURRENT_TICK = SDL_GetTicks();
 		if (CURRENT_TICK >= T_OF_NEXT_TICK) {
-			//debug("Tick");
 			TickEvent ev;
 			em->Post(&ev);
-			//T_OF_NEXT_TICK = CURRENT_TICK + em->dt * 1000;
 			T_OF_NEXT_TICK += em->dt * 1000;
 			TICKS_SINCE_LAST_FPS_UPDATE++;
 		}
 		if (CURRENT_TICK >= T_OF_NEXT_FPS_UPDATE) {
 			std::cout << 0.5 * TICKS_SINCE_LAST_FPS_UPDATE << " fps\n";
 			TICKS_SINCE_LAST_FPS_UPDATE = 0;
-			//T_OF_NEXT_FPS_UPDATE = CURRENT_TICK + 2000;
 			T_OF_NEXT_FPS_UPDATE += 2000;
 		}
 		if (CURRENT_TICK >= T_OF_NEXT_REFORM) {
 			ReformEvent ev;
 			em->Post(&ev);
 			TICKS_SINCE_LAST_REFORM = 0;
-			//T_OF_NEXT_REFORM = CURRENT_TICK + 5000;
 			T_OF_NEXT_REFORM += 5003;
 		}
 		Event* ev = NULL;

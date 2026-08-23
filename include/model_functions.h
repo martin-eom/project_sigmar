@@ -2,9 +2,20 @@
 #define MODEL_FUNCTIONS
 
 #include <model.h>
+#include <simple_ai.h>
+
+void Model::CreateSimpleAI(Player* player) {
+	simpleAIs.push_back(new SimpleAI(player, this, this->em));
+}
 
 void Model::GameStateCheck() {
 	switch(state) {
+	case MODEL_GAME_READY_TO_START: {
+		state = MODEL_GAME_PAUSED;
+		GamePausedEvent gpe;
+		em->Post(&gpe);
+		break;
+	}
 	case MODEL_GAME_RUNNING:
 		if(toNextState.done()) {
 			int sumLife1 = 0; 
@@ -21,6 +32,12 @@ void Model::GameStateCheck() {
 			}
 			else {
 				state = MODEL_GAME_PAUSED;
+				if(!currentPlayer)
+					currentPlayer = player1;
+				else if(currentPlayer == player1)
+					currentPlayer = player2;
+				else
+					currentPlayer = player1;
 				GamePausedEvent gpe;
 				em->Post(&gpe);
 				toNextState.reset();

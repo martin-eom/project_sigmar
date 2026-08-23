@@ -13,7 +13,6 @@
 #include <information.h>
 #include <timing.h>
 
-
 #include <cstdlib>
 #include <map>
 #include <chrono>
@@ -31,10 +30,13 @@ struct DamageTick {
 
 enum MODEL_STATES {
 	MODEL_SIMULATION,
+	MODEL_GAME_READY_TO_START,
 	MODEL_GAME_PAUSED,
 	MODEL_GAME_RUNNING,
 	MODEL_GAME_OVER
 };
+
+class SimpleAI;
 
 class Model : public Listener{
 	public:
@@ -46,6 +48,7 @@ class Model : public Listener{
 		std::vector<Player*> players;
 		Player* player1;
 		Player* player2;
+		Player* currentPlayer;
 		std::vector<Unit*> units;
 		std::vector<Soldier*> soldiers;
 		std::vector<omp_lock_t*> soldier_locks;
@@ -59,30 +62,30 @@ class Model : public Listener{
 		std::string result;
 
 		int nticks = 0;
-		double time_check_game_over = 0;
-		double time_placing_units = 0;
-		double time_collision_scrying = 0;
-		double time_collision_resolution = 0;
-		double time_map_object_collision_handling = 0;
-		double time_projectile_collision_scrying = 0;
-		double time_projectile_collision_resolution = 0;
-		double time_total = 0;
-		double time_ranged_target_finding = 0;
-		double time_melee_combat = 0;
-		double time_physics_step = 0;
-		double time_physics_path = 0;
-		double time_physics_order = 0;
-		double time_physics_movement = 0;
-		double time_physics_move_freepath = 0;
-		double time_physics_move_indiv = 0;
-		double time_physics_indiv_freepath = 0;
-		double time_physics_indiv_findpath = 0;
-		double time_physics_indiv_findpath_freepath = 0;
-		double time_physics_move_step = 0;
-		double time_physics_move_nextorder = 0;
-		double time_hitscan = 0;
-		double time_indiv_pathing = 0;
-		bool displayedTime = false;
+		//double time_check_game_over = 0;
+		//double time_placing_units = 0;
+		//double time_collision_scrying = 0;
+		//double time_collision_resolution = 0;
+		//double time_map_object_collision_handling = 0;
+		//double time_projectile_collision_scrying = 0;
+		//double time_projectile_collision_resolution = 0;
+		//double time_total = 0;
+		//double time_ranged_target_finding = 0;
+		//double time_melee_combat = 0;
+		//double time_physics_step = 0;
+		//double time_physics_path = 0;
+		//double time_physics_order = 0;
+		//double time_physics_movement = 0;
+		//double time_physics_move_freepath = 0;
+		//double time_physics_move_indiv = 0;
+		//double time_physics_indiv_freepath = 0;
+		//double time_physics_indiv_findpath = 0;
+		//double time_physics_indiv_findpath_freepath = 0;
+		//double time_physics_move_step = 0;
+		//double time_physics_move_nextorder = 0;
+		//double time_hitscan = 0;
+		//double time_indiv_pathing = 0;
+		//bool displayedTime = false;
 
 		//TileWalker displayWalker;
 		std::vector<gridpiece*> displayWalker;
@@ -91,12 +94,14 @@ class Model : public Listener{
 		Rrectangle walkerRec;
 		Timer walkerTimer = Timer(1500);
 		bool hasWalker = false;
+		std::vector<SimpleAI*> simpleAIs;
 
-		void loadSoldierTypes(std::string filename);
-		void loadUnitTypes(std::string filename);
-		void loadArmyLists(std::string filename);
-		void loadDamageInfo();
-		void loadSettings(std::string filename);
+		void LoadSoldierTypes(std::string filename);
+		void LoadUnitTypes(std::string filename);
+		void LoadArmyLists(std::string filename);
+		void LoadDamageInfo();
+		void LoadSettings(std::string filename);
+		void CreateSimpleAI(Player* player);
 		void init();
 
 		void GameStateCheck();
@@ -140,10 +145,10 @@ public:
 };
 
 void Model::init() {
-	loadSoldierTypes("config/templates/classes.json");
-	loadUnitTypes("config/templates/units.json");
+	LoadSoldierTypes("config/templates/classes.json");
+	LoadUnitTypes("config/templates/units.json");
 	//loadDamageInfo();
-	loadSettings("config/game_settings.json");
+	LoadSettings("config/game_settings.json");
 	if(settings.auto_generate_map_grids) {
 		settings.map_grids.clear();
 		for(auto it: SoldierTypes) {
@@ -218,6 +223,24 @@ void Model::init() {
 		omp_set_num_threads(std::max(1, omp_get_max_threads() - 1));
 	std::cout << "Running on " << omp_get_max_threads() << " threads.\n";
 
+	player1 = new Player(true, settings.player1_type);
+	players.push_back(player1);
+	if(player1->type == PLAYER_SIMPLEAI) {
+		CreateSimpleAI(player1);
+		std::cout << "Player1 is controlled by a SimpleAI.\n";
+	}
+	//model->player1 = player1;
+	player1->model = this;
+	currentPlayer = player1;
+	player2 = new Player(false, settings.player2_type);
+	players.push_back(player2);
+	if(player2->type == PLAYER_SIMPLEAI) {
+		CreateSimpleAI(player2);
+		std::cout << "Player2 is controlled by a SimpleAI.\n";
+	}
+	//model->player2 = player2;
+	player2->model = this;
+
 }
 
 void Model::Notify(Event* ev) {
@@ -248,54 +271,60 @@ void Model::Notify(Event* ev) {
 		projectiles.push_back(dynamic_cast<ProjectileSpawnEvent*>(ev)->p);
 	}
 	else if(ev->type == CONTINUE_GAME_EVENT) {
-		if(state == MODEL_GAME_PAUSED) {
+		if(state == MODEL_GAME_PAUSED || state == MODEL_GAME_READY_TO_START) {
 			state = MODEL_GAME_RUNNING;
 			toNextState.reset();
 		}
 	}
 	else if (ev->type == TICK_EVENT) {
-		auto global_start = std::chrono::system_clock::now();
+		//auto global_start = std::chrono::system_clock::now();
 		TickResponse();
-		auto global_end = std::chrono::system_clock::now();
-		if(state != MODEL_GAME_PAUSED)
-			time_total += std::chrono::duration<double>(global_end - global_start).count();
+		//auto global_end = std::chrono::system_clock::now();
+		//if(state != MODEL_GAME_PAUSED)
+		//	time_total += std::chrono::duration<double>(global_end - global_start).count();
 
-		if(state == MODEL_GAME_OVER && !displayedTime) {
-			std::cout << "####### MODEL TIMING ##############\n";
-			std::cout << "total time:              " << time_total << "\n";
+		//if(state == MODEL_GAME_OVER && !displayedTime) {
+			//std::cout << "####### MODEL TIMING ##############\n";
+			//std::cout << "total time:              " << time_total << "\n";
 			//std::cout << "expected time:           " << (nticks - 3600.) / 30. << "\n";
-			std::cout << "expected time:           " << (nticks/1.) / 30. << "\n";
-			std::cout << "placing units:           " << time_placing_units << "\n";
-			std::cout << "collision scrying:       " << time_collision_scrying << "\n";
-			std::cout << "collision resolution:    " << time_collision_resolution << "\n";
-			std::cout << "map object collisions:   " << time_map_object_collision_handling << "\n";
-			std::cout << "proj. collision scrying: " << time_projectile_collision_scrying << "\n";
-			std::cout << "proj. collision handling:" << time_projectile_collision_resolution << "\n";
-			std::cout << "ranged target finding:   " << time_ranged_target_finding << "\n";
-			std::cout << "melee combat:            " << time_melee_combat << "\n";
-			std::cout << "physics step:            " << time_physics_step << "\n";
-			std::cout << "update target path:      " << time_physics_path << "\n";
-			std::cout << "order advancement:       " << time_physics_order << "\n";
-			std::cout << "soldier movement:        " << time_physics_movement << "\n";
-			std::cout << "movement free path:      " << time_physics_move_freepath << "\n";
-			std::cout << "movement indiv path:     " << time_physics_move_indiv << "\n";
-			std::cout << "movement indiv freepath: " << time_physics_indiv_freepath << "\n";
-			std::cout << "movement indiv findpath: " << time_physics_indiv_findpath << "\n";
-			std::cout << "movement findpath fp:    " << time_physics_indiv_findpath_freepath << "\n";
-			std::cout << "movement step:           " << time_physics_move_step << "\n";
-			std::cout << "movement next order:     " << time_physics_move_nextorder << "\n";
-			std::cout << "projectile hit scanning: " << time_hitscan << "\n";
-			std::cout << "individual path finding: " << time_indiv_pathing << "\n";
-			std::cout << "##################################\n";
-			em->showTimes = true;
-			displayedTime = true;
-		}
+			//std::cout << "expected time:           " << (nticks/1.) / 30. << "\n";
+			//std::cout << "placing units:           " << time_placing_units << "\n";
+			//std::cout << "collision scrying:       " << time_collision_scrying << "\n";
+			//std::cout << "collision resolution:    " << time_collision_resolution << "\n";
+			//std::cout << "map object collisions:   " << time_map_object_collision_handling << "\n";
+			//std::cout << "proj. collision scrying: " << time_projectile_collision_scrying << "\n";
+			//std::cout << "proj. collision handling:" << time_projectile_collision_resolution << "\n";
+			//std::cout << "ranged target finding:   " << time_ranged_target_finding << "\n";
+			//std::cout << "melee combat:            " << time_melee_combat << "\n";
+			//std::cout << "physics step:            " << time_physics_step << "\n";
+			//std::cout << "update target path:      " << time_physics_path << "\n";
+			//std::cout << "order advancement:       " << time_physics_order << "\n";
+			//std::cout << "soldier movement:        " << time_physics_movement << "\n";
+			//std::cout << "movement free path:      " << time_physics_move_freepath << "\n";
+			//std::cout << "movement indiv path:     " << time_physics_move_indiv << "\n";
+			//std::cout << "movement indiv freepath: " << time_physics_indiv_freepath << "\n";
+			//std::cout << "movement indiv findpath: " << time_physics_indiv_findpath << "\n";
+			//std::cout << "movement findpath fp:    " << time_physics_indiv_findpath_freepath << "\n";
+			//std::cout << "movement step:           " << time_physics_move_step << "\n";
+			//std::cout << "movement next order:     " << time_physics_move_nextorder << "\n";
+			//std::cout << "projectile hit scanning: " << time_hitscan << "\n";
+			//std::cout << "individual path finding: " << time_indiv_pathing << "\n";
+			//std::cout << "##################################\n";
+			//em->showTimes = true;
+		//	displayedTime = true;
+		//}
 	}
 }
 
 void Model::GiveOrdersResponse(Event* ev) {
 	switch(state) {
+	case MODEL_GAME_RUNNING: {
+		GiveOrdersRequest* gor = dynamic_cast<GiveOrdersRequest*>(ev);
+		if(!gor->_auto)
+			break;
+	}
 	case MODEL_SIMULATION:
+	case MODEL_GAME_READY_TO_START:
 	case MODEL_GAME_PAUSED: {
 		GiveOrdersRequest* oev = dynamic_cast<GiveOrdersRequest*>(ev);
 		Unit* unit = oev->unit;
@@ -362,6 +391,7 @@ void Model::GiveAllOrdersResponse(Event* ev) {
 void Model::AppendOrdersResponse(Event* ev) {
 	switch(state) {
 	case MODEL_SIMULATION:
+	case MODEL_GAME_READY_TO_START:
 	case MODEL_GAME_PAUSED: {
 		AppendOrdersRequest* oev = dynamic_cast<AppendOrdersRequest*>(ev);
 		Unit* unit = oev->unit;
@@ -410,14 +440,15 @@ void Model::KillResponse(Event* ev) {
 }
 
 void Model::TickResponse() {
-	if(state != MODEL_GAME_PAUSED)
+	if(state != MODEL_GAME_PAUSED && state != MODEL_GAME_READY_TO_START)
 		nticks++;
 
 	// determining if game over
-	auto time = TimeFunction(std::bind(&Model::GameStateCheck, this));
+	GameStateCheck();
+	//auto time = TimeFunction(std::bind(&Model::GameStateCheck, this));
 	//auto time = TimeFunction([&]() {GameStateCheck();});
-	if(state != MODEL_GAME_PAUSED)
-		time_check_game_over += time;
+	//if(state != MODEL_GAME_PAUSED)
+	//	time_check_game_over += time;
 
 
 	switch(state) {
@@ -425,9 +456,10 @@ void Model::TickResponse() {
 	case MODEL_GAME_RUNNING: {
 
 		//placing units
-		time = TimeFunction(std::bind(&Model::PlaceUnits, this));
-		if(state != MODEL_GAME_PAUSED)
-			time_placing_units += time;
+		PlaceUnits();
+		//time = TimeFunction(std::bind(&Model::PlaceUnits, this));
+		//if(state != MODEL_GAME_PAUSED)
+		//	time_placing_units += time;
 
 		//deleting obsolete orders
 		for(auto unit: units) {
@@ -435,91 +467,95 @@ void Model::TickResponse() {
 		}
 
 		//mapping soldiers to grid
-		time = TimeFunction(std::bind(&Model::MapSoldiersToGrid, this));
-		if(state != MODEL_GAME_PAUSED)
-			time_collision_scrying += time;
+		MapSoldiersToGrid();
+		//time = TimeFunction(std::bind(&Model::MapSoldiersToGrid, this));
+		//if(state != MODEL_GAME_PAUSED)
+		//	time_collision_scrying += time;
 
 		//resolving collisions between soldiers and creating enemy neighbourlists
-		auto start = std::chrono::system_clock::now();
+		//auto start = std::chrono::system_clock::now();
 		CollisionResolution(map, &units, &soldiers, &soldier_locks);
-		auto end = std::chrono::system_clock::now();
-		if(state != MODEL_GAME_PAUSED)
-			time_collision_resolution += std::chrono::duration<double>(end - start).count();
+		//auto end = std::chrono::system_clock::now();
+		//if(state != MODEL_GAME_PAUSED)
+		//	time_collision_resolution += std::chrono::duration<double>(end - start).count();
 
 		//resolving collisions with map objects
-		start = std::chrono::system_clock::now();
+		//start = std::chrono::system_clock::now();
 		MapObjectCollisionHandling(map);
-		end = std::chrono::system_clock::now();
-		if(state != MODEL_GAME_PAUSED)
-			time_map_object_collision_handling += std::chrono::duration<double>(end - start).count();
+		//end = std::chrono::system_clock::now();
+		//if(state != MODEL_GAME_PAUSED)
+		//	time_map_object_collision_handling += std::chrono::duration<double>(end - start).count();
 
 		//mapping projectiles to grid
-		start = std::chrono::system_clock::now();
+		//start = std::chrono::system_clock::now();
 		ProjectileCollisionScrying(map, projectiles);
-		end = std::chrono::system_clock::now();
-		if(state != MODEL_GAME_PAUSED)
-			time_projectile_collision_scrying += std::chrono::duration<double>(end - start).count();
+		//end = std::chrono::system_clock::now();
+		//if(state != MODEL_GAME_PAUSED)
+		//	time_projectile_collision_scrying += std::chrono::duration<double>(end - start).count();
 
 		//resolving projectile collisions
-		start = std::chrono::system_clock::now();
+		//start = std::chrono::system_clock::now();
 		ProjectileCollisionHandling(map);
-		end = std::chrono::system_clock::now();
-		if(state != MODEL_GAME_PAUSED)
-			time_projectile_collision_resolution += std::chrono::duration<double>(end - start).count();
+		//end = std::chrono::system_clock::now();
+		//if(state != MODEL_GAME_PAUSED)
+		//	time_projectile_collision_resolution += std::chrono::duration<double>(end - start).count();
 
 		//physics step
-		start = std::chrono::system_clock::now();
+		//start = std::chrono::system_clock::now();
 		int n_units = units.size();
 		#pragma omp parallel for default(shared)
 		for(int n_unit = 0; n_unit < n_units; n_unit++) {
 			Unit* unit = units.at(n_unit);
 			if(unit->placed) {
 				//moving unit target if combat has already started every so often to keep up with moving units
-				auto sub_start = std::chrono::system_clock::now();
+				//auto sub_start = std::chrono::system_clock::now();
 				if(unit->orders.at(unit->currentOrder)->_combat) {
 					unit->UpdateTargetPath(map, em);
 				}
-				auto sub_end = std::chrono::system_clock::now();
-				if(state != MODEL_GAME_PAUSED)
-					time_physics_path += std::chrono::duration<double>(sub_end - sub_start).count();
+				//auto sub_end = std::chrono::system_clock::now();
+				//if(state != MODEL_GAME_PAUSED)
+				//	time_physics_path += std::chrono::duration<double>(sub_end - sub_start).count();
 				//advancing order
-				sub_start = std::chrono::system_clock::now();
+				//sub_start = std::chrono::system_clock::now();
 				if(unit->CurrentOrderCompleted()) {
 					unit->AdvanceOrder(map);
 				}
-				sub_end = std::chrono::system_clock::now();
-				if(state != MODEL_GAME_PAUSED)
-					time_physics_order += std::chrono::duration<double>(sub_end - sub_start).count();
+				//sub_end = std::chrono::system_clock::now();
+				//if(state != MODEL_GAME_PAUSED)
+				//	time_physics_order += std::chrono::duration<double>(sub_end - sub_start).count();
 				//individual movement
-				sub_start = std::chrono::system_clock::now();
-				unit->SoldierMovement(map, dt, &time_physics_move_freepath, &time_physics_move_indiv, 
-					&time_physics_move_step, &time_physics_move_nextorder, &time_physics_indiv_freepath,
-					&time_physics_indiv_findpath, &time_physics_indiv_findpath_freepath);
+				//sub_start = std::chrono::system_clock::now();
+				unit->SoldierMovement(map, dt);//, &time_physics_move_freepath, &time_physics_move_indiv, 
+					//&time_physics_move_step, &time_physics_move_nextorder, &time_physics_indiv_freepath,
+					//&time_physics_indiv_findpath, &time_physics_indiv_findpath_freepath);
 				unit->UpdatePos();
 				unit->UpdateVel();
-				sub_end = std::chrono::system_clock::now();
-				if(state != MODEL_GAME_PAUSED)
-					time_physics_movement += std::chrono::duration<double>(sub_end - sub_start).count();
+				//sub_end = std::chrono::system_clock::now();
+				//if(state != MODEL_GAME_PAUSED)
+				//	time_physics_movement += std::chrono::duration<double>(sub_end - sub_start).count();
 			}
 		}
-		end = std::chrono::system_clock::now();
-		if(state != MODEL_GAME_PAUSED)
-			time_physics_step += std::chrono::duration<double>(end - start).count();
+		//end = std::chrono::system_clock::now();
+		//if(state != MODEL_GAME_PAUSED)
+		//	time_physics_step += std::chrono::duration<double>(end - start).count();
 
 		//ranged target finding
 		RangedTargetFinding();
 
-		time = TimeFunction(std::bind(&Model::MeleeCombat, this));
-		if(state != MODEL_GAME_PAUSED)
-			time_melee_combat += time;
+		MeleeCombat();
+		//time = TimeFunction(std::bind(&Model::MeleeCombat, this));
+		//if(state != MODEL_GAME_PAUSED)
+		//	time_melee_combat += time;
 
-		time = TimeFunction(std::bind(&Model::Shooting, this));
-		if(state != MODEL_GAME_PAUSED)
-			time_ranged_target_finding += time;
+		Shooting();
+		//time = TimeFunction(std::bind(&Model::Shooting, this));
+		//if(state != MODEL_GAME_PAUSED)
+		//	time_ranged_target_finding += time;
 
-		time = TimeFunction(std::bind(&Model::ProjectileHitResolution, this));
-		if(state != MODEL_GAME_PAUSED)
-			time_hitscan += time;
+		ProjectileHitResolution();
+		//time = TimeFunction(std::bind(&Model::ProjectileHitResolution, this));
+		//if(state != MODEL_GAME_PAUSED)
+		//	time_hitscan += time;
 
 		DamageResolution();
 		ProjectileCleanup();

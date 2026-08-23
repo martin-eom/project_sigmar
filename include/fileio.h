@@ -179,7 +179,6 @@ void readMapObjectsFromJSON(json* j, Map* map) {
 void readPathInfoFromJSON(json* j, Map* map) {
 	if((*j).contains("waypoints")) {
 		for(auto jcirc : (*j)["waypoints"]) {
-			debug("Loading waypoint.");
 			Eigen::Vector2d pos; pos << jcirc["pos"][0], jcirc["pos"][1];
 			MapWaypoint* circ = new MapWaypoint(pos, jcirc["rad"]);
 			if(jcirc.contains("auto")) {
@@ -332,6 +331,8 @@ SettingsInformation::SettingsInformation(json input) {
 		map_grids.push_back(size);
 	set_custom_omp_num_threads = input["set_custom_omp_num_threads"];
 	custom_omp_num_threads = input["custom_omp_num_threads"];
+	player1_type = Player::playerTypeDict[input["player1_type"]];
+	player2_type = Player::playerTypeDict[input["player2_type"]];
 }
 
 MapEditorSettingsInformation::MapEditorSettingsInformation(json input) {
@@ -339,7 +340,7 @@ MapEditorSettingsInformation::MapEditorSettingsInformation(json input) {
 	if(custom_background)
 		backgroundInfo = AnimationInformation(input["background_animation"]);
 }
-void Model::loadSoldierTypes(std::string filename) {
+void Model::LoadSoldierTypes(std::string filename) {
 	json input = fromFile(filename);
 	for(auto entry : input) {
 		SoldierInformation info = SoldierInformation(entry);
@@ -347,7 +348,7 @@ void Model::loadSoldierTypes(std::string filename) {
 	}
 }
 
-void Model::loadUnitTypes(std::string filename) {
+void Model::LoadUnitTypes(std::string filename) {
 	json input = fromFile(filename);
 	for(auto entry : input) {
 		UnitInformation info = UnitInformation(entry);
@@ -355,7 +356,7 @@ void Model::loadUnitTypes(std::string filename) {
 	}
 }
 
-void Model::loadArmyLists(std::string filename) {
+void Model::LoadArmyLists(std::string filename) {
 	json input = fromFile(filename);
 	int nplayer = 0;
 	for(auto entry : input) {
@@ -381,18 +382,21 @@ void Model::loadArmyLists(std::string filename) {
 	unsigned seed = std::chrono::system_clock::now().time_since_epoch().count();
 	auto rng = std::default_random_engine(seed);
 	std::ranges::shuffle(soldiers,  rng);
+	for(auto ai : simpleAIs) {
+		ai->InitTargets();
+	}
 }
 
-void Model::loadDamageInfo() {
+void Model::LoadDamageInfo() {
 	json input = fromFile("config/templates/damage_tick.json");
 	damageInfo = AnimationInformation(input);
 }
 
-void Model::loadSettings(std::string filename) {
+void Model::LoadSettings(std::string filename) {
 	json input = fromFile(filename);
 	settings = SettingsInformation(input);
 	if(settings.simulation_mode) state = MODEL_SIMULATION;
-	else state = MODEL_GAME_PAUSED;
+	else state = MODEL_GAME_READY_TO_START;
 	toNextState.set_max(settings.turn_duration);
 }
 

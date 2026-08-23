@@ -32,6 +32,7 @@ enum EVENT_IDS {
 	CTRL_STATE_EVENT,
 	INPUT_RECEIVED_EVENT,
 	CHANGE_TEXTBOX_EVENT,
+	//GAME_START_EVENT,
 	GAME_PAUSED_EVENT,
 	CONTINUE_GAME_EVENT,
 	PROJECTILE_SPAWN_EVENT
@@ -103,12 +104,14 @@ class GiveOrdersRequest : public Event {
 	public:
 		Unit* unit;
 		std::vector<Order*> orders;
+		bool _auto = false; // true if request comes from pathfinding while the game is running instead of from input while game is paused
 
-		GiveOrdersRequest(Unit* unit, std::vector<Order*> orders) : Event(){
+		GiveOrdersRequest(Unit* unit, std::vector<Order*> orders, bool _auto = false) : Event(){
 			name = "GiveOrdersRequest";
 			type = GIVE_ORDERS_REQUEST;
 			this->unit = unit;
 			this->orders = orders;
+			this->_auto = _auto;
 		}
 };
 
@@ -182,7 +185,7 @@ class UnitPlaceRequest : public Event {
 };
 
 class Soldier;
-class Unit;
+//class Unit;
 
 class KillEvent : public Event {
 	public:
@@ -291,6 +294,14 @@ public:
 	}
 };
 
+/*class GameStartEvent : public Event {
+public:
+	GameStartEvent() : Event() {
+		name = "GameStartEvent";
+		type = GAME_PAUSED_EVENT;
+	}
+};*/
+
 class GamePausedEvent : public Event {
 public:
 	GamePausedEvent() : Event() {
@@ -319,5 +330,6 @@ public:
 		this->p = p;
 	}
 };
+
 
 #endif
