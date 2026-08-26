@@ -11,7 +11,7 @@
 #include <stdio.h>
 #include <iostream>
 #include <SDL.h>
-#include <Dense>
+#include <Eigen/Dense>
 #include <cmath>
 #include <string.h>
 
@@ -101,10 +101,10 @@ private:
 			RememberOrders* rem = dynamic_cast<RememberOrders*>(ev);
 			orders = rem->orders; }
 			break;
-		case SDL_EVENT:
+		case SDL_EVENT: {
 			SDL_Event e = dynamic_cast<SDLEvent*>(ev)->event;
 			handleSDLEvent(e, gem, model, view, map);
-			break;
+			break; }
 		case GAME_PAUSED_EVENT:
 			selectedPlayer = model->currentPlayer;
 			//if(!selectedPlayer) SetPlayer();
@@ -118,7 +118,7 @@ private:
 			newOrderList(selectedPlayer);
 			SetUnit();
 			break;
-		case TICK_EVENT:
+		case TICK_EVENT: {
 			double oldZoom = zoom;
 			zoom = zoom * std::pow(maxZoom, em->dt/1*(zoomSpeedIn - zoomSpeedOut));
 			if(zoom < minZoom) zoom = minZoom;
@@ -137,7 +137,7 @@ private:
 			if(y > ymax) y = ymax;
 			newCenter << x, y;
 			center = newCenter;
-			break;
+			break; }
 		}
 	}
 };

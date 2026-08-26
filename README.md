@@ -33,18 +33,39 @@ At the moment the game runs at its smooth 30fps with over 2000 soldiers on an AM
 * ai to play against
 
 ## Requirements
-* C++20
-* Eigen3 library
-* SDL2 library
-* SDL_ttf library
-* OpenMP library
+* CMake 3.21+
+* A C++20 compiler (GCC/Clang on Linux; MinGW-w64 for cross-compiling the Windows build from Linux)
+* [vcpkg](https://github.com/microsoft/vcpkg) in manifest mode. Set the `VCPKG_ROOT` environment variable to your vcpkg checkout.
+* An OpenMP-capable compiler/runtime (resolved separately via `find_package(OpenMP)`, not through vcpkg)
+* [NSIS](https://nsis.sourceforge.io/) (`makensis`), only needed if you want to build the Windows installer
 ## Compilation
-### Linux
-The code is written for a graphics apllication on Windows. Subsequently there is the usage of *Windows.h* to create a console window to display debug messages.
-The rest of the code should be platform independent. When compiling on Linux remember to remove the lines responsible for the console window in *server.cpp*.
-All header files are in the *include* folder, so make sure to include this folder when compiling.
-Additionally you might have to alter the include statements for SDL2 (*SDL.h*) and Eigen3 (*Dense*) to something like *SDL2/SDL.h* and *Eigen/Dense* in all files depending on your setup of the libraries.
-### Windows
-For installation on Windows an installer will be included in all releases starting with cdev0.2. The map editor, game and *maps* folder have to be within the same installation folder, because the map editor will save to *maps* and both programs will load from *maps*. It is not recommended to install into *Program Files*, because then the map editor would require administrator rights to be able to write into the *maps* folder.
+The project builds via CMake.
+
+### Linux (untested)
+```
+export VCPKG_ROOT=/path/to/vcpkg
+cmake --preset linux-release
+cmake --build --preset linux-release
+```
+
+### Windows (cross-compiled from Linux)
+Windows binaries are produced by cross-compiling with MinGW-w64:
+```
+export VCPKG_ROOT=/path/to/vcpkg
+cmake --preset mingw-release
+cmake --build --preset mingw-release
+```
+*(Building natively on Windows with MSVC via Visual Studio or VS Code should also work unmodified against the same `CMakePresets.json`/`vcpkg.json`, but only the MinGW cross-compile route above has been tested.)*
+
+The game and map editor have to be run in the directory that has `maps/`, `config/`, `textures/`, and `VeraMono.ttf`.
+
+
+### Packaging
+[CPack](https://cmake.org/cmake/help/latest/module/CPack.html) turns either build into a distributable bundle:
+```
+cd build/mingw-release && cpack -G NSIS   # Windows installer (.exe)
+cd build/linux-release && cpack -G TGZ    # Linux archive (.tar.gz)
+```
+
 ## Controls
 For both the map editor and game the controls being shown on screen can be toggled by pressing h.

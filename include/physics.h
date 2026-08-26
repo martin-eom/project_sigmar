@@ -13,7 +13,7 @@
 #define _USE_MATH_DEFINES
 #endif
 
-#include <Dense>
+#include <Eigen/Dense>
 #include <cmath>
 #include <deque>
 #include <omp.h>

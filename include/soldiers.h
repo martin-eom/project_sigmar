@@ -12,7 +12,7 @@
 #endif
 
 #include <cmath>
-#include <Dense>
+#include <Eigen/Dense>
 #include <ostream>
 #include <queue>
 #include <cstdlib>

@@ -1,0 +1,24 @@
+build/
+vcpkg_installed/
+out/
+.vs/
+CMakeUserPresets.json
+
+# Local dev/test maps, not part of the shipped installer content (see
+# CMakeLists.txt's install(FILES maps/...) list for the tracked set).
+maps/bigmap.json
+maps/borders.json
+maps/debug.json
+maps/deployment_test_map.json
+maps/desert.json
+maps/flat.json
+maps/flattest.json
+maps/followtest.json
+maps/highflat.json
+maps/path1.json
+maps/smallflat.json
+maps/test.json
+maps/testmap2.json
+maps/testmap_big.json
+maps/testmapb.json
+maps/triangles.json

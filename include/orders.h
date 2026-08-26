@@ -4,7 +4,7 @@
 #include <base.h>
 #include <extra_math.h>
 
-#include <Dense>
+#include <Eigen/Dense>
 
 enum ORDER_TYPES{
 	ORDER_ORDER,

@@ -4,7 +4,7 @@
 
 #include <list>
 #include <string>
-#include <Dense>
+#include <Eigen/Dense>
 #include <SDL.h>
 #include <vector>
 

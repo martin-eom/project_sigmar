@@ -1,7 +1,8 @@
 #define _CRT_SECURE_NO_WARNINGS
+#ifdef _WIN32
 #define NOMINMAX
-
-#include <Windows.h>
+#include <windows.h>
+#endif
 
 #include <map.h>
 #include <pathfinding.h>
@@ -99,9 +100,11 @@ bool Isdouble(std::string text) {
 }
 
 int main(int argc, char* argv[1]) {
+#ifdef _WIN32
 	AllocConsole();
 	freopen("CONOUT$", "w", stdout);
 	freopen("CONOUT$", "w", stderr);
+#endif
 
 	// Initializing SDL
 	if(SDL_Init(SDL_INIT_VIDEO) != 0) {

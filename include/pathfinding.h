@@ -3,7 +3,7 @@
 
 #include <map.h>
 #include <model.h>
-#include <Dense>
+#include <Eigen/Dense>
 
 
 enum TILEWALKER_DIRECTION {

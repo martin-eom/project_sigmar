@@ -11,7 +11,7 @@
 #include <iostream>
 #include <vector>
 #include <algorithm>
-#include <Dense>
+#include <Eigen/Dense>
 
 enum MAP_OBJECT_TYPES {
 	MAP_NONE,
@@ -107,7 +107,7 @@ public:
 
 class Map {
 public:
-	const static int optimalTileSize = 31;
+	static constexpr int optimalTileSize = 31;
 	int width;
 	int height;
 	std::vector<grid_container*> grids;

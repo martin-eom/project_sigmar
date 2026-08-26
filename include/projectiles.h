@@ -4,7 +4,7 @@
 #include <events.h>
 #include <extra_math.h>
 #include <timer.h>
-#include <Dense>
+#include <Eigen/Dense>
 
 enum PROJECTILE_TYPES {
 	PROJECTILE_GENERIC,

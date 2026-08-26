@@ -5,6 +5,7 @@
 #include <model.h>
 #include <view.h>
 #include <information.h>
+#include <simple_ai.h>
 
 #include <json.hpp>
 #include <iostream>

@@ -29,6 +29,6 @@
 	"map_grids": [16,32],
 	"set_custom_omp_num_threads": false,
 	"custom_omp_num_threads": 1,
-	"player1_type": "simpleai",
+	"player1_type": "local",
 	"player2_type": "simpleai"
 }

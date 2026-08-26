@@ -1,9 +1,6 @@
+#ifdef _WIN32
 #define NOMINMAX
-
-#include <Windows.h>
-
-#ifndef EIGEN_DONT_PARALLELIZE
-#define EIGEN_DONT_PARALLELIZE
+#include <windows.h>
 #endif
 
 #include <server.h>
@@ -100,9 +97,11 @@ void ResetTextbox(std::string text, bool input) {
 
 
 int main(int argc, char* argv[1]) {
+#ifdef _WIN32
 	AllocConsole();
 	freopen("CONOUT$", "w", stdout);
 	freopen("CONOUT$", "w", stderr);
+#endif
 
 	// Initializing SDL
 	if(SDL_Init(SDL_INIT_EVERYTHING) != 0) {
