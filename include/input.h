@@ -116,7 +116,10 @@ private:
 				);
 			}*/
 			newOrderList(selectedPlayer);
-			SetUnit();
+			if(selectedPlayer->type == PLAYER_SIMPLEAI)
+				selectedUnit = NULL;
+			else
+				SetUnit();
 			break;
 		case TICK_EVENT: {
 			double oldZoom = zoom;

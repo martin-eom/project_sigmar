@@ -338,10 +338,16 @@ void Model::GiveOrdersResponse(Event* ev) {
 				// deleting all future orders as well as the current one
 				while(unit->orders.size() > unit->currentOrder) unit->orders.pop_back();
 				// setting a new current order to the current unit position as starting point for the pathfinding calculation
+				Eigen::Matrix2d transitionRot = unit->rot;
+				if(!oev->orders.empty()) {
+					Eigen::Vector2d dir = oev->orders.at(0)->pos - unit->pos;
+					if(dir.norm() > 1e-6)
+						transitionRot = Rotation(Angle(dir.y() / dir.norm(), dir.x() / dir.norm()));
+				}
 				if(!oev->orders.empty() && oev->orders.at(0)->type == ORDER_ATTACK)
-					unit->orders.push_back(new MoveOrder(unit->pos, unit->rot, MOVE_PASSINGTHROUGH, true, false, oev->orders.at(0)->target));
+					unit->orders.push_back(new MoveOrder(unit->pos, transitionRot, MOVE_PASSINGTHROUGH, true, false, oev->orders.at(0)->target));
 				else
-					unit->orders.push_back(new MoveOrder(unit->pos, unit->rot, MOVE_PASSINGTHROUGH, true, false));
+					unit->orders.push_back(new MoveOrder(unit->pos, transitionRot, MOVE_PASSINGTHROUGH, true, false));
 			}
 			// appending the new orders
 			for(auto order : oev->orders) {

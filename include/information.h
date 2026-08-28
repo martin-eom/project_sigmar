@@ -113,6 +113,7 @@ public:
 	bool custom_background;
 	AnimationInformation backgroundInfo;
 	bool show_map_object_outlines;
+	bool show_all_unit_orders;
 	int turn_duration;
 	bool simulation_mode;
 	double base_melee_attack;

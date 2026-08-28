@@ -317,6 +317,7 @@ SettingsInformation::SettingsInformation(json input) {
 	if(custom_background)
 		backgroundInfo = AnimationInformation(input["background_animation"]);
 	show_map_object_outlines = input["show_map_object_outlines"];
+	show_all_unit_orders = input["show_all_unit_orders"];
 	turn_duration = input["turn_duration"];
 	simulation_mode = input["simulation_mode"];
 	base_melee_attack = input["base_melee_attack"];

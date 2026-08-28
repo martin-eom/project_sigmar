@@ -15,6 +15,7 @@
 		"ticks_per_frame" : 1000
 	},
 	"show_map_object_outlines": true,
+	"show_all_unit_orders": false,
 	"turn_duration": 300,
 	"simulation_mode": false,
 	"base_melee_attack": 0.35,

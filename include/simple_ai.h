@@ -151,7 +151,7 @@ void SimpleAI::GiveOrders() {
 								break;
 							}
 						}*/
-						Unit* targetInRange = canShootSomethingFromOrder(unit->pos, unit, model->player1, model->map);
+						Unit* targetInRange = canShootSomethingFromOrder(unit->pos, unit, Opponent(), model->map);
 						if(targetInRange) {
 							Eigen::Vector2d path = targetInRange->pos - unit->pos;
 							double sin = path.y() / path.norm();
@@ -161,7 +161,7 @@ void SimpleAI::GiveOrders() {
 						}
 						else if(unit->orders.empty() 
 							|| unit->CurrentOrderCompleted()
-							|| !canShootSomethingFromOrder(unit->orders.at(unit->currentOrder)->pos, unit, model->player1, model->map)) {
+							|| !canShootSomethingFromOrder(unit->orders.at(unit->currentOrder)->pos, unit, Opponent(), model->map)) {
 							//Unit* target = targets.at(unitNum);
 							//int unit_index = RNG::uniformInt(0, opponent->units.size() - 1);
 							//target = opponent->units.at(unit_index);
@@ -200,10 +200,10 @@ void SimpleAI::GiveOrders() {
 				orders.push_back(new MoveOrder(unit->pos, unit->rot, MOVE_PASSINGTHROUGH));
 			}
 		}
-		else
-			gameStarted = true;
 		orderList.push_back(orders);
 	}
+	if(!gameStarted)
+		gameStarted = true;
 	GiveAllOrdersRequest gaor = GiveAllOrdersRequest(player, orderList);
 	em->Post(&gaor);
 	ContinueGameEvent cge;
@@ -231,7 +231,7 @@ void SimpleAI::GivePlaceOrder(Unit* unit, std::vector<Order*>* orders) {
 void SimpleAI::ValidateOldTarget(int unitNum) {
 	if(targets.at(unitNum)) {
 		if(targets.at(unitNum)->nLiveSoldiers <= 0)
-			targets.at(unitNum = NULL);
+			targets.at(unitNum) = NULL;
 	}
 }
 
@@ -242,7 +242,7 @@ void SimpleAI::FindNewTarget(Unit* unit, int unitNum) {
 	else {
 		std::vector<TargetContainer> possibleTargets;
 		for(auto enemyUnit : Opponent()->units) {
-			if(unit->nLiveSoldiers > 0)
+			if(enemyUnit->nLiveSoldiers > 0)
 				possibleTargets.push_back(TargetContainer(enemyUnit, (enemyUnit->pos - unit->pos).norm()));
 		}
 		std::sort(possibleTargets.begin(), possibleTargets.end());
@@ -261,7 +261,7 @@ void SimpleAI::GiveOrderToTarget(Unit* unit, int unitNum, std::vector<Order*>* o
 	else {
 		// if no ranged target, but some target in range and los: move order to stop and shoot them
 		if(!unit->rangedTarget) {
-			Unit* targetInRange = canShootSomethingFromOrder(unit->pos, unit, model->player1, model->map);
+			Unit* targetInRange = canShootSomethingFromOrder(unit->pos, unit, Opponent(), model->map);
 			if(targetInRange) {
 				Eigen::Vector2d path = targetInRange->pos - unit->pos;
 				double sin = path.y() / path.norm();
@@ -271,7 +271,7 @@ void SimpleAI::GiveOrderToTarget(Unit* unit, int unitNum, std::vector<Order*>* o
 			}
 			else if(unit->orders.empty() 
 				|| unit->CurrentOrderCompleted()
-				|| !canShootSomethingFromOrder(unit->orders.at(unit->currentOrder)->pos, unit, model->player1, model->map)) {
+				|| !canShootSomethingFromOrder(unit->orders.at(unit->currentOrder)->pos, unit, Opponent(), model->map)) {
 				bool validShootingPosition = false;
 				Eigen::Vector2d shootingPos;
 				Eigen::Matrix2d rot = Eigen::Matrix2d::Identity();

@@ -522,40 +522,45 @@ void View::drawCurrentOrders(KeyboardAndMouseController* ctrl, Model* model, Uni
 			}
 		}
 						
-		if(ctrl->selectedUnit) {
-			if(ctrl->selectedUnit == unit) {
-				// draw unit order path
-				DrawUnitArrow(unit->posTarget, unit->rotTarget, renderer, colorGreen, SCREEN_WIDTH, SCREEN_HEIGHT, ctrl->zoom, ctrl->center);
-				debug(std::to_string(unit->orders.size()));
-				for(int i = 0; i < unit->orders.size(); i++) {
-					Order* o = unit->orders.at(i);
-					if(o->type == ORDER_MOVE) {
-						Rrectangle rec = UnitRectangle(unit, i);
-						DrawPolygon(&rec, renderer, colorGreen, SCREEN_WIDTH, SCREEN_HEIGHT, ctrl->zoom, ctrl->center);
-					}
-					else if(o->type == ORDER_ATTACK) {
-						AttackOrder* ao = dynamic_cast<AttackOrder*>(o);
-						Rrectangle rec = UnitRectangle(ao->target, ao->target->currentOrder);
-						DrawPolygon(&rec, renderer, colorOrange, SCREEN_WIDTH, SCREEN_HEIGHT, ctrl->zoom, ctrl->center);
-					}
-					else if(o->type == ORDER_TARGET) {
-						TargetOrder* to = dynamic_cast<TargetOrder*>(o);
-						Rrectangle rec = UnitRectangle(to->target, to->target->currentOrder);
-						DrawPolygon(&rec, renderer, colorOrange, SCREEN_WIDTH, SCREEN_HEIGHT, ctrl->zoom, ctrl->center);
-					}
-					if(i == 0 && unit->placed) {
-						Point p1(o->pos); Point p2(unit->pos);
-						DrawLine(&p1, &p2, renderer, colorGreen, SCREEN_WIDTH, SCREEN_HEIGHT, ctrl->zoom, ctrl->center);
-					}
-					if(i > 0) {
-						Order* prevo = unit->orders.at(i-1);
-						Point p1(o->pos); Point p2(prevo->pos);
-						DrawLine(&p1, &p2, renderer, colorGreen, SCREEN_WIDTH, SCREEN_HEIGHT, ctrl->zoom, ctrl->center);
-					}
-					debug("this loop might be infinite");
+		bool isSelected = (ctrl->selectedUnit == unit);
+		bool showAllOrders = model->settings.show_all_unit_orders;
+		if(isSelected || showAllOrders) {
+			// selected unit keeps the highlight green; with show_all_unit_orders every other
+			// unit's order path is drawn too, colored by owning player instead
+			Color* drawColor = colorGreen;
+			if(!isSelected)
+				drawColor = (unit->player == model->player1) ? colorBlue : colorRed;
+			// draw unit order path
+			DrawUnitArrow(unit->posTarget, unit->rotTarget, renderer, drawColor, SCREEN_WIDTH, SCREEN_HEIGHT, ctrl->zoom, ctrl->center);
+			debug(std::to_string(unit->orders.size()));
+			for(int i = 0; i < unit->orders.size(); i++) {
+				Order* o = unit->orders.at(i);
+				if(o->type == ORDER_MOVE) {
+					Rrectangle rec = UnitRectangle(unit, i);
+					DrawPolygon(&rec, renderer, drawColor, SCREEN_WIDTH, SCREEN_HEIGHT, ctrl->zoom, ctrl->center);
 				}
-				debug("or not");
+				else if(o->type == ORDER_ATTACK) {
+					AttackOrder* ao = dynamic_cast<AttackOrder*>(o);
+					Rrectangle rec = UnitRectangle(ao->target, ao->target->currentOrder);
+					DrawPolygon(&rec, renderer, colorOrange, SCREEN_WIDTH, SCREEN_HEIGHT, ctrl->zoom, ctrl->center);
+				}
+				else if(o->type == ORDER_TARGET) {
+					TargetOrder* to = dynamic_cast<TargetOrder*>(o);
+					Rrectangle rec = UnitRectangle(to->target, to->target->currentOrder);
+					DrawPolygon(&rec, renderer, colorOrange, SCREEN_WIDTH, SCREEN_HEIGHT, ctrl->zoom, ctrl->center);
+				}
+				if(i == 0 && unit->placed) {
+					Point p1(o->pos); Point p2(unit->pos);
+					DrawLine(&p1, &p2, renderer, drawColor, SCREEN_WIDTH, SCREEN_HEIGHT, ctrl->zoom, ctrl->center);
+				}
+				if(i > 0) {
+					Order* prevo = unit->orders.at(i-1);
+					Point p1(o->pos); Point p2(prevo->pos);
+					DrawLine(&p1, &p2, renderer, drawColor, SCREEN_WIDTH, SCREEN_HEIGHT, ctrl->zoom, ctrl->center);
+				}
+				debug("this loop might be infinite");
 			}
+			debug("or not");
 		}
 						
 	}
