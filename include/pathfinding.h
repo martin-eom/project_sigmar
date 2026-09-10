@@ -220,10 +220,11 @@ void TileWalker::SetStartPoint() {
 }
 
 gridpiece* TileWalker::Next() {
-	walkedTiles.push_back(current);
 	//std::cout << "direction: " << direction << ", step: " << cnt << ", lbound: " << lower_bound << ", ubound:" << upper_bound << ", ind: " << current_ind << ", path: " << path << "\n";
-	if(!_dontShow)
+	if(!_dontShow) {
+		walkedTiles.push_back(current);
 		std::cout << direction << " " << path << " " << current_ind << " " << end_path << " " << end_ind << "\n";
+	}
 	//std::cout << "if nothing disrupts the previous message we are stuck!\n";
 	if(current_ind == end_ind && path == end_path) {
 		current = NULL;
@@ -287,15 +288,15 @@ gridpiece* TileWalker::Next() {
 		switch(direction) {
 		case TW_WIDE_UP:
 		case TW_WIDE_DOWN:
-			if(current_ind < 0 || current_ind > grid->nrows || path < 0 || path > grid->ncols)
-				current = end;
+			if(current_ind < 0 || current_ind >= grid->nrows || path < 0 || path >= grid->ncols)
+				current = NULL;
 			else
 				current = grid->grid.at(current_ind).at(path);
 			break;
 		case TW_TALL_UP:
 		case TW_TALL_DOWN:
-			if(path < 0 || path > grid->nrows || current_ind < 0 || current_ind > grid->ncols)
-				current = end;
+			if(path < 0 || path >= grid->nrows || current_ind < 0 || current_ind >= grid->ncols)
+				current = NULL;
 			else
 				current = grid->grid.at(path).at(current_ind);
 			break;
