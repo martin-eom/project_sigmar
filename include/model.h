@@ -126,6 +126,8 @@ class Model : public Listener{
 			dt = &(em->dt);
 			state = MODEL_SIMULATION;
 		}
+
+		~Model();	// defined in model_functions.h
 	
 	private:
 		virtual void Notify(Event* ev);
@@ -345,15 +347,15 @@ void Model::GiveOrdersResponse(Event* ev) {
 						transitionRot = Rotation(Angle(dir.y() / dir.norm(), dir.x() / dir.norm()));
 				}
 				if(!oev->orders.empty() && oev->orders.at(0)->type == ORDER_ATTACK)
-					unit->orders.push_back(new MoveOrder(unit->pos, transitionRot, MOVE_PASSINGTHROUGH, true, false, oev->orders.at(0)->target));
+					unit->orders.push_back(std::make_shared<MoveOrder>(unit->pos, transitionRot, MOVE_PASSINGTHROUGH, true, false, oev->orders.at(0)->target));
 				else
-					unit->orders.push_back(new MoveOrder(unit->pos, transitionRot, MOVE_PASSINGTHROUGH, true, false));
+					unit->orders.push_back(std::make_shared<MoveOrder>(unit->pos, transitionRot, MOVE_PASSINGTHROUGH, true, false));
 			}
 			// appending the new orders
-			for(auto order : oev->orders) {
+			for(const auto& order : oev->orders) {
 				if(order->type == ORDER_ATTACK) {
 					order->setCombat();
-					Unit* target = dynamic_cast<AttackOrder*>(order)->target;
+					Unit* target = dynamic_cast<AttackOrder*>(order.get())->target;
 					order->pos = target->pos;
 				}
 				unit->orders.push_back(order);
@@ -361,7 +363,7 @@ void Model::GiveOrdersResponse(Event* ev) {
 
 			// preparing unplaced units
 			if(!unit->placed) unit->currentOrder = 0;
-			Order* o = unit->orders.at(unit->currentOrder);
+			Order* o = unit->orders.at(unit->currentOrder).get();
 			for(auto row : unit->soldiers) {
 				for(auto soldier : row) {
 					if(soldier->placed && soldier->alive) {
@@ -386,7 +388,7 @@ void Model::GiveOrdersResponse(Event* ev) {
 void Model::GiveAllOrdersResponse(Event* ev) {
 	GiveAllOrdersRequest* gaor = dynamic_cast<GiveAllOrdersRequest*>(ev);
 	for(int n_unit = 0; n_unit < gaor->orderList.size(); n_unit++) {
-		std::vector<Order*> orders = gaor->orderList.at(n_unit);
+		std::vector<OrderPtr> orders = gaor->orderList.at(n_unit);
 		if(orders.size() > 0) {
 			GiveOrdersRequest gor = GiveOrdersRequest(gaor->player->units.at(n_unit), orders);
 			em->Post(&gor);
@@ -402,9 +404,9 @@ void Model::AppendOrdersResponse(Event* ev) {
 		AppendOrdersRequest* oev = dynamic_cast<AppendOrdersRequest*>(ev);
 		Unit* unit = oev->unit;
 		if(unit) {
-			for(auto order : oev->orders) {
+			for(const auto& order : oev->orders) {
 				if(order->type == ORDER_ATTACK) {
-					Unit* target = dynamic_cast<AttackOrder*>(order)->target;
+					Unit* target = dynamic_cast<AttackOrder*>(order.get())->target;
 					order->pos = target->pos;
 				}
 				unit->orders.push_back(order);

@@ -30,6 +30,9 @@ class Player {
 			this->type = type;
 		};
 
+		// Defined in unit_functions.h.
+		~Player();
+
 		int getUnitID(Unit* unit) {
 			return std::find(units.begin(), units.end(), unit) - units.begin();
 		}

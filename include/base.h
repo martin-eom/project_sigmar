@@ -35,6 +35,7 @@ class EventManager {
 			this->fps = fps;
 			dt = 1./fps;
 		}
+		virtual ~EventManager() = default;
 				
 		void RegisterListener(Listener* listener) {
 			listeners.push_back(listener);
@@ -58,7 +59,11 @@ class Listener {
 			this->em = em;
 			em->RegisterListener(this);
 		}
-		
+
+		virtual ~Listener() {
+			if(em) em->UnregisterListener(this);
+		}
+
 		virtual void Notify(Event* ev){}
 };
 

@@ -40,8 +40,8 @@ private:
 	void SetPlayer();
 	void SetUnit();
 public:
-	std::vector<Order*> orders;
-	std::vector<std::vector<Order*>> orderList;
+	std::vector<OrderPtr> orders;
+	std::vector<std::vector<OrderPtr>> orderList;
 	Eigen::Vector2d p0, p1;
 	Eigen::Matrix2d rot;
 	bool passingThrough;
@@ -168,7 +168,7 @@ void KeyboardAndMouseController::SetUnit() {
 void KeyboardAndMouseController::newOrderList(Player* player) {
 	orderList.clear();
 	for(auto unit: player->units) {
-		orderList.push_back(std::vector<Order*>());
+		orderList.push_back(std::vector<OrderPtr>());
 	}
 }
 
@@ -197,7 +197,7 @@ void KeyboardAndMouseController::handleMouseKeyUpEvent(SDL_Event e, GameEventMan
 	y = mousePos.coeff(1);
 	switch(_state) {
 	case CTRL_GIVING_ORDERS: {
-		Order* o = NULL;
+		OrderPtr o;
 		if(e.button.button == SDL_BUTTON_RIGHT) {
 			if(firstPointSet) {
 				p1 << x, y;
@@ -208,9 +208,9 @@ void KeyboardAndMouseController::handleMouseKeyUpEvent(SDL_Event e, GameEventMan
 					double cos = dx / dp;
 					double sin = dy / dp;
 					rot << cos, -sin, sin, cos;
-					MoveOrder* mo = new MoveOrder(p0, rot, MOVE_FORMUP);
-					o = new MoveOrder(p0, rot, MOVE_FORMUP);
-					if(passingThrough) {mo->moveType = MOVE_PASSINGTHROUGH; dynamic_cast<MoveOrder*>(o)->moveType = MOVE_PASSINGTHROUGH;}
+					auto mo = std::make_shared<MoveOrder>(p0, rot, MOVE_FORMUP);
+					if(passingThrough) mo->moveType = MOVE_PASSINGTHROUGH;
+					o = mo;
 				}
 				else {
 					std::cout << "First and second point are identical, can't get angle.\n";
@@ -253,10 +253,10 @@ void KeyboardAndMouseController::handleMouseKeyUpEvent(SDL_Event e, GameEventMan
 						pos = selectedUnit->pos;
 						rot = selectedUnit->rot;
 					}
-					o = new TargetOrder(pos, rot, target);
+					o = std::make_shared<TargetOrder>(pos, rot, target);
 				}*/
 				else {
-					o = new AttackOrder(target, target->pos);
+					o = std::make_shared<AttackOrder>(target, target->pos);
 				}
 			}
 		}
@@ -324,7 +324,7 @@ void KeyboardAndMouseController::handleKeyDownEvent(SDL_Event e, GameEventManage
 }
 
 void KeyboardAndMouseController::handleKeyUpEvent(SDL_Event e, GameEventManager* gem, Model* model, GeneralView* view, Map* map) {
-	Event* nev = new Event();
+	Event* nev = NULL;
 	switch(e.key.keysym.sym) {
 	case SDLK_RETURN:
 		debug(std::to_string(_state));
@@ -335,18 +335,18 @@ void KeyboardAndMouseController::handleKeyUpEvent(SDL_Event e, GameEventManager*
 			if(selectedUnit) {
 				if(orders.size() > 0) {
 					for(int i = 0; i < orders.size(); i++) {
-						Order* o = orders.at(i);
+						OrderPtr o = orders.at(i);
 						if(selectedUnit->primaryRanged && o->type == ORDER_ATTACK) {
 							Eigen::Vector2d newPos; Eigen::Matrix2d newRot;
 							if(i == 0) {
 								newPos = selectedUnit->orders.at(selectedUnit->currentOrder)->pos;
 								newRot = selectedUnit->orders.at(selectedUnit->currentOrder)->rot;
-								orders.at(i) = new TargetOrder(newPos, newRot, dynamic_cast<AttackOrder*>(o)->target);
+								orders.at(i) = std::make_shared<TargetOrder>(newPos, newRot, dynamic_cast<AttackOrder*>(o.get())->target);
 							}
 							else {
 								newPos = orders.at(i-1)->pos;
 								newRot = orders.at(i-1)->rot;
-								orders.at(i) = new TargetOrder(newPos, newRot, dynamic_cast<AttackOrder*>(o)->target);
+								orders.at(i) = std::make_shared<TargetOrder>(newPos, newRot, dynamic_cast<AttackOrder*>(o.get())->target);
 							}
 						}
 					}
@@ -603,9 +603,9 @@ void KeyboardAndMouseController::handleKeyUpEvent(SDL_Event e, GameEventManager*
 			break;
 		}
 	}
-	if(nev->type != GENERIC_EVENT) {
+	if(nev) {
 		em->Post(nev);
-		delete(nev);
+		delete nev;
 	}
 }
 

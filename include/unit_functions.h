@@ -11,7 +11,7 @@
 
 bool Unit::CurrentOrderCompleted() {
 	if(placed) {
-		Order* currentOrder = orders.at(this->currentOrder);
+		Order* currentOrder = orders.at(this->currentOrder).get();
 		switch(currentOrder->type) {
 		case ORDER_ATTACK:
 			return (dynamic_cast<AttackOrder*>(currentOrder)->target->nLiveSoldiers) <= 0; break;
@@ -46,8 +46,8 @@ void Unit::AdvanceOrder(Map* map) {
 }
 
 void Unit::NextOrder(Map* map) {
-	Order* o = orders.at(currentOrder);
-	Order* no = orders.at(currentOrder + 1);
+	Order* o = orders.at(currentOrder).get();
+	Order* no = orders.at(currentOrder + 1).get();
 	//bool needsPathFinding = false;
 	if(!(o->_transition) && !(no->_transition))
 		NextOrderPathfinding(o, no, map);
@@ -55,7 +55,7 @@ void Unit::NextOrder(Map* map) {
 	currentOrder++;
 	nSoldiersArrived = 0;
 
-	//Order* no = orders.at(currentOrder);
+	//Order* no = orders.at(currentOrder).get();
 	if(o->type == ORDER_ATTACK) {
 		//std::erase(dynamic_cast<AttackOrder*>(o)->target->targetedBy, this);
 		if(!no->target || (no->type == ORDER_ATTACK && no->target != o->target))
@@ -63,8 +63,28 @@ void Unit::NextOrder(Map* map) {
 	}
 }
 
+Unit::~Unit() {
+	for(auto row : soldiers) {
+		for(auto soldier : row) {
+			delete soldier;
+		}
+	}
+	soldiers.clear();
+	liveSoldiers.clear();
+
+	// Orders use shared_ptr
+	orders.clear();
+}
+
+Player::~Player() {
+	for(auto unit : units) {
+		delete unit;
+	}
+	units.clear();
+}
+
 void Unit::RenewOrders(EventManager* em) {
-	std::vector<Order*> newOrders(orders.begin() + currentOrder, orders.end());
+	std::vector<OrderPtr> newOrders(orders.begin() + currentOrder, orders.end());
 	std::cout << "GiveOrdersRequest with " << newOrders.size() << " orders.\n";
 	GiveOrdersRequest gor(this, newOrders, true);
 	//em->Post(new GiveOrdersRequest(this, newOrders));
@@ -92,7 +112,7 @@ void Unit::DeleteObsoleteOrder() {
 void Unit::StripTransitionOrders() {
 	orders.erase(std::remove_if(orders.begin() + currentOrder, 
 		orders.end(),
-		[](const Order* o) {
+		[](const OrderPtr& o) {
 			return o->_transition;
 		}), orders.end()
 	);
@@ -105,7 +125,7 @@ void Unit::MoveTarget() {
 		for(int j = 0; j < ncols; j++) {
 			Soldier* soldier = soldiers->at(i).at(j);
 			if(soldier->placed && soldier->alive) {	//change to something like soldier->alive
-				Order* o = orders.at(soldier->currentOrder);
+				Order* o = orders.at(soldier->currentOrder).get();
 				if(o->type == ORDER_MOVE ||true) {
 					//MoveOrder* mo = dynamic_cast<MoveOrder*>(o);
 					//soldier->posTarget = mo->pos + mo->rot * posInUnit->at(i).at(j);
@@ -116,7 +136,7 @@ void Unit::MoveTarget() {
 			}
 		}
 	}
-	Order* o = orders.at(currentOrder);
+	Order* o = orders.at(currentOrder).get();
 	if(o->type == ORDER_MOVE || true) {
 		//MoveOrder* mo = dynamic_cast<MoveOrder*>(o);
 		posTarget = o->pos;
@@ -126,7 +146,7 @@ void Unit::MoveTarget() {
 }
 
 void Unit::NextOrderPathfinding(Order* oldOrder, Order* newOrder, Map* map) {
-	std::vector<Order*> newOrders;
+	std::vector<OrderPtr> newOrders;
 	double rad = ncols*(yspacing - 1);
 	MapWaypoint w1(newOrder->pos, rad);
 	MapWaypoint w2(oldOrder->pos, rad);
@@ -148,16 +168,16 @@ void Unit::NextOrderPathfinding(Order* oldOrder, Order* newOrder, Map* map) {
 				int movetype = MOVE_FORMUP;
 				if(enemyContact || true)
 					movetype = MOVE_PASSINGTHROUGH;
-				newOrders.push_back(new MoveOrder(positions.at(npos-1), Rot, movetype, true, true, newOrder->target));
+				newOrders.push_back(std::make_shared<MoveOrder>(positions.at(npos-1), Rot, movetype, true, true, newOrder->target));
 				newOrders.at(newOrders.size() - 1)->setCombat();
 				newOrder->rot = Rot;
 			}
 			else if(newOrder->type == ORDER_ATTACK) {
-				newOrders.push_back(new MoveOrder(positions.at(npos-1), Rot, MOVE_PASSINGTHROUGH, true, true, newOrder->target));
+				newOrders.push_back(std::make_shared<MoveOrder>(positions.at(npos-1), Rot, MOVE_PASSINGTHROUGH, true, true, newOrder->target));
 				newOrders.at(newOrders.size()-1)->setCombat();
 			}
 			else
-				newOrders.push_back(new MoveOrder(positions.at(npos-1), Rot, MOVE_PASSINGTHROUGH, true, true));
+				newOrders.push_back(std::make_shared<MoveOrder>(positions.at(npos-1), Rot, MOVE_PASSINGTHROUGH, true, true));
 		}
 	}
 	orders.insert(orders.begin() + currentOrder + 1, newOrders.begin(), newOrders.end());
@@ -179,7 +199,7 @@ void Unit::NextOrderPathfinding(Order* oldOrder, Order* newOrder, Map* map) {
 }
 
 bool Unit::UseOrderTarget(Map* map) {
-	Order* current = orders.at(currentOrder);
+	Order* current = orders.at(currentOrder).get();
 	if(current->type == ORDER_TARGET && current->target->nLiveSoldiers > 0 && (current->target->pos - pos).norm() < range) {
 		Circle c1 = Circle(pos, OnSpotUnitRectangle(this).hw*0.7);
 		Circle c2 = Circle(current->target->pos, OnSpotUnitRectangle(current->target).hw*0.7);
@@ -228,7 +248,7 @@ void Unit::UpdateTargetPath(Map* map, EventManager* em) {
 		targetUpdateTimer.reset();
 	}
 	else if(orders.at(currentOrder)->type == ORDER_ATTACK) {
-		Eigen::Vector2d newPosTarget = dynamic_cast<AttackOrder*>(orders.at(currentOrder))->target->pos;
+		Eigen::Vector2d newPosTarget = dynamic_cast<AttackOrder*>(orders.at(currentOrder).get())->target->pos;
 		//posTarget = newPosTarget;
 		orders.at(currentOrder)->pos = newPosTarget;
 		MoveTarget();
@@ -277,7 +297,7 @@ void Unit::ResetCharging() {
 }
 
 void Unit::PostCombatFormup() {
-	orders.push_back(new MoveOrder(pos, rot, MOVE_FORMUP, true));
+	orders.push_back(std::make_shared<MoveOrder>(pos, rot, MOVE_FORMUP, true));
 }
 
 void Unit::FindRangedTarget(std::vector<Player*> players) {
@@ -322,7 +342,7 @@ void Unit::SoldierMovement(Map* map, double* dt) {//, double* time1, double* tim
 				//auto end = std::chrono::system_clock::now();
 				//start = std::chrono::system_clock::now();
 				if(!soldier->charging && orders.at(co)->type != ORDER_ATTACK && orders.size() > (co + 1) && enemyContact) {
-					Order* no = orders.at(co + 1);
+					Order* no = orders.at(co + 1).get();
 					if(orders.at(co)->target && no->target) {
 						Circle c1(soldier->pos, soldier->rad);
 						Eigen::Vector2d nextPos = no->pos + no->rot * posInUnit.at(i).at(j);

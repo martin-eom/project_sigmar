@@ -4,6 +4,7 @@
 #include <base.h>
 #include <extra_math.h>
 
+#include <memory>
 #include <Eigen/Dense>
 
 enum ORDER_TYPES{
@@ -18,6 +19,13 @@ enum MOVEMENT_TYPE{
 	MOVE_PASSINGTHROUGH
 };
 
+/* Orders are shared-owned.
+*
+*  Rule of thumb: OrderPtr for anything that stores an order, a raw Order*
+*  (via .get()) for a local that merely reads one.
+*
+*  The OrderPtr alias is declared in events.h.
+*/
 
 class Order{
 
@@ -47,6 +55,8 @@ class Order{
 			this->_transition = _transition;
 			this->target = target;
 		}
+		// Orders are always held and deleted as Order*, so this must be virtual.
+		virtual ~Order() = default;
 };
 
 class MoveOrder : public Order {

@@ -42,9 +42,9 @@ void Unit::Reform() {
 				Eigen::Matrix2d rot;
 				Order* o;
 				if(soldier->alive)
-					o = orders.at(soldier->currentOrder);
+					o = orders.at(soldier->currentOrder).get();
 				else
-					o = orders.at(currentOrder);
+					o = orders.at(currentOrder).get();
 				if(o->type == ORDER_MOVE) {
 					MoveOrder* mo = dynamic_cast<MoveOrder*>(o);
 					rot = mo->rot;
@@ -167,7 +167,7 @@ void TimeStep(Soldier* soldier, double dt) {
 	bool closeToTarget = dx < soldier->maxSpeed/4;
 	bool almostOnTarget = dx < 50 
 		&& soldier->unit->orders.at(soldier->currentOrder)->type == ORDER_MOVE 
-		&& dynamic_cast<MoveOrder*>(soldier->unit->orders.at(soldier->currentOrder))->moveType == MOVE_FORMUP;
+		&& dynamic_cast<MoveOrder*>(soldier->unit->orders.at(soldier->currentOrder).get())->moveType == MOVE_FORMUP;
 	bool inMelee = soldier->meleeTarget && soldier->meleeTarget->alive;
 	bool movingAway = dist.dot(soldier->vel) < 0.;
 	if(closeToTarget) {
@@ -274,7 +274,7 @@ void TimeStep(Soldier* soldier, double dt) {
 	soldier->knockVel << 0., 0.;
 	//check if order complete
 	bool newestOrder = (soldier->currentOrder == soldier->unit->currentOrder);
-	Order* o = soldier->unit->orders.at(soldier->currentOrder);
+	Order* o = soldier->unit->orders.at(soldier->currentOrder).get();
 	if(o->type == ORDER_MOVE) {
 		MoveOrder* mo = dynamic_cast<MoveOrder*>(o);
 		if(!soldier->arrived && soldier->indivPath.empty()) {

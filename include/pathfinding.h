@@ -52,7 +52,7 @@ public:
 		SetStartPoint();
 		SetEndPoint();
 		if(!_dontShow)
-			std::cout << "end_path: " << end_path << ", end_ind: " << end_ind << ", nrows: " << grid->nrows << ", ncols: " << grid->ncols << " " << rec.corners.at(1)->x() << "\n";
+			std::cout << "end_path: " << end_path << ", end_ind: " << end_ind << ", nrows: " << grid->nrows << ", ncols: " << grid->ncols << " " << rec.corners.at(1).x() << "\n";
 	}
 
 };
@@ -88,15 +88,15 @@ void TileWalker::CreateRectangle(Circle* w1, Circle* w2) {
 		Eigen::Matrix2d rot; rot << cos, -sin, sin, cos;
 		rec = Rrectangle(hw, hl, c1->pos + 0.5*diff, rot);
 		//std::cout << "Rectangle corenrs:\n";
-		//std::cout << rec.corners.at(0)->pos << "\n";
-		//std::cout << rec.corners.at(1)->pos << "\n";
-		//std::cout << rec.corners.at(2)->pos << "\n";
-		//std::cout << rec.corners.at(3)->pos << "\n";
+		//std::cout << rec.corners.at(0).pos << "\n";
+		//std::cout << rec.corners.at(1).pos << "\n";
+		//std::cout << rec.corners.at(2).pos << "\n";
+		//std::cout << rec.corners.at(3).pos << "\n";
 }
 
 void TileWalker::SetLines() {
-	line1 = Straight(rec.corners.at(0), rec.corners.at(1));
-	line2 = Straight(rec.corners.at(3), rec.corners.at(2));
+	line1 = Straight(&rec.corners.at(0), &rec.corners.at(1));
+	line2 = Straight(&rec.corners.at(3), &rec.corners.at(2));
 	SetDirection();
 }
 
@@ -117,7 +117,7 @@ void TileWalker::SetDirection() {
 }
 
 void TileWalker::SetEndPoint() {
-	Eigen::Vector2d end_point = rec.corners.at(2)->pos;
+	Eigen::Vector2d end_point = rec.corners.at(2).pos;
 	int end_row = (int) (end_point.y() / grid->tilesize);
 	end_row = legalizeIndex(end_row, grid->nrows);
 	int end_col = (int) (end_point.x() / grid->tilesize);
@@ -132,10 +132,10 @@ void TileWalker::SetEndPoint() {
 		end_ind = end_row;
 		break;
 	case TW_WIDE_DOWN:
-		end_row = (int) (line2.y(rec.corners.at(1)->pos.x()) / grid->tilesize);
+		end_row = (int) (line2.y(rec.corners.at(1).pos.x()) / grid->tilesize);
 		//end_row = (int) (line2.y((end_row+1)*grid->tilesize) / grid->tilesize);
 		//end_row = legalizeIndex(end_row, grid->nrows);
-		end_col = (int) (rec.corners.at(1)->x() / grid->tilesize);
+		end_col = (int) (rec.corners.at(1).x() / grid->tilesize);
 		end_col = legalizeIndex(end_col, grid->ncols);
 		end_row = (int) (line2.y((end_col+1)*grid->tilesize) / grid->tilesize);
 		end_row = legalizeIndex(end_row, grid->nrows);
@@ -143,9 +143,9 @@ void TileWalker::SetEndPoint() {
 		end_ind = end_row;
 		break;
 	case TW_TALL_UP:
-		end_row = (int) (rec.corners.at(1)->pos.y() / grid->tilesize);
+		end_row = (int) (rec.corners.at(1).pos.y() / grid->tilesize);
 		end_row = legalizeIndex(end_row, grid->nrows);
-		//end_col = (int) (line2.x(rec.corners.at(1)->pos.y()) / grid->tilesize);
+		//end_col = (int) (line2.x(rec.corners.at(1).pos.y()) / grid->tilesize);
 		end_col = (int) (line2.x((end_row+1)*grid->tilesize) / grid->tilesize);
 		end_col = legalizeIndex(end_col, grid->ncols);
 		end_path = end_row;
@@ -162,7 +162,7 @@ void TileWalker::SetEndPoint() {
 }
 
 void TileWalker::SetStartPoint() {
-	Eigen::Vector2d start_point = rec.corners.at(0)->pos;
+	Eigen::Vector2d start_point = rec.corners.at(0).pos;
 	int start_row = (int) (start_point.y() / grid->tilesize);
 	start_row = legalizeIndex(start_row, grid->nrows);
 	//std::cout << "initial starting row: " << start_row << "\n";
@@ -181,9 +181,9 @@ void TileWalker::SetStartPoint() {
 		upper_bound = legalizeIndex(upper_bound, grid->nrows);
 		break;
 	case TW_WIDE_DOWN:
-		//start_row = (int) (line1.y(rec.corners.at(3)->pos.x()) / grid->tilesize);
+		//start_row = (int) (line1.y(rec.corners.at(3).pos.x()) / grid->tilesize);
 		//start_row = legalizeIndex(start_row, grid->nrows);
-		start_col = (int) (rec.corners.at(3)->x() / grid->tilesize);
+		start_col = (int) (rec.corners.at(3).x() / grid->tilesize);
 		start_col = legalizeIndex(start_col, grid->ncols);
 		start_row = (int) (line1.y(start_col*grid->tilesize) / grid->tilesize);
 		start_row = legalizeIndex(start_row, grid->nrows);
@@ -193,9 +193,9 @@ void TileWalker::SetStartPoint() {
 		upper_bound = legalizeIndex(upper_bound, grid->nrows);
 		break;
 	case TW_TALL_UP:
-		start_row = (int) (rec.corners.at(3)->pos.y() / grid->tilesize);
+		start_row = (int) (rec.corners.at(3).pos.y() / grid->tilesize);
 		start_row = legalizeIndex(start_row, grid->nrows);
-		//start_col = (int) (line1.x(rec.corners.at(3)->pos.y()) / grid->tilesize);
+		//start_col = (int) (line1.x(rec.corners.at(3).pos.y()) / grid->tilesize);
 		start_col = (int) (line1.x(start_row*grid->tilesize) / grid->tilesize);
 		start_col = legalizeIndex(start_col, grid->ncols);
 		path = start_row;

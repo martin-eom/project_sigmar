@@ -130,8 +130,8 @@ int main(int argc, char* argv[1]) {
 						ctrl->state = EDITOR_CLOSING;
 					}
 					else if(e.type == SDL_KEYUP || e.type == SDL_KEYDOWN || e.type == SDL_TEXTINPUT ||e.type == SDL_MOUSEBUTTONUP || e.type == SDL_MOUSEMOTION) {
-						Event* ev = new SDLEvent(e);
-						em->Post(ev);
+						SDLEvent ev(e);
+						em->Post(&ev);
 					}
 				}
 				TickEvent ev;

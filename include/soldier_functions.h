@@ -81,7 +81,7 @@ void Soldier::HandleCharging(std::vector<SoldierNeighbourContainer>* targets) {
 	//handling "charging" status
 	//	while charging soldiers will push into the enemy position
 	//  if they have no target in front of them for 1 second they will stop charging and seek out enemies close to them
-	Order* o = unit->orders.at(currentOrder);
+	Order* o = unit->orders.at(currentOrder).get();
 	if(o->target) {
 		if(charging) {
 			UpdateChargingStatus(targets, o);

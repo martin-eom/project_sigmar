@@ -7,6 +7,7 @@
 #include <Eigen/Dense>
 #include <SDL.h>
 #include <vector>
+#include <memory>
 
 enum EVENT_IDS {
 	GENERIC_EVENT,
@@ -49,6 +50,7 @@ class Event {
 			name = "GenericEvent";
 			type = GENERIC_EVENT;
 		}
+		virtual ~Event() = default;
 };
 
 class SDLEvent : public Event {
@@ -100,13 +102,18 @@ class ClickEvent : public Event {
 class Unit;
 class Order;
 
+/* Has to be declared here rather than orders.h because this is
+*  (base.h includes events.h, and orders.h includes base.h).
+*/
+using OrderPtr = std::shared_ptr<Order>;
+
 class GiveOrdersRequest : public Event {
 	public:
 		Unit* unit;
-		std::vector<Order*> orders;
+		std::vector<OrderPtr> orders;
 		bool _auto = false; // true if request comes from pathfinding while the game is running instead of from input while game is paused
 
-		GiveOrdersRequest(Unit* unit, std::vector<Order*> orders, bool _auto = false) : Event(){
+		GiveOrdersRequest(Unit* unit, std::vector<OrderPtr> orders, bool _auto = false) : Event(){
 			name = "GiveOrdersRequest";
 			type = GIVE_ORDERS_REQUEST;
 			this->unit = unit;
@@ -120,9 +127,9 @@ class Player;
 class GiveAllOrdersRequest : public Event {
 public:
 	Player* player;
-	std::vector<std::vector<Order*>> orderList;
+	std::vector<std::vector<OrderPtr>> orderList;
 
-	GiveAllOrdersRequest(Player* player, std::vector<std::vector<Order*>> orderList) : Event() {
+	GiveAllOrdersRequest(Player* player, std::vector<std::vector<OrderPtr>> orderList) : Event() {
 		name = "GiveAllOrdersRequest";
 		type = GIVE_ALL_ORDERS_REQUEST;
 		this->player = player;
@@ -132,9 +139,9 @@ public:
 
 class RememberOrders : public Event {
 	public:
-		std::vector<Order*> orders;
+		std::vector<OrderPtr> orders;
 
-		RememberOrders(std::vector<Order*> orders) : Event() {
+		RememberOrders(std::vector<OrderPtr> orders) : Event() {
 			name = "RememberOrders";
 			type = REMEMBER_ORDERS;
 			this->orders = orders;
@@ -144,9 +151,9 @@ class RememberOrders : public Event {
 class AppendOrdersRequest : public Event {
 	public:
 		Unit* unit;
-		std::vector<Order*> orders;
+		std::vector<OrderPtr> orders;
 
-		AppendOrdersRequest(Unit* unit, std::vector<Order*> orders) : Event(){
+		AppendOrdersRequest(Unit* unit, std::vector<OrderPtr> orders) : Event(){
 			name = "AppendOrdersRequest";
 			type = APPEND_ORDERS_REQUEST;
 			this->unit = unit;

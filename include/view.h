@@ -112,6 +112,7 @@ private:
 		void loadTextures();
 		void loadDamageTexture();
 		void createAnimations();
+		void clearAnimations();
 		void animateBackground(Animation* anime, ZoomableGUIController* ctrl);
 		void animateSelectionCircle(SoldierAnimation* anime, ZoomableGUIController* ctrl);
 		void animateSoldier(SoldierAnimation* anime, ZoomableGUIController* ctrl, bool hpAlpha = true, 
@@ -153,6 +154,8 @@ private:
 			loadTextures();
 			loadDamageTexture();
 		}
+
+		~View();
 	private:
 		void Update() {
 			GameEventManager* gem = Gem();
@@ -180,12 +183,7 @@ private:
 			}
 			else if(ev->type == UNIT_ROSTER_MODIFIED_EVENT) {
 				debug("Unit roster was modified. Generating new animations...");
-				legs.clear();
-				melee.clear();
-				ranged.clear();
-				bodies.clear();
-				damages.clear();
-				projectiles.clear();
+				clearAnimations();
 				debug("Cleared old animations.");
 				createAnimations();
 			}
@@ -373,6 +371,56 @@ void View::createAnimations() {
 	debug("bodies now contains " + std::to_string(bodies.size()) + " animations!\n");
 }
 
+void View::clearAnimations() {
+	for(auto anime : legs) delete anime;
+	legs.clear();
+	for(auto anime : melee) delete anime;
+	melee.clear();
+	for(auto anime : ranged) delete anime;
+	ranged.clear();
+	for(auto anime : bodies) delete anime;
+	bodies.clear();
+	for(auto anime : damages) delete anime;
+	damages.clear();
+	for(auto anime : projectiles) delete anime;
+	projectiles.clear();
+}
+
+View::~View() {
+	clearAnimations();
+
+	if(background) delete background->object;
+	delete background;
+
+	delete textControls;
+	delete textInputAdvice;
+	delete textInput;
+	delete objInformation;
+	delete gameInstructions;
+	delete objCircle;
+	delete token;
+	delete damage;
+	delete backgroundTexture;
+
+	auto deleteTextures = [](std::map<std::string, ImgTexture*>& textures) {
+		for(auto& entry : textures) delete entry.second;
+		textures.clear();
+	};
+	deleteTextures(blueLegTextures);
+	deleteTextures(redLegTextures);
+	deleteTextures(blueBodyTextures);
+	deleteTextures(redBodyTextures);
+	deleteTextures(blueMeleeTextures);
+	deleteTextures(redMeleeTextures);
+	deleteTextures(blueRangedTextures);
+	deleteTextures(redRangedTextures);
+	deleteTextures(projectileTextures);
+
+	if(font) TTF_CloseFont(font);
+	if(fontLarge) TTF_CloseFont(fontLarge);
+	font = NULL; fontLarge = NULL;
+}
+
 void View::drawMapObjects(KeyboardAndMouseController* ctrl, Model* model) {
 	if(model->settings.show_map_object_outlines) {
 		for(auto obj : map->mapObjects) {
@@ -433,15 +481,15 @@ void View::drawTileObjectCollision(KeyboardAndMouseController* ctrl) {
 
 void View::drawProposedOrders1(KeyboardAndMouseController* ctrl, Model* model) {
 	
-	auto drawOrderList = [&](std::vector<Order*> orders, Unit* unit, Color* drawColor) {
+	auto drawOrderList = [&](const std::vector<OrderPtr>& orders, Unit* unit, Color* drawColor) {
 		for(int n_order = 0; n_order < orders.size(); n_order++) {
-			Order* o = orders.at(n_order);
+			Order* o = orders.at(n_order).get();
 			if(unit->placed && n_order == 0) {
 				Point p1(o->pos); Point p2(unit->pos);
 				DrawLine(&p1, &p2, renderer, drawColor, SCREEN_WIDTH, SCREEN_HEIGHT, ctrl->zoom, ctrl->center);
 			}
 			if(n_order > 0) {
-				Order* prevo = orders.at(n_order-1);
+				Order* prevo = orders.at(n_order-1).get();
 				Point p1(o->pos); Point p2(prevo->pos);
 				DrawLine(&p1, &p2, renderer, drawColor, SCREEN_WIDTH, SCREEN_HEIGHT, ctrl->zoom, ctrl->center);
 			}
@@ -471,7 +519,7 @@ void View::drawProposedOrders1(KeyboardAndMouseController* ctrl, Model* model) {
 					drawColor = colorBlue;
 			}
 			Unit* unit = ctrl->selectedPlayer->units.at(n_unit);
-			std::vector<Order*> orders = ctrl->orderList.at(n_unit);
+			std::vector<OrderPtr> orders = ctrl->orderList.at(n_unit);
 			if(orders.size() == 0) orders = unit->orders;
 			if(unit->nLiveSoldiers > 0)
 				drawOrderList(orders, unit, drawColor);
@@ -534,7 +582,7 @@ void View::drawCurrentOrders(KeyboardAndMouseController* ctrl, Model* model, Uni
 			DrawUnitArrow(unit->posTarget, unit->rotTarget, renderer, drawColor, SCREEN_WIDTH, SCREEN_HEIGHT, ctrl->zoom, ctrl->center);
 			debug(std::to_string(unit->orders.size()));
 			for(int i = 0; i < unit->orders.size(); i++) {
-				Order* o = unit->orders.at(i);
+				Order* o = unit->orders.at(i).get();
 				if(o->type == ORDER_MOVE) {
 					Rrectangle rec = UnitRectangle(unit, i);
 					DrawPolygon(&rec, renderer, drawColor, SCREEN_WIDTH, SCREEN_HEIGHT, ctrl->zoom, ctrl->center);
@@ -554,7 +602,7 @@ void View::drawCurrentOrders(KeyboardAndMouseController* ctrl, Model* model, Uni
 					DrawLine(&p1, &p2, renderer, drawColor, SCREEN_WIDTH, SCREEN_HEIGHT, ctrl->zoom, ctrl->center);
 				}
 				if(i > 0) {
-					Order* prevo = unit->orders.at(i-1);
+					Order* prevo = unit->orders.at(i-1).get();
 					Point p1(o->pos); Point p2(prevo->pos);
 					DrawLine(&p1, &p2, renderer, drawColor, SCREEN_WIDTH, SCREEN_HEIGHT, ctrl->zoom, ctrl->center);
 				}
@@ -599,13 +647,15 @@ void View::drawGameObjects(KeyboardAndMouseController* ctrl) {
 	for(auto anime : damages) {
 		animateSoldier(anime, ctrl, false);
 	}
-	for(auto anime : projectiles) {
+	for(auto it = projectiles.begin(); it != projectiles.end(); ) {
+		ProjectileAnimation* anime = *it;
 		animateProjectile(anime, ctrl);
 		if(anime->projectile->dead) {
-			ProjectileAnimation* tempProj = anime;
-			std::erase(projectiles, anime);
-			//delete tempProj;	///////// VERY IMPORTANT
+			// The actual projectile belongs to the model.
+			it = projectiles.erase(it);
+			delete anime;
 		}
+		else it = std::next(it);
 	}
 	for(auto anime : bodies) {
 		Soldier* soldier = anime->soldier;
@@ -924,7 +974,7 @@ void MapEditorView::drawPlacedObjects(MapEditorController* ctrl) {
 					if(nc == 1) corCol = colorGrey;
 					if(nc == 2) corCol = darkGrey;
 					if(nc == 3) corCol = darkGreen;
-					Corner* corner = rec->corners.at(nc);
+					Corner* corner = &rec->corners.at(nc);
 					Circle circ(corner->pos, rec->hdiag*0.25);
 					DrawCircle(&circ, renderer, corCol, SCREEN_WIDTH, SCREEN_HEIGHT, ctrl->zoom, ctrl->center);
 				}

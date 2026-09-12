@@ -118,21 +118,15 @@ public:
 	}
 };
 
-class Ppolygon;
-
-class Corner : public Point { // point that holds reference to the polygon it is a part of
+class Corner : public Point { // a polygon's vertex, held by value in Ppolygon::corners
 public:
-	Ppolygon* pol;
-
-	Corner(Eigen::Vector2d pos, Ppolygon* pol) : Point(pos) {
-		this->pol = pol;
-	}
+	Corner(Eigen::Vector2d pos) : Point(pos) {}
 };
 
 class Ppolygon : public Point {
 public:
 	Eigen::Matrix2d rot;
-	std::vector<Corner*> corners;
+	std::vector<Corner> corners;
 
 	void Reposition(Eigen::Vector2d pos);
 	void Rotate(Eigen::Matrix2d rot);
@@ -158,13 +152,14 @@ public:
 		else this->gamma = gamma;
 		//M_PI
 		gamma_rot = Rotation(M_PI/180*this->gamma);
-		corners.push_back(new Corner(pos, this));
+		corners.reserve(3);
+		corners.push_back(Corner(pos));
 		Eigen::Vector2d p3(this->b, 0);
 		p3 = (rot * (gamma_rot * p3)) + pos;
-		corners.push_back(new Corner(p3, this));
+		corners.push_back(Corner(p3));
 		Eigen::Vector2d p2(this->a, 0);
 		p2 = (rot * p2) + pos;
-		corners.push_back(new Corner(p2, this));
+		corners.push_back(Corner(p2));
 	}
 
 	void Reshape(double a, double b, double gamma) {
@@ -177,10 +172,10 @@ public:
 		gamma_rot = Rotation(M_PI/180*this->gamma);
 		Eigen::Vector2d p3(this->b, 0);
 		p3 = (rot * (gamma_rot * p3)) + pos;
-		corners.at(1)->pos = p3;
+		corners.at(1).pos = p3;
 		Eigen::Vector2d p2(this->a, 0);
 		p2 = (rot * p2) + pos;
-		corners.at(2)->pos = p2;
+		corners.at(2).pos = p2;
 	}
 };
 
@@ -212,28 +207,29 @@ Rrectangle::Rrectangle(double hl, double hw, Eigen::Vector2d pos, Eigen::Matrix2
 	this->hw = hw;
 	this->hdiag = pow(hw*hw + hl*hl, 0.5);
 	Eigen::Vector2d cornerPos;
+	corners.reserve(4);
 	cornerPos << -hw, hl; cornerPos = rot*cornerPos + pos;
-	corners.push_back(new Corner(cornerPos, dynamic_cast<Ppolygon*>(this)));
+	corners.push_back(Corner(cornerPos));
 	cornerPos << hw, hl; cornerPos = rot*cornerPos + pos;
-	corners.push_back(new Corner(cornerPos, this));
+	corners.push_back(Corner(cornerPos));
 	cornerPos << hw, -hl; cornerPos = rot*cornerPos + pos;
-	corners.push_back(new Corner(cornerPos, this));
+	corners.push_back(Corner(cornerPos));
 	cornerPos << -hw, -hl; cornerPos = rot*cornerPos + pos;
-	corners.push_back(new Corner(cornerPos, this));
+	corners.push_back(Corner(cornerPos));
 }
 
 void Ppolygon::Reposition(Eigen::Vector2d pos) {
 	Eigen::Vector2d dist = pos - this->pos;
-	for(auto corner : corners) {
-		corner->pos += dist;
+	for(auto& corner : corners) {
+		corner.pos += dist;
 	}
 	this->pos += dist;
 }
 
 void Ppolygon::Rotate(Eigen::Matrix2d rot) {
 	Eigen::Matrix2d rotDiff = rot * this->rot.transpose();
-	for(auto corner : corners) {
-		corner->pos = rotDiff * (corner->pos - pos) + pos;
+	for(auto& corner : corners) {
+		corner.pos = rotDiff * (corner.pos - pos) + pos;
 	}
 	this->rot = rot;
 }
@@ -241,13 +237,13 @@ void Ppolygon::Rotate(Eigen::Matrix2d rot) {
 void Rrectangle::Reshape(double hl, double hw) {
 	Eigen::Vector2d cornerPos;
 	cornerPos << -hw, hl; cornerPos = rot*cornerPos + pos;
-	corners.at(0)->pos = cornerPos;
+	corners.at(0).pos = cornerPos;
 	cornerPos << hw, hl; cornerPos = rot*cornerPos + pos;
-	corners.at(1)->pos = cornerPos;
+	corners.at(1).pos = cornerPos;
 	cornerPos << hw, -hl; cornerPos = rot*cornerPos + pos;
-	corners.at(2)->pos = cornerPos;
+	corners.at(2).pos = cornerPos;
 	cornerPos << -hw, -hl; cornerPos = rot*cornerPos + pos;
-	corners.at(3)->pos = cornerPos;
+	corners.at(3).pos = cornerPos;
 	this->hl = hl;
 	this->hw = hw;
 }
@@ -326,7 +322,7 @@ bool PointBelowLine(Point* p, Point* l1, Point* l2) {	// checks the direction of
 
 bool PointPolygonCollision(Point* p, Ppolygon* pol) {
 	for(int nCorner = 0; nCorner < pol->corners.size(); nCorner++) {
-		if(!PointBelowLine(p, pol->corners.at(nCorner), pol->corners.at((nCorner+1)%pol->corners.size())))
+		if(!PointBelowLine(p, &pol->corners.at(nCorner), &pol->corners.at((nCorner+1)%pol->corners.size())))
 			return false;
 	}
 	return true;
@@ -343,8 +339,8 @@ bool LinePolygonCollision(Point* l1, Point* l2, Ppolygon* pol) {
 	if(PointPolygonCollision(l1, pol)) return true;
 	if(PointPolygonCollision(l2, pol)) return true;
 	for(int nCorner = 0; nCorner < pol->corners.size() * 0.5; nCorner++) {
-		if(LineLineCollision(l1, l2, 
-			pol->corners.at(nCorner), pol->corners.at((nCorner + pol->corners.size()/2)%pol->corners.size())))
+		if(LineLineCollision(l1, l2,
+			&pol->corners.at(nCorner), &pol->corners.at((nCorner + pol->corners.size()/2)%pol->corners.size())))
 			return true;
 	}
 	return false;
@@ -355,8 +351,8 @@ bool LineRectangleCollison(Point* l1, Point* l2, Rrectangle* rec) {
 	if(PointPolygonCollision(l1, rec)) return true;
 	if(PointPolygonCollision(l2, rec)) return true;
 	// check one diagonal from every point for crossing the line
-	if(LineLineCollision(l1, l2, (rec->corners.at(0)), (rec->corners.at(2)))) return true;
-	if(LineLineCollision(l1, l2, (rec->corners.at(1)), (rec->corners.at(3)))) return true;
+	if(LineLineCollision(l1, l2, &rec->corners.at(0), &rec->corners.at(2))) return true;
+	if(LineLineCollision(l1, l2, &rec->corners.at(1), &rec->corners.at(3))) return true;
 	return false;
 }
 
@@ -367,7 +363,7 @@ bool CirclePolygonCollision(Circle* circ, Ppolygon* pol) {
 	}
 	// or circle must touch a line of the polygon
 	for(int nCorner = 0; nCorner < pol->corners.size(); nCorner++) {
-		if(LineCircleCollision(pol->corners.at(nCorner), pol->corners.at((nCorner+1)%pol->corners.size()), circ))
+		if(LineCircleCollision(&pol->corners.at(nCorner), &pol->corners.at((nCorner+1)%pol->corners.size()), circ))
 			return true;
 	}
 	return false;
@@ -378,18 +374,18 @@ bool CircleRectangleCollision(Circle* circle, Rrectangle* rec) {
 }
 
 bool PolygonPolygonCollision(Ppolygon* pol1, Ppolygon* pol2) {
-	for(auto corner : pol1->corners) {
-		if(PointPolygonCollision(corner, pol2)) return true;
+	for(auto& corner : pol1->corners) {
+		if(PointPolygonCollision(&corner, pol2)) return true;
 	}
-	for(auto corner : pol2->corners) {
-		if(PointPolygonCollision(corner, pol1)) return true;
+	for(auto& corner : pol2->corners) {
+		if(PointPolygonCollision(&corner, pol1)) return true;
 	}
 	// check one diagonal connected to each corner
 	for(int nCorner1 = 0; nCorner1 < pol1->corners.size() * 0.5; nCorner1++) {
 		for(int nCorner2 = 0; nCorner2 < pol2->corners.size(); nCorner2++) {
 			if(LineLineCollision(
-				pol1->corners.at(nCorner1), pol1->corners.at((nCorner1 + pol1->corners.size()/2)%pol1->corners.size()),
-				pol2->corners.at(nCorner2), pol2->corners.at((nCorner2+1)%pol2->corners.size())
+				&pol1->corners.at(nCorner1), &pol1->corners.at((nCorner1 + pol1->corners.size()/2)%pol1->corners.size()),
+				&pol2->corners.at(nCorner2), &pol2->corners.at((nCorner2+1)%pol2->corners.size())
 				))
 				return true;
 		}
@@ -425,8 +421,8 @@ bool LenientToughCircleRectangleCollision(Circle* circ, Rrectangle* rec) {
 	if(collision) return true;
 	else {
 		double diag = std::sqrt(2 * circ->rad * circ->rad);
-		for(auto corner : rec->corners) {
-			if((circ->pos - corner->pos).norm() < diag * 0.95) return true;
+		for(auto& corner : rec->corners) {
+			if((circ->pos - corner.pos).norm() < diag * 0.95) return true;
 		}
 		return false;
 	}

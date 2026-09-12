@@ -176,13 +176,14 @@ void DrawUnitArrow(Eigen::Vector2d pos, Eigen::Matrix2d rot, SDL_Renderer* rende
 void DrawPolygon(Ppolygon* pol, SDL_Renderer* renderer, Color* color, int SCREEN_WIDTH, int SCREEN_HEIGHT, double zoom, Eigen::Vector2d center) {
 	Eigen::Vector2d diag; diag << SCREEN_WIDTH / 2., SCREEN_HEIGHT / 2.;
 	Ppolygon zoomPol(pol->pos*zoom - center + diag, pol->rot);
-	for(auto corner : pol->corners) {
-		zoomPol.corners.push_back(new Corner(corner->pos*zoom - center + diag, &zoomPol));
+	zoomPol.corners.reserve(pol->corners.size());
+	for(auto& corner : pol->corners) {
+		zoomPol.corners.push_back(Corner(corner.pos*zoom - center + diag));
 	}
 	SDL_SetRenderDrawColor(renderer, color->r, color->g, color->b, color->al);
 	for(int nCorner = 0; nCorner < zoomPol.corners.size(); nCorner++) {
-		Eigen::Vector2d p0 = zoomPol.corners.at(nCorner)->pos;
-		Eigen::Vector2d p1 = zoomPol.corners.at((nCorner+1)%zoomPol.corners.size())->pos;
+		Eigen::Vector2d p0 = zoomPol.corners.at(nCorner).pos;
+		Eigen::Vector2d p1 = zoomPol.corners.at((nCorner+1)%zoomPol.corners.size()).pos;
 		SDL_RenderDrawLine(renderer, p0.coeff(0), SCREEN_HEIGHT - p0.coeff(1), p1.coeff(0), SCREEN_HEIGHT - p1.coeff(1));
 	}
 }
@@ -192,10 +193,10 @@ void DrawRectangle(Rrectangle* rec, SDL_Renderer* renderer, Color* color, int SC
 	Rrectangle rrec(rec->hl*zoom, rec->hw*zoom, rec->pos*zoom - center + diag, rec->rot);
 	SDL_SetRenderDrawColor(renderer, color->r, color->g, color->b, color->al);
 	Eigen::Vector2d p0, p1, p2, p3;	//top left->top right->bottom right->bottom left
-	p0 << rrec.corners.at(0)->pos.coeff(0), rrec.corners.at(0)->pos.coeff(1);
-	p1 << rrec.corners.at(1)->pos.coeff(0), rrec.corners.at(1)->pos.coeff(1);
-	p2 << rrec.corners.at(2)->pos.coeff(0), rrec.corners.at(2)->pos.coeff(1);
-	p3 << rrec.corners.at(3)->pos.coeff(0), rrec.corners.at(3)->pos.coeff(1);
+	p0 << rrec.corners.at(0).pos.coeff(0), rrec.corners.at(0).pos.coeff(1);
+	p1 << rrec.corners.at(1).pos.coeff(0), rrec.corners.at(1).pos.coeff(1);
+	p2 << rrec.corners.at(2).pos.coeff(0), rrec.corners.at(2).pos.coeff(1);
+	p3 << rrec.corners.at(3).pos.coeff(0), rrec.corners.at(3).pos.coeff(1);
 	SDL_RenderDrawLine(renderer, p0.coeff(0), SCREEN_HEIGHT - p0.coeff(1), p1.coeff(0), SCREEN_HEIGHT - p1.coeff(1));
 	SDL_RenderDrawLine(renderer, p1.coeff(0), SCREEN_HEIGHT - p1.coeff(1), p2.coeff(0), SCREEN_HEIGHT - p2.coeff(1));
 	SDL_RenderDrawLine(renderer, p2.coeff(0), SCREEN_HEIGHT - p2.coeff(1), p3.coeff(0), SCREEN_HEIGHT - p3.coeff(1));

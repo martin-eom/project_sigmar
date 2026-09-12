@@ -44,7 +44,7 @@ public:
 	Eigen::Vector2d posTarget;
 	Eigen::Matrix2d rot;
 	Eigen::Matrix2d rotTarget;
-	std::vector<Order*> orders;
+	std::vector<OrderPtr> orders;
 	Eigen::Vector2d vel;
 	bool enemyContact;
 	Timer targetUpdateTimer = Timer(int(100 + (rand()/RAND_MAX)*20));
@@ -106,7 +106,9 @@ public:
 
 		init(classMap);
 
-	}				
+	}
+
+	~Unit();	// defined in unit_functions.h
 };
 
 struct UnitSorter {
@@ -222,8 +224,8 @@ void SoldierNextOrder(Soldier* soldier, Eigen::Vector2d posInUnit) {
 	if(soldier->currentOrder == 0) {soldier->unit->nSoldiersOnFirstOrder--;}
 	soldier->currentOrder++;
 	soldier->arrived = false;
-	Order* o = soldier->unit->orders.at(soldier->currentOrder);
-	Order* po = soldier->unit->orders.at(soldier->currentOrder - 1);
+	Order* o = soldier->unit->orders.at(soldier->currentOrder).get();
+	Order* po = soldier->unit->orders.at(soldier->currentOrder - 1).get();
 	soldier->posTarget = o->pos + o->rot * posInUnit;
 	soldier->rotTarget = o->rot;
 	soldier->angleTarget = o->angleTarget;
@@ -235,7 +237,7 @@ void SoldierNextOrder(Soldier* soldier, Eigen::Vector2d posInUnit) {
 
 Rrectangle SoldierRectangle(Soldier* soldier) {
 	Unit* unit = soldier->unit;
-	Order* o = unit->orders.at(soldier->currentOrder);
+	Order* o = unit->orders.at(soldier->currentOrder).get();
 	switch(o->type) {
 	case ORDER_ATTACK:
 		unit = dynamic_cast<AttackOrder*>(o)->target;
@@ -258,7 +260,7 @@ Rrectangle SoldierRectangle(Soldier* soldier) {
 }
 
 Rrectangle UnitRectangle(Unit* unit, int orderID) {
-	Order* o = unit->orders.at(orderID);
+	Order* o = unit->orders.at(orderID).get();
 	switch(o->type) {
 	case ORDER_ATTACK:
 		unit = dynamic_cast<AttackOrder*>(o)->target;
@@ -296,7 +298,7 @@ Rrectangle OnSpotUnitRectangle(Unit* unit) {
 	return Rrectangle(halfWidth, halfDepth, unit->pos, unit->rot);
 };
 
-Rrectangle UnitRectangle(Unit* unit, int orderID, std::vector<Order*> orders) {
+Rrectangle UnitRectangle(Unit* unit, int orderID, const std::vector<OrderPtr>& orders) {
 	double halfWidth, halfDepth;
 	if(unit->maxSoldiers == 1)
 		halfWidth = halfDepth = unit->soldiers.at(0).at(0)->rad;
@@ -304,7 +306,7 @@ Rrectangle UnitRectangle(Unit* unit, int orderID, std::vector<Order*> orders) {
 		halfWidth = (unit->ncols - 1) * unit->yspacing * 0.5;
 		halfDepth = (unit->nrows - 1) * unit->xspacing * 0.5;
 	}
-	Order* o = orders.at(orderID);
+	Order* o = orders.at(orderID).get();
 	Eigen::Vector2d pos;
 	Eigen::Matrix2d rot;
 	if(o->type == ORDER_MOVE) {

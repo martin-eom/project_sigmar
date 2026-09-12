@@ -31,7 +31,7 @@ public:
 	Player* player;
 	Model* model;
 	bool gameStarted = false;
-	std::vector<std::vector<Order*>> orderList;
+	std::vector<std::vector<OrderPtr>> orderList;
 	std::vector<Unit*> targets;
 
 	SimpleAI(Player* player, Model* model, EventManager* em) : Listener(em) {
@@ -53,10 +53,10 @@ public:
 	void GiveOrders();
 	Player* Opponent();
 	
-	void GivePlaceOrder(Unit* unit, std::vector<Order*>* orders);
+	void GivePlaceOrder(Unit* unit, std::vector<OrderPtr>* orders);
 	void ValidateOldTarget(int unitNum);
 	void FindNewTarget(Unit* unit, int unitNum);
-	void GiveOrderToTarget(Unit* unit, int unitNum, std::vector<Order*>* orders);
+	void GiveOrderToTarget(Unit* unit, int unitNum, std::vector<OrderPtr>* orders);
 
 private:
 	void Notify(Event* ev) {
@@ -85,7 +85,7 @@ void SimpleAI::GiveOrders() {
 	orderList.clear();
 	for(auto unit : player->units) {
 		int unitNum = std::find(player->units.begin(), player->units.end(), unit) - player->units.begin();
-		std::vector<Order*> orders;
+		std::vector<OrderPtr> orders;
 		// place unit
 		if(!unit->placed) {
 			GivePlaceOrder(unit, &orders);
@@ -101,7 +101,7 @@ void SimpleAI::GiveOrders() {
 				}
 			}
 			Eigen::Matrix2d rot;
-			MoveOrder* mo = new MoveOrder(pos, Eigen::Matrix2d::Identity(), MOVE_FORMUP);
+			auto mo = std::make_shared<MoveOrder>(pos, Eigen::Matrix2d::Identity(), MOVE_FORMUP);
 			orders.push_back(mo);*/
 		}
 		if(player == model->player2 || gameStarted) {
@@ -135,7 +135,7 @@ void SimpleAI::GiveOrders() {
 					if(unit->orders.empty() || unit->orders.at(unit->currentOrder)->type != ORDER_ATTACK) {
 						//int unit_index = RNG::uniformInt(0, opponent->units.size() - 1);
 						//target = opponent->units.at(unit_index);
-						orders.push_back(new AttackOrder(target, target->pos));
+						orders.push_back(std::make_shared<AttackOrder>(target, target->pos));
 					}
 				}
 				else {
@@ -157,7 +157,7 @@ void SimpleAI::GiveOrders() {
 							double sin = path.y() / path.norm();
 							double cos = path.x() / path.norm();
 							Eigen::Matrix2d rot = Rotation(Angle(sin, cos));
-							orders.push_back(new MoveOrder(unit->pos, rot, MOVE_PASSINGTHROUGH));
+							orders.push_back(std::make_shared<MoveOrder>(unit->pos, rot, MOVE_PASSINGTHROUGH));
 						}
 						else if(unit->orders.empty() 
 							|| unit->CurrentOrderCompleted()
@@ -190,14 +190,14 @@ void SimpleAI::GiveOrders() {
 								attemptCount++;
 							}
 							if(validShootingPosition) {
-								orders.push_back(new MoveOrder(shootingPos, rot, MOVE_PASSINGTHROUGH));
+								orders.push_back(std::make_shared<MoveOrder>(shootingPos, rot, MOVE_PASSINGTHROUGH));
 							}
 						}
 					}
 				}
 			}
 			else {
-				orders.push_back(new MoveOrder(unit->pos, unit->rot, MOVE_PASSINGTHROUGH));
+				orders.push_back(std::make_shared<MoveOrder>(unit->pos, unit->rot, MOVE_PASSINGTHROUGH));
 			}
 		}
 		orderList.push_back(orders);
@@ -210,7 +210,7 @@ void SimpleAI::GiveOrders() {
 	em->Post(&cge);
 }
 
-void SimpleAI::GivePlaceOrder(Unit* unit, std::vector<Order*>* orders) {
+void SimpleAI::GivePlaceOrder(Unit* unit, std::vector<OrderPtr>* orders) {
 	// under construction: does modifying ordedrs like work, or does it need a pointer to the vector?
 	Eigen::Vector2d pos;
 	bool validOrder = false;
@@ -224,7 +224,7 @@ void SimpleAI::GivePlaceOrder(Unit* unit, std::vector<Order*>* orders) {
 		}
 	}
 	Eigen::Matrix2d rot;
-	MoveOrder* mo = new MoveOrder(pos, Eigen::Matrix2d::Identity(), MOVE_FORMUP);
+	auto mo = std::make_shared<MoveOrder>(pos, Eigen::Matrix2d::Identity(), MOVE_FORMUP);
 	orders->push_back(mo);
 }
 
@@ -251,11 +251,11 @@ void SimpleAI::FindNewTarget(Unit* unit, int unitNum) {
 	}
 }
 
-void SimpleAI::GiveOrderToTarget(Unit* unit, int unitNum, std::vector<Order*>* orders) {
+void SimpleAI::GiveOrderToTarget(Unit* unit, int unitNum, std::vector<OrderPtr>* orders) {
 	Unit* target = targets.at(unitNum);
 	if(!unit->ranged) {
 		if(unit->orders.empty() || unit->orders.at(unit->currentOrder)->type != ORDER_ATTACK) {
-			orders->push_back(new AttackOrder(target, target->pos));
+			orders->push_back(std::make_shared<AttackOrder>(target, target->pos));
 		}
 	}
 	else {
@@ -267,7 +267,7 @@ void SimpleAI::GiveOrderToTarget(Unit* unit, int unitNum, std::vector<Order*>* o
 				double sin = path.y() / path.norm();
 				double cos = path.x() / path.norm();
 				Eigen::Matrix2d rot = Rotation(Angle(sin, cos));
-				orders->push_back(new MoveOrder(unit->pos, rot, MOVE_PASSINGTHROUGH));
+				orders->push_back(std::make_shared<MoveOrder>(unit->pos, rot, MOVE_PASSINGTHROUGH));
 			}
 			else if(unit->orders.empty() 
 				|| unit->CurrentOrderCompleted()
@@ -297,7 +297,7 @@ void SimpleAI::GiveOrderToTarget(Unit* unit, int unitNum, std::vector<Order*>* o
 					attemptCount++;
 				}
 				if(validShootingPosition) {
-					orders->push_back(new MoveOrder(shootingPos, rot, MOVE_PASSINGTHROUGH));
+					orders->push_back(std::make_shared<MoveOrder>(shootingPos, rot, MOVE_PASSINGTHROUGH));
 				}
 			}
 		}

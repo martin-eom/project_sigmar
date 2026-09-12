@@ -7,17 +7,17 @@
 #include <map.h>
 #include <pathfinding.h>
 
-void OrderPathfinding(Unit* unit, Map* map, std::vector<Order*> nos = std::vector<Order*>(), int start_order = 0) {
-	std::vector<Order*> newOrders = std::vector<Order*>();
+void OrderPathfinding(Unit* unit, Map* map, std::vector<OrderPtr> nos = std::vector<OrderPtr>(), int start_order = 0) {
+	std::vector<OrderPtr> newOrders = std::vector<OrderPtr>();
 	if(start_order == 0)
 		start_order = unit->currentOrder + 1;
 		nos = unit->orders;
 	for(int i = start_order; i < nos.size(); i++) {
 		debug("Pathfinding for an order started");
-		Order* mo = nos.at(i);
+		OrderPtr mo = nos.at(i);
 		if((nos.at(i)->type == ORDER_MOVE && nos.at(i-1)->type == ORDER_MOVE) || true) {
-			Order* mo = nos.at(i);
-			Order* pmo = nos.at(i-1);
+			Order* mo = nos.at(i).get();
+			Order* pmo = nos.at(i-1).get();
 			//checking if line of sight between orders
 			double rad = unit->ncols*(unit->yspacing - 1);
 			MapWaypoint w1 = MapWaypoint(mo->pos, rad);
@@ -41,13 +41,13 @@ void OrderPathfinding(Unit* unit, Map* map, std::vector<Order*> nos = std::vecto
 						int movetype = MOVE_FORMUP;
 						if(unit->enemyContact)
 							movetype = MOVE_PASSINGTHROUGH;
-						newOrders.push_back(new MoveOrder(positions.at(k-1), Rot, movetype, true, true, mo->target));
+						newOrders.push_back(std::make_shared<MoveOrder>(positions.at(k-1), Rot, movetype, true, true, mo->target));
 						mo->rot = Rot;
 					}
 					else if(mo->type == ORDER_ATTACK)
-						newOrders.push_back(new MoveOrder(positions.at(k-1), Rot, MOVE_PASSINGTHROUGH, true, false, mo->target));
+						newOrders.push_back(std::make_shared<MoveOrder>(positions.at(k-1), Rot, MOVE_PASSINGTHROUGH, true, false, mo->target));
 					else
-						newOrders.push_back(new MoveOrder(positions.at(k-1), Rot, MOVE_PASSINGTHROUGH, true, false));
+						newOrders.push_back(std::make_shared<MoveOrder>(positions.at(k-1), Rot, MOVE_PASSINGTHROUGH, true, false));
 				}
 
 			}
@@ -61,14 +61,14 @@ void OrderPathfinding(Unit* unit, Map* map, std::vector<Order*> nos = std::vecto
 				int movetype = MOVE_FORMUP;
 				if(unit->enemyContact)
 					movetype = MOVE_PASSINGTHROUGH;
-				newOrders.push_back(new MoveOrder(w2.pos, Rot, movetype, true, true, mo->target));
+				newOrders.push_back(std::make_shared<MoveOrder>(w2.pos, Rot, movetype, true, true, mo->target));
 			}
 		}
 		newOrders.push_back(mo);
 		if(mo->type == ORDER_ATTACK)
-			newOrders.push_back(new MoveOrder(mo->pos, mo->rot, MOVE_FORMUP, true, true));
+			newOrders.push_back(std::make_shared<MoveOrder>(mo->pos, mo->rot, MOVE_FORMUP, true, true));
 		else if(mo->type == ORDER_TARGET) {
-			newOrders.push_back(new MoveOrder(mo->pos, mo->rot, MOVE_FORMUP, true, true));
+			newOrders.push_back(std::make_shared<MoveOrder>(mo->pos, mo->rot, MOVE_FORMUP, true, true));
 		}
 	}
 	while(nos.size() > start_order) unit->orders.pop_back(); // I cant use nos here, damnit

@@ -26,7 +26,8 @@ public:
 		_width = 0; _length = 0;
 		this->renderer = renderer;
 	};
-	~Texture() {free();}
+
+	virtual ~Texture() {free();}
 
 	int width() {return _width;}
 	int length() {return _length;}

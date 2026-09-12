@@ -8,6 +8,35 @@ void Model::CreateSimpleAI(Player* player) {
 	simpleAIs.push_back(new SimpleAI(player, this, this->em));
 }
 
+Model::~Model() {
+	// Projectiles are owned by model. ProjectileAnimations
+	// are owned (and freed) by ~View.
+	for(auto projectile : projectiles) delete projectile;
+	projectiles.clear();
+
+	for(auto ai : simpleAIs) delete ai;
+	simpleAIs.clear();
+
+	for(auto player : players) delete player;
+	players.clear();
+	units.clear();
+	soldiers.clear();
+	player1 = NULL; player2 = NULL; currentPlayer = NULL;
+
+	for(auto lock : unit_locks) {
+		omp_destroy_lock(lock);
+		delete lock;
+	}
+	unit_locks.clear();
+	for(auto lock : soldier_locks) {
+		omp_destroy_lock(lock);
+		delete lock;
+	}
+	soldier_locks.clear();
+
+	// map belongs to server.cpp.
+}
+
 void Model::GameStateCheck() {
 	switch(state) {
 	case MODEL_GAME_READY_TO_START: {
@@ -55,10 +84,10 @@ void Model::PlaceUnits() {
 		for(auto unit : player->units) {
 			if(!unit->placed) {
 				if(!unit->orders.empty()) {
-					Order* o = unit->orders.at(0);
+					Order* o = unit->orders.at(0).get();
 					if(o->type == ORDER_MOVE) {	// this is only triggered in simulation mode, if you try to place a unit with an attack order
-						UnitPlaceRequest* pev = new UnitPlaceRequest(unit, o->pos, o->rot);
-						em->Post(pev);
+						UnitPlaceRequest pev(unit, o->pos, o->rot);
+						em->Post(&pev);
 					}
 				}
 			}
@@ -145,17 +174,18 @@ void Model::ProjectileHitResolution() {
 }
 
 void Model::ProjectileCleanup() {
-	for(auto projectile : projectiles) {
+	for(auto it = projectiles.begin(); it != projectiles.end(); ) {
+		Projectile* projectile = *it;
 		if(projectile->longDead) {
-			Projectile* tempProj = projectile;
-			std::erase(projectiles, projectile);
-			//delete tempProj;	///////// VERY IMPORTANT
-		}
-		else if(projectile->dead) {
-			projectile->longDead = true;
+			it = projectiles.erase(it);
+			delete projectile;
 		}
 		else {
-			projectile->advance();
+			if(projectile->dead)
+				projectile->longDead = true;
+			else
+				projectile->advance();
+			it = std::next(it);
 		}
 	}
 }

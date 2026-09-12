@@ -43,6 +43,8 @@ public:
 		high = !high;
 	};
 	MapObject() {type = MAP_NONE;}
+
+	virtual ~MapObject() = default;
 };
 
 class MapCircle : public MapObject, public Circle {
@@ -149,6 +151,7 @@ public:
 
 	Map(int width, int height) : Map(width, height, optimalTileSize) {}
 	Map(std::string filename);	//defined in fileio.h
+	~Map();
 };
 
 void Map::init() {
@@ -313,6 +316,30 @@ void Map::createBorders() {
 	borders.push_back(new MapBorder(hl, ht, pos, rot));
 }
 
+Map::~Map() {
+	std::vector<MapObject*> owned = mapObjects;
+	for(auto border : borders) {
+		if(std::find(owned.begin(), owned.end(), border) == owned.end())
+			owned.push_back(border);
+	}
+	for(auto obj : owned) delete obj;	// virtual ~MapObject
+	mapObjects.clear();
+	waypoints.clear();
+	deploymentZones.clear();
+	borders.clear();
+
+	for(auto grid : grids) {
+		for(auto row : grid->grid) {
+			for(auto tile : row) {
+				delete tile->rec;
+				delete tile;
+			}
+		}
+		delete grid;
+	}
+	grids.clear();
+}
+
 void Map::Cleangrid() {
 	for(auto grid: grids) {
 		for(auto row: grid->grid) {
@@ -446,6 +473,9 @@ void Map::toggelBorders() {
 						}
 					}
 				}
+
+				if(std::find(borders.begin(), borders.end(), obj) == borders.end())
+					delete obj;
 			}
 		}
 		std::cout << "Toggled off map borders.\n";
@@ -498,12 +528,12 @@ void SoldierPolygonCollision(Soldier* soldier, Ppolygon* pol) {
 	Eigen::Matrix2d rot; Eigen::Matrix2d reversedRot;
 	Eigen::Vector2d solPos;
 	for(int i = 0; i < pol->corners.size(); i++) {
-		edge = pol->corners.at((i + 1)%pol->corners.size())->pos
-			- pol->corners.at(i)->pos;
+		edge = pol->corners.at((i + 1)%pol->corners.size()).pos
+			- pol->corners.at(i).pos;
 		len = edge.norm();
 		rot = Rotation(Angle(edge.coeff(1) / len, edge.coeff(0) / len));
 		reversedRot = rot.transpose();
-		solPos = reversedRot * (soldier->pos - pol->corners.at(i)->pos);
+		solPos = reversedRot * (soldier->pos - pol->corners.at(i).pos);
 		if(0 <= solPos.coeff(0) && solPos.coeff(0) <= len && 0 <= solPos.coeff(1)) {
 			minEdgeDist = abs(solPos.coeff(1));
 			closestEdge = i;
@@ -515,7 +545,7 @@ void SoldierPolygonCollision(Soldier* soldier, Ppolygon* pol) {
 	if(collision_type == COLLISION_CORNER) {
 		double minCornerDist; minCornerDist = std::numeric_limits<float>::infinity();
 		for(int i = 0; i < pol->corners.size(); i++) {
-			Eigen::Vector2d diff = soldier->pos - pol->corners.at(i)->pos;
+			Eigen::Vector2d diff = soldier->pos - pol->corners.at(i).pos;
 			double dist = diff.coeff(0)*diff.coeff(0) + diff.coeff(1)*diff.coeff(1);
 			if(dist < minCornerDist) {
 				minCornerDist = dist;
@@ -529,12 +559,12 @@ void SoldierPolygonCollision(Soldier* soldier, Ppolygon* pol) {
 	Eigen::Vector2d soldierPosCorrection; soldierPosCorrection << 0., 0.;
 	switch(collision_type) {
 	case COLLISION_EDGE: {
-		edge = pol->corners.at((closestEdge + 1)%pol->corners.size())->pos
-			- pol->corners.at(closestEdge)->pos;
+		edge = pol->corners.at((closestEdge + 1)%pol->corners.size()).pos
+			- pol->corners.at(closestEdge).pos;
 		len = edge.norm();
 		rot = Rotation(Angle(edge.coeff(1) / len, edge.coeff(0) / len));
 		reversedRot = rot.transpose();
-		solPos = reversedRot * (soldier->pos - pol->corners.at(closestEdge)->pos);
+		solPos = reversedRot * (soldier->pos - pol->corners.at(closestEdge).pos);
 		rotVel = reversedRot * soldier->vel;
 		if(rotVel.coeff(1) < 0 && solPos.coeff(1) < soldier->rad) {
 			rotVel(0) = 0;
@@ -546,7 +576,7 @@ void SoldierPolygonCollision(Soldier* soldier, Ppolygon* pol) {
 		}
 	}break;
 	case COLLISION_CORNER: {
-		solPos = soldier->pos - pol->corners.at(closestCorner)->pos;
+		solPos = soldier->pos - pol->corners.at(closestCorner).pos;
 		len = solPos.norm();
 		rot = Rotation(Angle(solPos.coeff(1) / len, solPos.coeff(0) / len));
 		reversedRot = rot.transpose();
@@ -594,9 +624,9 @@ void MapCircle::AutoWaypoints(double rad, Map* map) {
 void MapTriangle::AutoWaypoints(double rad, Map* map) {
 	for(int i = 0; i < corners.size(); i++) {
 		Eigen::Vector2d pos;
-		Corner* c1 = corners.at(i);
-		Corner* c2 = corners.at((i+1)%corners.size());
-		Corner* c3 = corners.at((i+2)%corners.size());
+		Corner* c1 = &corners.at(i);
+		Corner* c2 = &corners.at((i+1)%corners.size());
+		Corner* c3 = &corners.at((i+2)%corners.size());
 		Eigen::Vector2d p1 = c1->pos - c2->pos;
 		Eigen::Vector2d p3 = c3->pos - c2->pos;
 		Eigen::Matrix2d rot1 = Rotation(Angle(-p1.coeff(1)/p1.norm(), -p1.coeff(0)/p1.norm()));
@@ -656,6 +686,7 @@ void AutoWaypoints(double rad, Map* map) {
 	for(auto wp : wpreference) {
 		if(wp->_auto) {
 			map->RemoveMapObject(wp);
+			delete wp;
 		}
 	}
 	//creating new automatic waypoints
@@ -699,6 +730,7 @@ void AutoWaypoints(double rad, Map* map) {
 			}
 			if(collision) {
 				map->RemoveMapObject(wp);
+				delete wp;
 				break;
 			}
 		}

@@ -39,24 +39,22 @@ void close() {
 	renderer = NULL;
 }
 
+void CloseGame() {
+	/* Tears down everything OpenWindow() built. Has to be called before close(). Does not destroy map.*/
+	delete view;	view = NULL;
+	delete ctrl;	ctrl = NULL;
+	delete model;	model = NULL;
+	delete em;		em = NULL;
+}
+
 void OpenWindow(Map* map) {
 	em = new GameEventManager(30);
 	dynamic_cast<GameEventManager*>(em)->map = map;
 	model = new Model(em, map);
 	model->init();
 	dynamic_cast<GameEventManager*>(em)->model = model;
-	/*Player* player1 = new Player(true);
-	model->players.push_back(player1);
-	model->player1 = player1;
-	model->player1->model = model;
-	model->currentPlayer = model->player1;
-	Player* player2 = new Player(false);
-	model->players.push_back(player2);
-	model->player2 = player2;
-	model->player2->model = model;*/
 	model->LoadArmyLists("config/templates/armylist.json");
 	ctrl = new KeyboardAndMouseController(em, SCREEN_WIDTH, SCREEN_HEIGHT, map);
-	//SimpleAI* sai = new SimpleAI(model, em);
 	dynamic_cast<GameEventManager*>(em)->ctrl = ctrl;
 
 	//Creating window to get screen size
@@ -166,8 +164,11 @@ int main(int argc, char* argv[1]) {
 				ResetTextbox("Loading new map. Enter file name: ", true);
 			}
 			if(ctrl->inputConfirmed()) {
+				Map* oldMap = map;
 				map = new Map("maps/" + ctrl->input());
+				CloseGame();
 				close();
+				delete oldMap;
 				OpenWindow(map);
 			}
 			break;
@@ -179,7 +180,10 @@ int main(int argc, char* argv[1]) {
 	}
 
 	// Cleanup
+	CloseGame();
 	close();
+	delete map;	map = NULL;
+	TTF_Quit();
 	SDL_Quit();
-	return -1;
+	return 0;
 }
