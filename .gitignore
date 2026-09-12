@@ -4,6 +4,9 @@ out/
 .vs/
 CMakeUserPresets.json
 
+# Runtime diagnostic log written by Log::Init() (see include/logger.h).
+game.log
+
 # Local dev/test maps, not part of the shipped installer content (see
 # CMakeLists.txt's install(FILES maps/...) list for the tracked set).
 maps/bigmap.json

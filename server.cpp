@@ -8,6 +8,7 @@
 #include <view.h>
 #include <input.h>
 #include <simple_ai.h>
+#include <logger.h>
 
 #include <SDL.h>
 #include <stdio.h>
@@ -100,6 +101,8 @@ int main(int argc, char* argv[1]) {
 	freopen("CONOUT$", "w", stdout);
 	freopen("CONOUT$", "w", stderr);
 #endif
+
+	Log::Init();
 
 	// Initializing SDL
 	if(SDL_Init(SDL_INIT_EVERYTHING) != 0) {
